@@ -1,0 +1,125 @@
+{
+  "theme": "light_and_dark_toggle",
+  "archetype": "Swiss & High-Contrast",
+  "typography": {
+    "headings": "Manrope",
+    "body": "IBM Plex Sans",
+    "rules": [
+      "No Inter, Roboto, Open Sans.",
+      "Headlines > 32px must use tracking-tight.",
+      "Labels/Overlines must be uppercase, tiny, wide spacing (tracking-[0.2em]).",
+      "Do not exceed text-6xl for hero/headings.",
+      "H1: text-4xl sm:text-5xl lg:text-5xl tracking-tight font-black.",
+      "H2: text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+      "Body: text-base leading-relaxed"
+    ]
+  },
+  "colors": {
+    "strategy": "Functional Color. UI is mostly monochrome. Color exists to guide action.",
+    "light_mode": {
+      "background": "#FAFAFA",
+      "foreground": "#09090B",
+      "primary": "#09090B",
+      "primary_foreground": "#FAFAFA",
+      "accent": "#D9381E",
+      "border": "#E4E4E7",
+      "surface": "#FFFFFF"
+    },
+    "dark_mode": {
+      "background": "#09090B",
+      "foreground": "#FAFAFA",
+      "primary": "#FAFAFA",
+      "primary_foreground": "#09090B",
+      "accent": "#D9381E",
+      "border": "#27272A",
+      "surface": "#18181B"
+    },
+    "rules": [
+      "Never use pure black or pure gray. Always tint neutrally (e.g. Slate/Zinc).",
+      "Explicitly set hover states: hover:bg-zinc-800 hover:text-white.",
+      "Focus states must have higher contrast.",
+      "Text on surfaces must maintain 4.5:1 ratio."
+    ]
+  },
+  "spacing_and_layout": {
+    "grid_system": "High Density Grid (For Dashboards / Analytics). Base Grid: grid-cols-1 md:grid-cols-3 lg:grid-cols-4. Tight gaps (gap-4 or gap-6).",
+    "bento_rules": "Summary widgets: col-span-1. Primary Data: col-span-2 row-span-2. Every pixel utilized. h-full on children.",
+    "spacing_scale": "Use generous spacing internally: p-6, p-8 for containers. Add padding if container has a border to prevent text collision.",
+    "alignment": "Optical alignment over geometrical. Left-align dense content and forms. Do not center-align app container."
+  },
+  "surfaces_and_micro_themes": {
+    "dashboard_cards": "Flat background, 1px subtle border (border-border), no shadow. On hover: slight lift (-translate-y-1) and subtle shadow.",
+    "headers": "Crystal Glass: backdrop-blur-xl bg-white/70 (light) or bg-black/60 (dark). 1px delicate inner stroke (border-white/20).",
+    "grid_borders": "For data-heavy areas, use visible grid skeletons (border-collapse, border-r, border-b)."
+  },
+  "components_and_interactions": {
+    "navigation": "Collapsible left-sidebar (280px) for modules + Topbar for Global Search (Command Palette style) and Notification bell.",
+    "forms_and_inputs": "Shadcn components only. Do not use native HTML inputs. Left-aligned labels.",
+    "buttons": "Sharp edges (rounded-none or rounded-sm). Strong hover/active animations (scale down).",
+    "tables": "High density, screen-reader friendly. Subtle borders for rows, no excessive padding.",
+    "toasts": "Use Sonner for toasts.",
+    "charts": "Shadcn chart components / Recharts. Accessible color palettes."
+  },
+  "motion_and_animations": {
+    "rules": [
+      "Hover states for all interactive elements.",
+      "Entrance animations: staggered for lists and dashboard widgets.",
+      "Use specific transitions, NO transition-all.",
+      "Respect prefers-reduced-motion."
+    ]
+  },
+  "icons_and_assets": {
+    "icon_library": "@phosphor-icons/react (Dense dashboards need clear, geometric icons).",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1501619438411-47314d5a0580",
+        "description": "Brown wooden boards abstract",
+        "category": "auth_background"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1637088059539-ad62cba57895",
+        "description": "Abstract architectural window frame",
+        "category": "empty_state_illustration"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1505798577917-a65157d3320a",
+        "description": "Craftsman installing window / working",
+        "category": "onboarding_or_hero"
+      }
+    ]
+  },
+  "accessibility": {
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case, role-based.",
+    "contrast": "Minimum 4.5:1 for normal text.",
+    "aria": "Add aria-hidden='true' to purely decorative elements."
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid the 'AI slop' aesthetic. Make creative, distinctive frontends.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition (transition: all).",
+    "You MUST NOT center align the app container, i.e. do not add .App { text-align: center; }.",
+    "Always use modern button styles like sharp buttons with interaction animations & color relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Subtle grain textures, custom cursors, selection states, and loading animations separate good from extraordinary.",
+    "Main agent relies on the provided image URLs. NEVER use placeholder URLs (via.placeholder.com).",
+    "Prioritize using pre-existing components from src/components/ui. Examine them before creating new ones.",
+    "Use sonner for toasts.",
+    "Import Manrope and IBM Plex Sans from Google Fonts."
+  ],
+  "specific_instructions_for_infissi_express": {
+    "i18n": "Predispose i18n system. Default language: Italian (it). Only Italian visible initially.",
+    "currency_timezone": "EUR, Europe/Rome.",
+    "auth": "Custom email/password (no social login). Include Password Reset and First-time password change.",
+    "dashboard": "Widgets: counters, last activities, recent audits, notifications. Include North Star metric on top-left.",
+    "sidebar": "Modular navigation (Lead, Cliente, Preventivo, Contratto, ecc.).",
+    "topbar": "Global search (multi-collection), notification bell, user menu.",
+    "data_density": "High density data tables for manufacturing, precision layout, sharp UI edges.",
+    "audit_log": "Filterable Audit Log panel.",
+    "settings": "Company settings (data, logo, progressive numeration, locale)."
+  }
+}
