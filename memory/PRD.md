@@ -3,42 +3,35 @@
 ## Original Problem Statement
 Piattaforma SaaS cloud (Web based App, responsive) per la gestione end-to-end del ciclo di vita commerciale, tecnico, produttivo e post-vendita di un'azienda produttrice e installatrice di infissi. ERP verticale (M1-M10).
 
-## Milestone 1 (Full) — Implemented
-- Auth custom email/password + refresh token rotation, session revocation, brute-force lock
-- Password reset via email token, invitation acceptance, must_change_password flow
-- Users CRUD (create/invite/deactivate/unlock/resend), Roles CRUD (system + custom), Permissions matrix (28 keys)
-- Multi-tenant scaffolding (`tenant_id` = `company_id` on every entity)
-- Company settings (anagrafica, logo URL, locale/currency/timezone)
-- Audit log append-only + viewer with filters
-- Attachments: upload/list/download/delete, S3-compatible provider (local dev, S3 ready)
-- Progressive numerations (sequences) with year_reset + next atomic generator
-- Global search across users/roles/attachments/sequences/audit
-- Notifications (in-app), Sessions management, Email logs viewer
-- Dashboard with counters + recent activity + recent users
-- i18n predisposed (italiano attivo)
-- 20+ data-testid coverage for automated testing
+## Milestones — Completate
+
+### M1 (Fondazioni) — 2026-07-15
+Auth JWT + refresh rotation + jti, RBAC granulare (28 perms + 10 ruoli), audit append-only, allegati (S3-ready), numerazioni progressive, notifiche, sessioni, ricerca globale, dashboard, gestione utenti/ruoli/azienda. 34/34 test PASS.
+
+### M2 (CRM) — 2026-07-15
+- **Onboarding wizard** (5 step: azienda → logo → numerazioni → invito → primo lead → completato)
+- **Fase 1 CRM**: Lead con intelligenza vendita (probability, days_since_contact, next_action suggerita), Clienti (conversione da lead), Contatti, Pipeline commerciale (7 stage: Nuovo/Contattato/Qualificato/Preventivo/Trattativa/Vinto/Perso), **Timeline centrale** (ogni evento del sistema registra un'attività), Task, Note, Calendario settimanale
+- **Fase 2 CRM**: Comunicazioni telefonate (registrazione con esito/durata), email (mock provider dev, Resend prod-ready), WhatsApp (mock provider dev, Twilio prod-ready), promemoria, appuntamenti con calendar view, obiettivi (per user/periodo/metrica), regole provvigioni
+- **Fase 3 CRM**: Dashboard **role-adaptive** (endpoint /variant + rendering client) — Commerciale (lead aperti, appuntamenti oggi, task, pipeline ponderata, obiettivi, prossime azioni), Direzione (conversion rate, top performer, stage breakdown, fatturato acquisito), Produzione (placeholder M6), Posatore (placeholder M8)
+- **Global search estesa**: lead, clienti, contatti, attività, task, appuntamenti, utenti, allegati (multi-collection cross-tenant filtered)
+- 37/37 backend + 17/17 frontend test PASS
 
 ## Architecture
-- Backend: FastAPI + Motor (MongoDB) + PyJWT + bcrypt, modular routers under `/api`
+- Backend: FastAPI + Motor (MongoDB) + PyJWT + bcrypt, 27+ router `/api/*` modulari
 - Frontend: React 19 + Tailwind + Shadcn/UI + react-i18next + Zustand-ready + React Query
-- Storage: Local dev, S3-compatible provider abstraction ready for Emergent Object Storage
-- Email: Mock provider (dev), Resend provider stub for prod (behind interface)
+- Storage: Local dev, S3-compatible provider ready
+- Email: Mock (dev) + Resend (prod stub)
+- WhatsApp: Mock (dev) + Twilio (prod stub)
 
-## User Personas
-- Super Admin (system-wide)
-- Admin Azienda (tenant-wide, full)
-- Commerciale, Tecnico Rilievo, Produzione, Magazzino, Posatore, Amministrazione, Cliente, Viewer
+## Roadmap
+- **M3** Preventivatore + configuratori (serramenti/vetri/ferramenta/cassonetti/persiane/zanzariere) + PDF + contratti + firma
+- **M4** Rilievo tecnico + ordine esecutivo con blocco misure
+- **M5** Ordini fornitore + magazzino base + varianti/lotti
+- **M6** Produzione: distinte base + liste taglio + ottimizzazione barre + tracciabilità QR
+- **M7** Pianificazione + QC + non conformità
+- **M8** Prodotto finito + logistica + posa + verbali mobile
+- **M9** Assistenza + garanzie + portale cliente
+- **M10** Amministrazione + BI + cash flow + AI CFO
 
-## Roadmap (Backlog)
-- M2: CRM, lead, clienti, calendario, comunicazioni email/WhatsApp
-- M3: Preventivatore + configuratori + PDF + contratti + firma
-- M4: Rilievo tecnico + ordine esecutivo
-- M5: Ordini fornitore, acquisti, magazzino base
-- M6-M10: produzione, QC, posa, assistenza, BI, AI CFO
-
-## What's implemented (2026-07-15)
-Full Milestone 1 as above, italiano UI, admin seed + credentials in `/app/memory/test_credentials.md`.
-
-## Next Tasks
-- Test with testing_agent_v3 for validation
-- M2 planning: CRM + lead + clienti next
+## Test Credentials
+`/app/memory/test_credentials.md` — admin@infissiexpress.com / Admin!2025
