@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Play } from "@phosphor-icons/react";
 
@@ -111,7 +111,7 @@ function CreateSequenceDialog({ onSubmit, loading }) {
   const submit = (e) => { e.preventDefault(); onSubmit({ key: key.trim(), label, prefix, padding: Number(padding), year_reset: yr }); };
   return (
     <DialogContent className="rounded-sm" data-testid="create-sequence-dialog">
-      <DialogHeader><DialogTitle className="font-display tracking-tight">{t("sequences.add")}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle className="font-display tracking-tight">{t("sequences.add")}</DialogTitle><DialogDescription>Configura una nuova numerazione progressiva.</DialogDescription></DialogHeader>
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">

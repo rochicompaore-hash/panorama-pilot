@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -183,6 +183,7 @@ function CreateUserDialog({ roles, onSubmit, loading }) {
     <DialogContent className="rounded-sm max-w-lg" data-testid="create-user-dialog">
       <DialogHeader>
         <DialogTitle className="font-display tracking-tight">{t("users.add_user")}</DialogTitle>
+        <DialogDescription>Invita un nuovo utente specificando email, ruoli e opzioni.</DialogDescription>
       </DialogHeader>
       <form onSubmit={submit} className="space-y-4" data-testid="create-user-form">
         <div className="space-y-1.5">

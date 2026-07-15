@@ -23,6 +23,7 @@ def create_access_token(user_id: str, tenant_id: str, is_superadmin: bool = Fals
         "tenant_id": tenant_id,
         "is_superadmin": is_superadmin,
         "type": "access",
+        "jti": secrets.token_urlsafe(16),
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     }
@@ -35,6 +36,7 @@ def create_refresh_token(user_id: str, tenant_id: str, session_id: str) -> str:
         "tenant_id": tenant_id,
         "sid": session_id,
         "type": "refresh",
+        "jti": secrets.token_urlsafe(16),
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     }

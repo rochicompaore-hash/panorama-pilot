@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Trash, PencilSimple } from "@phosphor-icons/react";
 
@@ -154,7 +154,7 @@ function CreateRoleDialog({ onSubmit, loading }) {
   const submit = (e) => { e.preventDefault(); onSubmit({ name: name.trim(), description: desc || null, permission_keys: [] }); };
   return (
     <DialogContent className="rounded-sm" data-testid="create-role-dialog">
-      <DialogHeader><DialogTitle className="font-display tracking-tight">{t("roles.new_role")}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle className="font-display tracking-tight">{t("roles.new_role")}</DialogTitle><DialogDescription>Crea un nuovo ruolo personalizzato.</DialogDescription></DialogHeader>
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-1.5">
           <Label className="overline">{t("users.name")}</Label>
