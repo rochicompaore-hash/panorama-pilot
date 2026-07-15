@@ -18,6 +18,16 @@ import NotificationsPage from "@/pages/NotificationsPage";
 import SessionsPage from "@/pages/SessionsPage";
 import EmailLogsPage from "@/pages/EmailLogsPage";
 import SearchPage from "@/pages/SearchPage";
+import LeadsPage from "@/pages/LeadsPage";
+import LeadDetailPage from "@/pages/LeadDetailPage";
+import CustomersPage from "@/pages/CustomersPage";
+import CustomerDetailPage from "@/pages/CustomerDetailPage";
+import ContactsPage from "@/pages/ContactsPage";
+import TasksPage from "@/pages/TasksPage";
+import CalendarPage from "@/pages/CalendarPage";
+import GoalsPage from "@/pages/GoalsPage";
+import WhatsAppLogsPage from "@/pages/WhatsAppLogsPage";
+import OnboardingWizard from "@/pages/OnboardingWizard";
 import AppLayout from "@/layouts/AppLayout";
 
 function Protected({ children }) {
@@ -43,6 +53,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
         <Route path="/change-password" element={<ChangePassword />} />
+        <Route path="/onboarding" element={<Protected><OnboardingWizard /></Protected>} />
         <Route
           path="/"
           element={
@@ -53,6 +64,15 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="leads" element={<LeadsPage />} />
+          <Route path="leads/:id" element={<LeadDetailPage />} />
+          <Route path="customers" element={<CustomersPage />} />
+          <Route path="customers/:id" element={<CustomerDetailPage />} />
+          <Route path="contacts" element={<ContactsPage />} />
+          <Route path="tasks" element={<TasksPage />} />
+          <Route path="calendar" element={<CalendarPage />} />
+          <Route path="goals" element={<GoalsPage />} />
+          <Route path="whatsapp-logs" element={<WhatsAppLogsPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="roles" element={<RolesPage />} />
           <Route path="company" element={<CompanyPage />} />

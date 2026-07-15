@@ -37,6 +37,24 @@ async def ensure_indexes():
     await db.email_logs.create_index("created_at")
     await db.login_attempts.create_index("identifier")
     await db.login_attempts.create_index("expires_at")
+    # CRM indexes
+    await db.pipelines.create_index([("tenant_id", 1), ("is_default", 1)])
+    await db.leads.create_index([("tenant_id", 1), ("stage_id", 1)])
+    await db.leads.create_index([("tenant_id", 1), ("assigned_to", 1)])
+    await db.leads.create_index([("tenant_id", 1), ("lifecycle", 1)])
+    await db.customers.create_index([("tenant_id", 1)])
+    await db.contacts.create_index([("tenant_id", 1), ("customer_id", 1)])
+    await db.contacts.create_index([("tenant_id", 1), ("lead_id", 1)])
+    await db.activities.create_index([("tenant_id", 1), ("lead_id", 1), ("occurred_at", -1)])
+    await db.activities.create_index([("tenant_id", 1), ("customer_id", 1), ("occurred_at", -1)])
+    await db.activities.create_index([("tenant_id", 1), ("type", 1)])
+    await db.tasks.create_index([("tenant_id", 1), ("assigned_to", 1), ("task_status", 1)])
+    await db.tasks.create_index([("tenant_id", 1), ("due_at", 1)])
+    await db.appointments.create_index([("tenant_id", 1), ("start_at", 1)])
+    await db.appointments.create_index([("tenant_id", 1), ("attendees", 1)])
+    await db.goals.create_index([("tenant_id", 1), ("user_id", 1), ("period_start", -1)])
+    await db.commission_rules.create_index([("tenant_id", 1)])
+    await db.whatsapp_logs.create_index([("tenant_id", 1), ("created_at", -1)])
 
 
 async def seed_permissions():
@@ -167,5 +185,8 @@ async def run_seed():
     roles = await seed_roles(company_id)
     await seed_sequences(company_id)
     await seed_super_admin(company_id, roles["super_admin"])
+    # Seed default pipeline (M2)
+    from app.routers.pipelines import seed_default_pipeline
+    await seed_default_pipeline(company_id)
     await write_test_credentials()
     logger.info("Seed completed. Company=%s", company_id)

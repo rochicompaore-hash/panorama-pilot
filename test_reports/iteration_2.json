@@ -1,0 +1,68 @@
+{
+  "summary": "Full E2E test of Infissi Express Cloud M2 (CRM). Backend: 37/37 M2 pytest tests pass (onboarding wizard 5 steps + complete, pipelines default+custom, leads CRUD/kanban/stage-change/convert/soft-delete, customers CRUD, contacts linked to lead, activities+comms including MOCKED email and MOCKED WhatsApp with whatsapp_logs, tasks with mark-done timeline, appointments with mark-done, goals CRUD, dashboards variant=direction+sales, extended global search finds leads). Frontend: 17/17 UI flows pass (login, direction dashboard renders 'Vista Direzione' + top performers + stage breakdown + all 8 counters, sidebar CRM group with 6 nav items, /leads kanban with 7 columns, new lead dialog creates lead, /leads/:id detail with ActivityLogger and note submit, customer + task + calendar + goals + whatsapp-logs pages load, global search shows lead+activity results). M1 refresh-token bug from iteration_1 is FIXED (JWT payload now contains `jti` claim). No blocking bugs found in M2.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/dashboard-crm/production and /installer",
+        "issue": "Return placeholders (counters all 0) — intentional per code comment ('Modulo produzione disponibile dalla Milestone 6'). Flagged only so it's not mistaken for a bug."
+      },
+      {
+        "endpoint": "POST /api/onboarding/step-first-lead",
+        "issue": "Requires permission crm.leads.create even during onboarding. If an admin re-runs the wizard for a role without CRM leads create, this step will 403. Acceptable for superadmin/Admin Azienda usage but might block Commerciale role from finishing wizard for someone else."
+      },
+      {
+        "endpoint": "GET /api/pipelines/default",
+        "issue": "Endpoint auto-seeds a default pipeline via seed_default_pipeline on first request if none exists. Fine, but this means the first GET is not idempotent-read (it may create). Consider decoupling seed from GET or make POST /pipelines/seed explicit."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Dashboard (Direction)",
+        "issues": [
+          "Variant selection is async — brief blank state on first paint before /dashboard-crm/variant resolves (no skeleton for the whole page). Consider optimistic 'core' skeleton, then swap."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/crm_m2_test.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/m2_results.xml"
+  ],
+  "action_items": [
+    "None blocking for M2 acceptance.",
+    "(Optional) Add a top-level skeleton / loading spinner on Dashboard while the variant query is in flight so the page isn't briefly blank.",
+    "(Optional) Decouple pipeline auto-seeding from GET /pipelines/default (move to explicit seed at company creation)."
+  ],
+  "critical_code_review_comments": [
+    "app/routers/dashboards_crm.py::direction — uses find(... won_at{$gte:start_month}) but M2 stores won_at as ISO string; string comparison with an ISO start-of-month string works because ISO-8601 is lexicographically sortable at second precision, but be aware if any code path writes non-ISO or with a different timezone offset the query silently misses records.",
+    "app/routers/appointments.py::list_appointments — from_date/to_date filters compare ISO strings against `start_at` field; same string-comparison caveat as above. Works because clients send ISO+Z, but Pydantic-serialized appointments may store as datetime objects on model_dump; to_mongo should normalise, but this reliance is fragile.",
+    "app/routers/onboarding.py::step_invite — creates a User with must_change_password=True and password_hash=None BEFORE the invitation is accepted. If /auth/login is somehow called for that email with an empty password it should be rejected by _verify_password (bcrypt on None). Verify _verify_password handles None hash defensively.",
+    "app/services/timeline.py::record_activity — silently drops errors? No — errors will propagate. But comment says 'Never blocks main flow' which is not enforced. Consider try/except around the DB write so a lead create doesn't fail if activities collection has an issue.",
+    "app/routers/leads.py::update_lead::patch — sets probability from stage default only when 'probability' not in payload — good. But when moving BACK from a won/lost stage to open, `won_at`/`lost_at` are not cleared. If a user accidentally moves to Vinto then back, the lead keeps a stale won_at and will still count in Direction 'won_month'. Recommend clearing won_at/lost_at on transition to a non-terminal stage.",
+    "app/routers/activities.py::send_email_action — uses `body.body.replace(chr(10), '<br>')` to build HTML — no HTML escaping first, so an attacker with crm.comms.email permission could inject HTML/tracking pixels into the mock email log. Since this is dev-only mock the impact is low, but consider html.escape first when Twilio/SendGrid is wired.",
+    "app/routers/search.py — 8 sequential collection queries with regex; no compound text index and no aggregation. Works at low volume but at 10k+ leads this will be slow. Consider mongodb text index or Atlas Search post-M2.",
+    "app/routers/leads.py::kanban — pipeline_id path parameter is set from seed_default_pipeline() but the second query uses `_id == pipeline_id` without deleted_at:null filter — a soft-deleted default pipeline could return a stale 404 path. Cheap fix: add deleted_at: None to that query too.",
+    "app/models_crm.py::Appointment — no soft-delete filter on `deleted_at: None` when calling appointments/{id} in DELETE (it just $sets deleted_at). GET list correctly filters. OK.",
+    "Onboarding step-first-lead requires crm.leads.create — inconsistent with the wizard being a company-admin task. Consider allowing users.create + company.edit holder to create the demo lead too."
+  ],
+  "updated_files": [
+    "/app/backend/tests/crm_m2_test.py (new — 37 tests, all pass)"
+  ],
+  "success_rate": {
+    "backend": "100% (37/37 M2 tests, plus M1 baseline still 34/34 per iteration_1)",
+    "frontend": "100% of tested M2 flows (17/17 checks)"
+  },
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "M2 tests create TEST_*-prefixed and freshly-uuid'd leads/customers/contacts/tasks/appointments/goals/whatsapp-logs. Kanban+timeline data intentionally left in DB for UI verification. Onboarding wizard state was completed=true at end (used seq/prefixes reset to PRV-/ORD-). One TEST_Pipe_XXXX custom pipeline was left in DB. Recommend the main agent optionally purge tenant with a `find({tags:'TEST'})` batch delete before real user testing.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "M2 test suite lives at /app/backend/tests/crm_m2_test.py (37 tests) and can be run via `cd /app/backend && pytest tests/crm_m2_test.py -v`. Uses pytest-xdist loadscope so each class stays on one worker. The direction dashboard variant is async — always wait_for_selector('[data-testid=cd-top]') or a short (~2s) sleep after navigating to /dashboard before asserting. The refresh-token bug from iteration_1 is FIXED (JWT now includes jti claim). WhatsApp provider is set to WHATSAPP_PROVIDER=mock in env, so send-whatsapp returns status='sent' immediately with a mock_ prefixed provider_message_id — no external calls. Email is same (mock). All UI testids follow the pattern documented in review_request (nl-*, nc-*, nt-*, cd-*, cs-*, cal-day-*, kanban-col-*, kanban-card-*, logger-tab-*, etc.). If M3 (quotes/orders) starts, keep tests idempotent since STATE dict is per-class.",
+  "rca of the issue": "No blocking issues to RCA in M2. The initial playwright flake for cd-top/cd-stages was a test-side race: /dashboard-crm/variant is fetched async on mount and until it resolves the Dashboard component renders CoreDashboard (which has no cd-* testids). Adding a wait_for_timeout(2000) after wait_for_url('**/dashboard**') resolves it — confirmed on the second run where all cd-* testids and 'Vista Direzione' overline are present."
+}

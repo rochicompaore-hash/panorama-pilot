@@ -43,6 +43,44 @@ PERMISSION_CATALOG = [
     ("workflow.assign", "Workflow", "assign", "Assegna incarichi"),
     ("workflow.change_status", "Workflow", "change_status", "Modifica stato documenti"),
     ("workflow.export", "Workflow", "export", "Esporta dati"),
+    # CRM - Leads
+    ("crm.leads.view", "CRM Lead", "view", "Visualizza lead"),
+    ("crm.leads.create", "CRM Lead", "create", "Crea lead"),
+    ("crm.leads.edit", "CRM Lead", "edit", "Modifica lead"),
+    ("crm.leads.delete", "CRM Lead", "delete", "Elimina lead"),
+    ("crm.leads.assign", "CRM Lead", "assign", "Assegna lead ad un commerciale"),
+    ("crm.leads.convert", "CRM Lead", "approve", "Converti lead in cliente"),
+    # CRM - Customers
+    ("crm.customers.view", "CRM Clienti", "view", "Visualizza clienti"),
+    ("crm.customers.create", "CRM Clienti", "create", "Crea clienti"),
+    ("crm.customers.edit", "CRM Clienti", "edit", "Modifica clienti"),
+    ("crm.customers.delete", "CRM Clienti", "delete", "Elimina clienti"),
+    # CRM - Contacts
+    ("crm.contacts.view", "CRM Contatti", "view", "Visualizza contatti"),
+    ("crm.contacts.manage", "CRM Contatti", "edit", "Gestisce contatti"),
+    # CRM - Pipelines
+    ("crm.pipelines.view", "CRM Pipeline", "view", "Visualizza pipeline"),
+    ("crm.pipelines.manage", "CRM Pipeline", "edit", "Gestisce pipeline"),
+    # CRM - Activities / Timeline
+    ("crm.activities.view", "CRM Timeline", "view", "Visualizza timeline attività"),
+    ("crm.activities.create", "CRM Timeline", "create", "Registra attività"),
+    # CRM - Comms
+    ("crm.comms.email", "Comunicazioni", "create", "Invia email"),
+    ("crm.comms.whatsapp", "Comunicazioni", "create", "Invia WhatsApp"),
+    ("crm.comms.call", "Comunicazioni", "create", "Registra telefonata"),
+    # CRM - Tasks
+    ("crm.tasks.view", "Task", "view", "Visualizza task"),
+    ("crm.tasks.manage", "Task", "edit", "Gestisce task"),
+    # CRM - Appointments
+    ("crm.appointments.view", "Appuntamenti", "view", "Visualizza appuntamenti"),
+    ("crm.appointments.manage", "Appuntamenti", "edit", "Gestisce appuntamenti"),
+    # CRM - Sales targets
+    ("crm.goals.view", "Obiettivi", "view", "Visualizza obiettivi"),
+    ("crm.goals.manage", "Obiettivi", "edit", "Gestisce obiettivi"),
+    ("crm.commissions.view", "Provvigioni", "view", "Visualizza provvigioni"),
+    ("crm.commissions.manage", "Provvigioni", "edit", "Gestisce provvigioni"),
+    # Onboarding
+    ("onboarding.access", "Onboarding", "view", "Accesso wizard onboarding"),
 ]
 
 # Predefined roles with permissions
@@ -61,12 +99,22 @@ PREDEFINED_ROLES = {
     },
     "commerciale": {
         "name": "Commerciale",
-        "description": "Ruolo commerciale (preparato per moduli futuri CRM/preventivi)",
+        "description": "Ruolo commerciale (CRM completo, preventivi in M3)",
         "is_system": True,
         "permissions": [
             "dashboard.view", "notifications.view", "search.global",
             "attachments.view", "attachments.create", "attachments.download",
             "financials.view", "workflow.assign", "workflow.change_status",
+            "crm.leads.view", "crm.leads.create", "crm.leads.edit", "crm.leads.assign", "crm.leads.convert",
+            "crm.customers.view", "crm.customers.create", "crm.customers.edit",
+            "crm.contacts.view", "crm.contacts.manage",
+            "crm.pipelines.view",
+            "crm.activities.view", "crm.activities.create",
+            "crm.comms.email", "crm.comms.whatsapp", "crm.comms.call",
+            "crm.tasks.view", "crm.tasks.manage",
+            "crm.appointments.view", "crm.appointments.manage",
+            "crm.goals.view", "crm.commissions.view",
+            "onboarding.access",
         ],
     },
     "tecnico_rilievo": {

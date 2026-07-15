@@ -26,6 +26,16 @@ from app.routers.search import router as search_router
 from app.routers.sessions import router as sessions_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.email_logs import router as email_logs_router
+from app.routers.onboarding import router as onboarding_router
+from app.routers.pipelines import router as pipelines_router
+from app.routers.leads import router as leads_router
+from app.routers.customers import router as customers_router
+from app.routers.contacts import router as contacts_router
+from app.routers.activities import router as activities_router
+from app.routers.tasks import router as tasks_router
+from app.routers.appointments import router as appointments_router
+from app.routers.sales import goals_router, commissions_router
+from app.routers.dashboards_crm import router as dashboards_crm_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,6 +77,17 @@ api.include_router(search_router)
 api.include_router(sessions_router)
 api.include_router(dashboard_router)
 api.include_router(email_logs_router)
+api.include_router(onboarding_router)
+api.include_router(pipelines_router)
+api.include_router(leads_router)
+api.include_router(customers_router)
+api.include_router(contacts_router)
+api.include_router(activities_router)
+api.include_router(tasks_router)
+api.include_router(appointments_router)
+api.include_router(goals_router)
+api.include_router(commissions_router)
+api.include_router(dashboards_crm_router)
 
 app.include_router(api)
 

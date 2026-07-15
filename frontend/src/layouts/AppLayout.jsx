@@ -6,6 +6,8 @@ import { api } from "@/api/client";
 import {
   House, Users, ShieldCheck, Buildings, Hash, Files, ClockCounterClockwise,
   Bell, Devices, EnvelopeSimple, MagnifyingGlass, SignOut, List, X, CaretDown,
+  UserCircle, IdentificationCard, ListChecks, CalendarBlank, Target, WhatsappLogo,
+  Kanban,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,8 +26,19 @@ const NAV = [
     items: [
       { to: "/dashboard", i18n: "nav.dashboard", icon: House, perm: "dashboard.view" },
       { to: "/search", i18n: "nav.search", icon: MagnifyingGlass, perm: "search.global" },
-      { to: "/attachments", i18n: "nav.attachments", icon: Files, perm: "attachments.view" },
       { to: "/notifications", i18n: "nav.notifications", icon: Bell, perm: null },
+    ],
+  },
+  {
+    group: "crm",
+    items: [
+      { to: "/leads", i18n: "nav.leads", icon: Kanban, perm: "crm.leads.view" },
+      { to: "/customers", i18n: "nav.customers", icon: UserCircle, perm: "crm.customers.view" },
+      { to: "/contacts", i18n: "nav.contacts", icon: IdentificationCard, perm: "crm.contacts.view" },
+      { to: "/tasks", i18n: "nav.tasks", icon: ListChecks, perm: "crm.tasks.view" },
+      { to: "/calendar", i18n: "nav.calendar", icon: CalendarBlank, perm: "crm.appointments.view" },
+      { to: "/goals", i18n: "nav.goals", icon: Target, perm: "crm.goals.view" },
+      { to: "/attachments", i18n: "nav.attachments", icon: Files, perm: "attachments.view" },
     ],
   },
   {
@@ -43,6 +56,7 @@ const NAV = [
       { to: "/audit", i18n: "nav.audit", icon: ClockCounterClockwise, perm: "audit.view" },
       { to: "/sessions", i18n: "nav.sessions", icon: Devices, perm: null },
       { to: "/email-logs", i18n: "nav.email_logs", icon: EnvelopeSimple, perm: "audit.view" },
+      { to: "/whatsapp-logs", i18n: "nav.whatsapp_logs", icon: WhatsappLogo, perm: "audit.view" },
     ],
   },
 ];
@@ -128,7 +142,7 @@ export default function AppLayout() {
         <div className="overline">Infissi Express</div>
         <div className="font-display text-lg font-black tracking-tight mt-1">CLOUD ERP</div>
         <div className="mt-2 text-[10px] font-mono-plex text-muted-foreground">
-          M1 · FONDAZIONI
+          M2 · CRM
         </div>
       </div>
       <div className="flex-1 overflow-y-auto pb-4">
