@@ -1,54 +1,71 @@
-import { useEffect } from "react";
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import { useAuth } from "@/contexts/AuthContext";
+import Login from "@/pages/Login";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import AcceptInvitation from "@/pages/AcceptInvitation";
+import ChangePassword from "@/pages/ChangePassword";
+import Dashboard from "@/pages/Dashboard";
+import UsersPage from "@/pages/UsersPage";
+import RolesPage from "@/pages/RolesPage";
+import CompanyPage from "@/pages/CompanyPage";
+import SequencesPage from "@/pages/SequencesPage";
+import AttachmentsPage from "@/pages/AttachmentsPage";
+import AuditPage from "@/pages/AuditPage";
+import NotificationsPage from "@/pages/NotificationsPage";
+import SessionsPage from "@/pages/SessionsPage";
+import EmailLogsPage from "@/pages/EmailLogsPage";
+import SearchPage from "@/pages/SearchPage";
+import AppLayout from "@/layouts/AppLayout";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+function Protected({ children }) {
+  const { user } = useAuth();
+  if (user === undefined) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="overline" data-testid="app-loading">Caricamento…</div>
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.must_change_password) return <Navigate to="/change-password" replace />;
+  return children;
+}
 
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/accept-invitation" element={<AcceptInvitation />} />
+        <Route path="/change-password" element={<ChangePassword />} />
+        <Route
+          path="/"
+          element={
+            <Protected>
+              <AppLayout />
+            </Protected>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="roles" element={<RolesPage />} />
+          <Route path="company" element={<CompanyPage />} />
+          <Route path="sequences" element={<SequencesPage />} />
+          <Route path="attachments" element={<AttachmentsPage />} />
+          <Route path="audit" element={<AuditPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="sessions" element={<SessionsPage />} />
+          <Route path="email-logs" element={<EmailLogsPage />} />
+          <Route path="search" element={<SearchPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }

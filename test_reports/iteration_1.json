@@ -1,0 +1,59 @@
+{
+  "summary": "First full-stack E2E test of Infissi Express Cloud M1. Backend: 34/34 pytest tests pass (auth full flow, users CRUD + invitation + RBAC, roles + permissions matrix, company, sequences, attachments upload/download/delete + limits, audit, notifications, sessions, search, dashboard, email logs). Frontend: login redirects to dashboard, all 10 sidebar navigations load correctly, user creation, sequences, attachments upload, company page, global search all work. Found 1 CRITICAL security bug: refresh-token rotation produces byte-identical tokens when two refreshes happen in the same second (JWT iat is seconds-precision and payload has no jti/nonce), silently defeating reuse-detection.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/auth/refresh (app/security.py::create_refresh_token)",
+        "issue": "Refresh-token rotation is not guaranteed to produce a different token. JWT payload uses seconds-precision `iat` and no `jti`/nonce claim, so two successive create_refresh_token(user, tenant, sid) calls executed within the same second yield byte-identical tokens. Effect: (1) old refresh token still authenticates because its sha256 hash equals the newly-stored one, and (2) the token-reuse detection branch in /auth/refresh is unreachable in the fast path, so a leaked refresh token would not trigger session revocation as long as it is used quickly. Fix: add `\"jti\": secrets.token_urlsafe(16)` (or uuid4 hex) to the refresh-token payload (and ideally also to access-token). Regression covered by test_refresh_rotation_and_reuse_detection (currently only passes because of an inserted time.sleep(1.1)).",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Dialogs (Create user, Create role, etc.)",
+        "issues": [
+          "Console warning: 'Missing `Description` or `aria-describedby={undefined}` for {DialogContent}'. Add <DialogDescription> (or aria-describedby) to every shadcn DialogContent for a11y."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "SECURITY: Add a per-token `jti` claim (uuid4/token_urlsafe) in app/security.create_refresh_token so refresh-token rotation always produces a distinct token, restoring correct reuse-detection semantics. Consider same for create_access_token.",
+    "A11y: Add DialogDescription (or aria-describedby) to shadcn DialogContent instances (Users create dialog at minimum)."
+  ],
+  "critical_code_review_comments": [
+    "app/security.py::create_refresh_token — missing nonce/jti; iat has seconds precision => rotation can emit identical tokens (see critical bug above).",
+    "app/routers/auth.py::_set_auth_cookies uses secure=False and samesite=lax. Acceptable for the preview HTTP flow but should be secure=True + SameSite=None when running behind HTTPS in production; consider driving from settings.",
+    "app/routers/auth.py::login — brute-force identifier is `f\"{ip}:{email}\"`. Works, but behind a shared proxy egressing many users a single ip:email is fine; however, user account is never locked on the user row itself (locked_until on users doc is not set on failed logins). users.locked_until / failed_login_attempts fields are declared but never updated on failed login (only cleared on unlock/reset). If that is intentional (rate-limit is pure IP:email based), fine; otherwise the model fields are dead.",
+    "app/routers/auth.py::refresh — success path returns access+refresh in JSON body AND sets them as httpOnly cookies. Client should not need both, but the axios interceptor uses body values. OK.",
+    "app/routers/attachments.py — reads full file into memory before size check. For a 25MB limit that is fine, but any client can force allocation of up to (memory) bytes because FastAPI has already buffered the multipart. Consider checking Content-Length header up-front for large uploads.",
+    "app/routers/sequences.py::next_number — year-reset resets current_number before the atomic $inc. There is a small race between the read and the $set for year rollover on Jan 1 (two callers both see year mismatch and both reset). Use `find_one_and_update` with a filter on current_year to atomically reset.",
+    "app/deps.py::get_current_user reads cookie 'access_token' first, Bearer fallback second — standard and correct.",
+    "app/services/storage.py::LocalStorageProvider does not validate that the resolved absolute path is inside settings.STORAGE_LOCAL_PATH. `build_key` sanitizes filenames so path traversal is unlikely, but adding a `os.path.commonpath` assertion in _path would harden it.",
+    "server.py CORS: when CORS_ORIGINS='*' the code uses allow_origin_regex='.*' + allow_credentials=True. That is functionally equivalent to '*' + credentials, which is not spec-compliant and browsers may reject. Fine for dev, but production must set a concrete origin list.",
+    "Multiple routers import `require_any_permission` but only `require_permission` is used in the checked routers — dead import in attachments.py."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (34/34)",
+    "frontend": "100% of tested flows"
+  },
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Tests create TEST_* named roles and unique test.user.<uuid>@infissiexpress.com users. Users get soft-deleted at end of TestUsersCRUD. Custom TEST_ roles get hard-deleted. One notification and one attachment are created; attachment is deleted, notification is left as read.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest suite lives in /app/backend/tests/backend_test.py and is driven by /app/backend/pytest.ini (xdist loadscope, 2 workers). STATE dict is per-worker but pytest-xdist loadscope pins each class to a single worker so intra-class ordered flows work. If the main agent fixes the refresh-token jti bug, remove the `time.sleep(1.1)` in test_refresh_rotation_and_reuse_detection to prove rotation is now cryptographically distinct (not just time-distinct). Frontend E2E was smoke-only via Playwright; deeper checks (e.g. must-change-password flow, invitation acceptance in UI, forgot-password UI, RBAC-driven sidebar hiding for viewer, permission matrix toggling with save) still need coverage.",
+  "rca of the issue": "create_refresh_token(user_id, tenant_id, session_id) encodes {sub, tenant_id, sid, type='refresh', iat: now(seconds), exp: now+7d}. During /auth/refresh the same three positional inputs are passed again with the same session_id. jwt.encode is deterministic for identical payloads + secret, and datetime.now precision in the JWT lib truncates to seconds. Therefore, if the second call executes in the same wall-second as the first, iat is identical => payload identical => JWT bytes identical. The DB session row is then updated with hash(new_token)==hash(old_token), so the OLD token still passes the equality check in the reuse-detection branch. Reproduction: two rapid POST /api/auth/refresh calls. Mitigation: add `\"jti\": secrets.token_urlsafe(16)` in both create_access_token and create_refresh_token payloads."
+}

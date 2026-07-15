@@ -1,0 +1,32 @@
+import os
+
+class Settings:
+    MONGO_URL: str = os.environ["MONGO_URL"]
+    DB_NAME: str = os.environ["DB_NAME"]
+    JWT_SECRET: str = os.environ["JWT_SECRET"]
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    INVITATION_EXPIRE_HOURS: int = int(os.environ.get("INVITATION_EXPIRE_HOURS", "72"))
+    PASSWORD_RESET_EXPIRE_MINUTES: int = int(os.environ.get("PASSWORD_RESET_EXPIRE_MINUTES", "30"))
+    MAX_FAILED_LOGIN_ATTEMPTS: int = int(os.environ.get("MAX_FAILED_LOGIN_ATTEMPTS", "5"))
+    LOGIN_LOCK_MINUTES: int = int(os.environ.get("LOGIN_LOCK_MINUTES", "15"))
+    ADMIN_EMAIL: str = os.environ.get("ADMIN_EMAIL", "admin@infissiexpress.local")
+    ADMIN_PASSWORD: str = os.environ.get("ADMIN_PASSWORD", "Admin!2025")
+    ADMIN_COMPANY_NAME: str = os.environ.get("ADMIN_COMPANY_NAME", "Infissi Express SRL")
+    EMAIL_PROVIDER: str = os.environ.get("EMAIL_PROVIDER", "mock")
+    RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")
+    EMAIL_FROM: str = os.environ.get("EMAIL_FROM", "no-reply@infissiexpress.local")
+    EMAIL_FROM_NAME: str = os.environ.get("EMAIL_FROM_NAME", "Infissi Express Cloud")
+    APP_BASE_URL: str = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    STORAGE_PROVIDER: str = os.environ.get("STORAGE_PROVIDER", "local")
+    STORAGE_LOCAL_PATH: str = os.environ.get("STORAGE_LOCAL_PATH", "/app/storage")
+    S3_BUCKET: str = os.environ.get("S3_BUCKET", "")
+    S3_ENDPOINT: str = os.environ.get("S3_ENDPOINT", "")
+    S3_ACCESS_KEY: str = os.environ.get("S3_ACCESS_KEY", "")
+    S3_SECRET_KEY: str = os.environ.get("S3_SECRET_KEY", "")
+    S3_REGION: str = os.environ.get("S3_REGION", "eu-west-1")
+    MAX_UPLOAD_SIZE_MB: int = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "25"))
+    CORS_ORIGINS: str = os.environ.get("CORS_ORIGINS", "*")
+
+settings = Settings()
