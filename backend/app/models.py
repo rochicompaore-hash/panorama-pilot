@@ -44,25 +44,57 @@ class CompanySettings(BaseModel):
 class Company(BaseDoc):
     name: str
     legal_name: Optional[str] = None
+    commercial_name: Optional[str] = None
     vat_number: Optional[str] = None
     tax_code: Optional[str] = None
+    rea: Optional[str] = None
+    share_capital: Optional[str] = None
+    # Legal HQ
+    legal_address: Optional[str] = None
+    legal_city: Optional[str] = None
+    legal_zip: Optional[str] = None
+    legal_province: Optional[str] = None
+    # Operational HQ (fallback = legal)
     address: Optional[str] = None
     city: Optional[str] = None
     zip_code: Optional[str] = None
     province: Optional[str] = None
     country: str = "IT"
+    # Contacts
     phone: Optional[str] = None
     email: Optional[str] = None
+    pec: Optional[str] = None
     website: Optional[str] = None
+    sdi_code: Optional[str] = None
+    # Bank
+    iban: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_holder: Optional[str] = None
+    # Branding
     logo_url: Optional[str] = None
+    logo_secondary_url: Optional[str] = None
+    signature_url: Optional[str] = None
+    stamp_url: Optional[str] = None
+    primary_color: str = "#0F1720"
+    secondary_color: str = "#D42027"
+    # Additional
+    certifications: List[str] = Field(default_factory=list)
+    legal_notes: Optional[str] = None
     settings: CompanySettings = Field(default_factory=CompanySettings)
 
 
 class CompanyUpdate(BaseModel):
     name: Optional[str] = None
     legal_name: Optional[str] = None
+    commercial_name: Optional[str] = None
     vat_number: Optional[str] = None
     tax_code: Optional[str] = None
+    rea: Optional[str] = None
+    share_capital: Optional[str] = None
+    legal_address: Optional[str] = None
+    legal_city: Optional[str] = None
+    legal_zip: Optional[str] = None
+    legal_province: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     zip_code: Optional[str] = None
@@ -70,8 +102,20 @@ class CompanyUpdate(BaseModel):
     country: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    pec: Optional[str] = None
     website: Optional[str] = None
+    sdi_code: Optional[str] = None
+    iban: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_holder: Optional[str] = None
     logo_url: Optional[str] = None
+    logo_secondary_url: Optional[str] = None
+    signature_url: Optional[str] = None
+    stamp_url: Optional[str] = None
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
+    certifications: Optional[List[str]] = None
+    legal_notes: Optional[str] = None
     settings: Optional[CompanySettings] = None
 
 

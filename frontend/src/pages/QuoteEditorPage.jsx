@@ -18,6 +18,8 @@ import { AutosaveIndicator } from "@/components/app/AutosaveIndicator";
 import { useConflict, getVersion, withVersion, withForce } from "@/hooks/useConflict";
 import { useAutosave } from "@/hooks/useAutosave";
 import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { FilePdf, Download, Eye, CaretDown } from "@phosphor-icons/react";
 
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0); } catch { return "€ 0"; } }
 
@@ -122,6 +124,49 @@ export default function QuoteEditorPage() {
     onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
   });
 
+  // PDF actions (M3.3.2)
+  const { data: pdfsResp } = useQuery({
+    queryKey: ["quote-pdfs", id],
+    queryFn: async () => (await api.get(`/quotes/${id}/pdfs`)).data,
+    enabled: !!q,
+  });
+  const pdfs = pdfsResp?.items || [];
+  const latestDef = pdfs.find((p) => p.kind === "definitive" && !p.invalidated_at);
+  const previewPdf = useMutation({
+    mutationFn: async () => (await api.post(`/quotes/${id}/pdf/preview`, {})).data,
+    onSuccess: async (d) => {
+      toast.success("Anteprima BOZZA generata");
+      window.open(`${api.defaults.baseURL}/quote-pdfs/${d.id}/download`, "_blank");
+      qc.invalidateQueries({ queryKey: ["quote-pdfs", id] });
+    },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
+  });
+  const generatePdf = useMutation({
+    mutationFn: async (opts = {}) => (await api.post(`/quotes/${id}/pdf/generate`, opts)).data,
+    onSuccess: (d) => {
+      if (d.idempotent_hit) toast.info("Nessuna modifica: rigenerazione idempotente"); else toast.success("PDF definitivo emesso");
+      qc.invalidateQueries({ queryKey: ["quote-pdfs", id] });
+      qc.invalidateQueries({ queryKey: ["quote", id] });
+    },
+    onError: (e) => {
+      const err = e.response?.data?.detail;
+      if (err && typeof err === "object" && err.errors) {
+        toast.error(`Validazione fallita:\n${err.errors.map((x) => "• " + x.message).join("\n")}`, { duration: 8000 });
+      } else {
+        toast.error(formatApiError(err) || e.message);
+      }
+    },
+  });
+  const downloadPdf = (pid, filename) => {
+    // Download via authenticated axios stream
+    api.get(`/quote-pdfs/${pid}/download`, { responseType: "blob" }).then((res) => {
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = filename || "preventivo.pdf"; document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+    });
+  };
+
   if (!q) return <div className="text-sm text-muted-foreground">Caricamento…</div>;
 
   const allowForce = editable;
@@ -179,6 +224,19 @@ export default function QuoteEditorPage() {
           {q.quote_status === "sent" && <Button variant="outline" className="rounded-sm" onClick={() => changeStatus.mutate("accepted")} data-testid="quote-accept"><Check size={14} className="mr-1" /> Accettato</Button>}
           {["accepted", "approved"].includes(q.quote_status) && !q.contract_id && has("quotes.convert_contract") && <Button className="rounded-sm bg-emerald-600 hover:bg-emerald-700" onClick={async () => { await autosave.flushNow(); convert.mutate(); }} data-testid="quote-convert"><FileText size={14} className="mr-1" /> Genera contratto</Button>}
           {editable && q.is_current && <Button variant="outline" className="rounded-sm" onClick={async () => { await autosave.flushNow(); revise.mutate(); }} data-testid="quote-revise"><ArrowsClockwise size={14} className="mr-1" /> Nuova revisione</Button>}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="rounded-sm bg-[hsl(var(--brand-red))] hover:bg-[hsl(var(--brand-red))]/90 text-white" data-testid="pdf-menu"><FilePdf size={14} className="mr-1" /> PDF <CaretDown size={12} className="ml-1" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-sm">
+              {has("quotes.preview_pdf") && <DropdownMenuItem onClick={async () => { await autosave.flushNow(); previewPdf.mutate(); }} data-testid="pdf-preview"><Eye size={14} className="mr-2" /> Anteprima BOZZA</DropdownMenuItem>}
+              {has("quotes.generate_pdf") && editable && <DropdownMenuItem onClick={async () => { await autosave.flushNow(); generatePdf.mutate({}); }} data-testid="pdf-generate"><FilePdf size={14} className="mr-2" /> Emetti PDF definitivo</DropdownMenuItem>}
+              {latestDef && <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => downloadPdf(latestDef.id, latestDef.filename)} data-testid="pdf-download"><Download size={14} className="mr-2" /> Scarica ultimo definitivo</DropdownMenuItem>
+              </>}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -343,6 +401,28 @@ export default function QuoteEditorPage() {
                 </div>
               ))}
             </div>
+          </Card>
+
+          <Card className="rounded-sm border-border p-6" data-testid="pdf-history-card">
+            <div className="overline mb-3">PDF emessi ({pdfs.length})</div>
+            {pdfs.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Nessun PDF ancora generato. Usa il pulsante PDF in alto per anteprima o emissione definitiva.</div>
+            ) : (
+              <div className="space-y-2">
+                {pdfs.slice(0, 5).map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 py-1 border-b last:border-b-0 text-[11px]">
+                    <Badge variant="outline" className={`rounded-sm text-[9px] ${p.kind === 'definitive' ? 'bg-emerald-500/10 text-emerald-800' : p.kind === 'preview' ? 'bg-amber-500/10 text-amber-800' : 'bg-red-500/10 text-red-800'}`}>{p.kind.toUpperCase()}</Badge>
+                    <div className="flex-1 min-w-0 truncate font-mono-plex" title={p.filename}>{p.filename}</div>
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => downloadPdf(p.id, p.filename)} data-testid={`pdf-hist-dl-${p.id}`}><Download size={12} /></Button>
+                  </div>
+                ))}
+                {pdfs.length > 0 && (
+                  <div className="mt-2 pt-2 border-t text-[10px] font-mono-plex text-muted-foreground">
+                    Hash snapshot: {(latestDef?.snapshot_hash || pdfs[0].snapshot_hash || "").slice(0, 12)}…
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
         </div>
       </div>

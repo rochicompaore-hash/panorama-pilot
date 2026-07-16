@@ -108,6 +108,13 @@ PERMISSION_CATALOG = [
     ("contracts.cancel", "Contratti", "delete", "Annulla contratti"),
     # Records governance / concurrency
     ("records.force_override", "Record", "approve", "Sovrascrittura forzata con motivazione (bypass concorrenza)"),
+    # PDF & Templates (M3.3.2)
+    ("quotes.preview_pdf", "Preventivi", "view", "Anteprima PDF bozza"),
+    ("quotes.generate_pdf", "Preventivi", "approve", "Emette PDF definitivo con snapshot immutabile"),
+    ("quotes.download_pdf", "Preventivi", "view", "Scarica PDF definitivo"),
+    ("quotes.invalidate_pdf", "Preventivi", "approve", "Annulla PDF definitivo"),
+    ("quotes.manage_templates", "Preventivi", "create", "Gestisce template PDF preventivi"),
+    ("quotes.manage_clauses", "Preventivi", "create", "Gestisce libreria clausole contrattuali"),
 ]
 
 # Predefined roles with permissions

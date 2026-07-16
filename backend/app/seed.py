@@ -211,5 +211,8 @@ async def run_seed():
     # Seed pricing defaults (M3.2)
     from app.seed_pricing import run_pricing_seed
     await run_pricing_seed(company_id)
+    # Seed PDF templates + clauses (M3.3.2)
+    from app.seed_pdf import run_pdf_seed
+    await run_pdf_seed(company_id)
     await write_test_credentials()
     logger.info("Seed completed. Company=%s", company_id)

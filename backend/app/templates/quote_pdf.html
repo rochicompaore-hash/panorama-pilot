@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="{{ snap.template.language or 'it' }}">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ snap.quote.number }} — Preventivo</title>
+  <style>
+    /* --- Reset & base --- */
+    @page {
+      size: A4;
+      margin: 20mm 15mm 22mm 15mm;
+      @top-left {
+        content: element(header);
+      }
+      @bottom-center {
+        content: element(footer);
+        font-size: 8pt;
+      }
+      @bottom-right {
+        content: "Pag. " counter(page) " di " counter(pages);
+        font-size: 8pt;
+        color: #666;
+        font-family: 'DejaVu Sans', 'Liberation Sans', sans-serif;
+      }
+    }
+    html, body { margin: 0; padding: 0; font-family: 'DejaVu Sans', 'Liberation Sans', 'Helvetica', sans-serif; color: #1a1a1a; font-size: 10pt; line-height: 1.35; }
+    :root {
+      --brand: {{ snap.company.primary_color or '#0F1720' }};
+      --accent: {{ snap.company.secondary_color or '#D42027' }};
+      --border: #d8d8d8;
+      --soft: #f5f5f5;
+      --muted: #666;
+    }
+
+    /* --- Watermark --- */
+    {% if watermark %}
+    body::before {
+      content: "{{ watermark }}";
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 96pt;
+      color: rgba(200, 30, 30, 0.10);
+      font-weight: 900;
+      letter-spacing: 4pt;
+      z-index: -1;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    {% endif %}
+
+    /* --- Running header/footer --- */
+    .running-header { position: running(header); font-size: 8pt; color: var(--muted); width: 100%; border-bottom: 0.5pt solid var(--border); padding-bottom: 2mm; }
+    .running-header .col { display: inline-block; vertical-align: middle; }
+    .running-header .brand { color: var(--brand); font-weight: bold; }
+    .running-footer { position: running(footer); font-size: 8pt; color: var(--muted); width: 100%; border-top: 0.5pt solid var(--border); padding-top: 2mm; }
+
+    /* --- Layout blocks --- */
+    .cover { padding: 4mm 0 8mm 0; border-bottom: 2pt solid var(--brand); margin-bottom: 8mm; }
+    .cover .logo { max-height: 22mm; max-width: 60mm; }
+    .cover h1 { font-size: 22pt; margin: 4mm 0 2mm 0; color: var(--brand); }
+    .cover .meta { display: table; width: 100%; margin-top: 6mm; }
+    .cover .meta > div { display: table-cell; vertical-align: top; padding: 0 3mm; }
+    .cover .meta .label { font-size: 7pt; color: var(--muted); text-transform: uppercase; letter-spacing: 1pt; margin-bottom: 1mm; }
+    .cover .meta .value { font-size: 11pt; font-weight: bold; color: var(--brand); }
+
+    /* --- Section --- */
+    .section { break-inside: avoid-page; margin: 6mm 0; }
+    .section h2 { font-size: 13pt; color: var(--brand); border-bottom: 1pt solid var(--brand); padding-bottom: 1.5mm; margin-bottom: 4mm; }
+    .kv { width: 100%; border-collapse: collapse; }
+    .kv td { padding: 1.5mm 3mm; vertical-align: top; }
+    .kv td.k { color: var(--muted); font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5pt; width: 38%; }
+    .kv td.v { font-weight: 500; }
+
+    /* --- Opening card --- */
+    .opening { break-inside: avoid-page; border: 0.5pt solid var(--border); border-radius: 2mm; padding: 4mm; margin-bottom: 4mm; page-break-inside: avoid; }
+    .opening .head { display: table; width: 100%; margin-bottom: 3mm; }
+    .opening .head .code { display: table-cell; width: 20mm; background: var(--brand); color: white; padding: 2mm 3mm; font-weight: bold; text-align: center; vertical-align: middle; border-radius: 1.5mm; }
+    .opening .head .title { display: table-cell; padding-left: 4mm; vertical-align: middle; }
+    .opening .head .title h3 { margin: 0; font-size: 11pt; color: var(--brand); }
+    .opening .head .title .desc { font-size: 8.5pt; color: var(--muted); }
+
+    /* --- Lines table --- */
+    table.lines { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+    table.lines thead th { background: var(--soft); border-bottom: 1pt solid var(--brand); font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5pt; text-align: left; padding: 2mm; color: var(--brand); }
+    table.lines tbody td { padding: 2mm; border-bottom: 0.25pt solid var(--border); font-size: 9pt; vertical-align: top; }
+    table.lines td.qty, table.lines td.price, table.lines td.sub { text-align: right; font-variant-numeric: tabular-nums; }
+    table.lines tr.total-row td { background: var(--brand); color: white; font-weight: bold; font-size: 10pt; border-bottom: none; }
+    thead { display: table-header-group; }
+
+    /* --- Economic summary --- */
+    .econ { break-inside: avoid; margin-top: 6mm; }
+    .econ table { width: 100%; max-width: 90mm; float: right; border-collapse: collapse; }
+    .econ table tr td { padding: 1.5mm 3mm; font-size: 10pt; border-bottom: 0.25pt solid var(--border); }
+    .econ table tr.total td { background: var(--brand); color: white; font-weight: bold; font-size: 12pt; }
+    .econ table tr td.k { color: var(--muted); }
+    .econ table tr td.v { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* --- Payment terms --- */
+    .payment { clear: both; margin-top: 8mm; padding: 4mm; background: var(--soft); border-left: 3pt solid var(--brand); }
+    .payment h3 { margin: 0 0 2mm 0; color: var(--brand); font-size: 11pt; }
+    .payment ul { margin: 1mm 0 0 0; padding-left: 4mm; }
+    .payment li { margin-bottom: 1mm; font-size: 9pt; }
+    .payment .note { margin-top: 2mm; font-size: 8.5pt; color: var(--muted); font-style: italic; }
+
+    /* --- Clauses --- */
+    .clause { break-inside: avoid; page-break-inside: avoid; margin-top: 4mm; }
+    .clause h4 { margin: 0 0 1.5mm 0; font-size: 10pt; color: var(--brand); }
+    .clause p { margin: 0; font-size: 8.5pt; line-height: 1.4; text-align: justify; }
+    .clause .badge { display: inline-block; background: var(--accent); color: white; font-size: 6.5pt; padding: 0.5mm 1.5mm; border-radius: 1mm; margin-left: 2mm; vertical-align: middle; text-transform: uppercase; }
+
+    /* --- Signature block --- */
+    .signature-block { margin-top: 12mm; display: table; width: 100%; }
+    .signature-block .box { display: table-cell; width: 50%; padding: 4mm; vertical-align: top; }
+    .signature-block .line { border-top: 0.5pt solid #333; margin-top: 16mm; padding-top: 1.5mm; font-size: 8pt; color: var(--muted); text-align: center; }
+
+    /* --- Legal disclaimer boxes --- */
+    .disclaimer { margin-top: 6mm; padding: 3mm; border: 0.5pt dashed var(--accent); background: rgba(212, 32, 39, 0.03); font-size: 8.5pt; color: #444; line-height: 1.35; }
+
+    /* --- Utility --- */
+    .muted { color: var(--muted); }
+    .small { font-size: 8pt; }
+    .bold { font-weight: bold; }
+    .right { text-align: right; }
+    .center { text-align: center; }
+    .flex-two { display: table; width: 100%; }
+    .flex-two > div { display: table-cell; vertical-align: top; width: 50%; padding-right: 3mm; }
+
+    /* Break helpers */
+    .page-break { page-break-after: always; }
+    tr, td, .opening, .clause { page-break-inside: avoid; }
+  </style>
+</head>
+<body>
+
+<!-- Running header -->
+<div class="running-header">
+  <div class="col brand">{{ snap.company.commercial_name or snap.company.name }}</div>
+  &nbsp;·&nbsp;
+  <div class="col">Preventivo <b>{{ snap.quote.number }}</b> {{ snap.quote.revision_label or ('R' ~ '%02d' % snap.quote.revision) }}</div>
+</div>
+
+<!-- Running footer -->
+<div class="running-footer">
+  {{ snap.company.legal_name or snap.company.name }}
+  {% if snap.company.vat_number %} · P.IVA {{ snap.company.vat_number }}{% endif %}
+  {% if snap.company.email %} · {{ snap.company.email }}{% endif %}
+  {% if snap.company.phone %} · {{ snap.company.phone }}{% endif %}
+</div>
+
+<!-- COVER -->
+<div class="cover">
+  {% if snap.company.logo_url %}
+    <img class="logo" src="{{ snap.company.logo_url }}" alt="logo" />
+  {% else %}
+    <div style="font-size: 18pt; font-weight: 900; color: var(--brand);">{{ snap.company.commercial_name or snap.company.name }}</div>
+  {% endif %}
+  <h1>Preventivo <span style="color: var(--accent);">{{ snap.quote.number }}</span></h1>
+  <div class="small muted">Revisione <b>{{ snap.quote.revision_label or ('R' ~ '%02d' % snap.quote.revision) }}</b> — emesso il {{ snap.quote.issue_date | dt }}{% if snap.quote.valid_until %} — valido fino al <b>{{ snap.quote.valid_until | dt }}</b>{% endif %}</div>
+
+  <div class="meta">
+    <div>
+      <div class="label">Cliente</div>
+      <div class="value">{{ snap.quote.customer.name or '—' }}</div>
+      {% if snap.quote.customer.vat_number %}<div class="small">P.IVA {{ snap.quote.customer.vat_number }}</div>{% endif %}
+      {% if snap.quote.customer.email %}<div class="small">{{ snap.quote.customer.email }}</div>{% endif %}
+      {% if snap.quote.customer.phone %}<div class="small">{{ snap.quote.customer.phone }}</div>{% endif %}
+    </div>
+    <div>
+      <div class="label">Cantiere</div>
+      {% if snap.quote.site_address %}
+        <div class="value">{{ snap.quote.site_address.street or '' }}</div>
+        <div class="small">{{ snap.quote.site_address.zip_code or '' }} {{ snap.quote.site_address.city or '' }} {% if snap.quote.site_address.province %}({{ snap.quote.site_address.province }}){% endif %}</div>
+      {% else %}<div class="muted small">Non specificato</div>{% endif %}
+    </div>
+    <div>
+      <div class="label">Riferimento commerciale</div>
+      <div class="value">{{ snap.quote.sales_rep.name if snap.quote.sales_rep else '—' }}</div>
+      {% if snap.quote.sales_rep and snap.quote.sales_rep.email %}<div class="small">{{ snap.quote.sales_rep.email }}</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Intro text -->
+{% if snap.template.intro_text %}
+<div class="section"><p>{{ snap.template.intro_text }}</p></div>
+{% endif %}
+
+<!-- Summary card -->
+<div class="section">
+  <h2>Oggetto e riepilogo</h2>
+  <table class="kv">
+    <tr><td class="k">Oggetto</td><td class="v">{{ snap.quote.title or 'Fornitura e posa serramenti' }}</td></tr>
+    <tr><td class="k">N° vani</td><td class="v">{{ snap.quote.openings | length }}</td></tr>
+    <tr><td class="k">N° righe prodotto</td><td class="v">{{ snap.quote.lines | length }}</td></tr>
+    <tr><td class="k">Tempo indicativo di consegna</td><td class="v">{{ snap.template.delivery_days_min }}-{{ snap.template.delivery_days_max }} giorni lavorativi dall'ordine e dal rilievo definitivo</td></tr>
+    <tr><td class="k">Garanzia</td><td class="v">{{ snap.template.warranty_months }} mesi sui prodotti forniti</td></tr>
+    <tr><td class="k">Validità offerta</td><td class="v">{% if snap.quote.valid_until %}Fino al <b>{{ snap.quote.valid_until | dt }}</b>{% else %}{{ snap.template.validity_days }} giorni dalla data di emissione{% endif %}</td></tr>
+  </table>
+</div>
+
+<!-- Openings & lines -->
+{% if snap.template.show_prices_mode != 'total_only' %}
+<div class="section">
+  <h2>Dettaglio prodotti per vano</h2>
+  {% set ns = namespace(shown=[]) %}
+  {% for op in snap.quote.openings %}
+    <div class="opening">
+      <div class="head">
+        <div class="code">{{ op.code }}</div>
+        <div class="title">
+          <h3>{{ op.description or 'Vano ' + op.code }}</h3>
+          <div class="desc">
+            {% if op.floor %}Piano: {{ op.floor }} · {% endif %}
+            {% if op.room %}Locale: {{ op.room }} · {% endif %}
+            {% if op.width_mm and op.height_mm %}Misura indicativa: {{ op.width_mm }}×{{ op.height_mm }} mm{% endif %}
+          </div>
+        </div>
+      </div>
+      <table class="lines">
+        <thead>
+          <tr>
+            <th>Descrizione</th>
+            <th class="qty">Q.tà</th>
+            {% if snap.template.show_prices_mode == 'per_line' %}<th class="price">Prezzo un.</th><th class="sub">Subtotale</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in snap.quote.lines if l.opening_id == op.id %}
+            {% set _ = ns.shown.append(l.id) %}
+            <tr>
+              <td>
+                <b>{{ l.description or 'Prodotto' }}</b>
+                {% if l.width_mm and l.height_mm %}<div class="small muted">{{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}
+              </td>
+              <td class="qty">{{ l.quantity | num(0) }}</td>
+              {% if snap.template.show_prices_mode == 'per_line' %}
+                <td class="price">{{ l.unit_price_final | cur }}</td>
+                <td class="sub">{{ l.subtotal_line | cur }}</td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+  {# Show lines without opening #}
+  {% set orphans = snap.quote.lines | rejectattr('id', 'in', ns.shown) | list %}
+  {% if orphans %}
+    <div class="opening">
+      <div class="head"><div class="code">—</div><div class="title"><h3>Righe aggiuntive</h3></div></div>
+      <table class="lines">
+        <thead><tr><th>Descrizione</th><th class="qty">Q.tà</th>{% if snap.template.show_prices_mode == 'per_line' %}<th class="price">Prezzo un.</th><th class="sub">Subtotale</th>{% endif %}</tr></thead>
+        <tbody>
+          {% for l in orphans %}
+            <tr>
+              <td><b>{{ l.description or 'Prodotto' }}</b>{% if l.width_mm %}<div class="small muted">{{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}</td>
+              <td class="qty">{{ l.quantity | num(0) }}</td>
+              {% if snap.template.show_prices_mode == 'per_line' %}<td class="price">{{ l.unit_price_final | cur }}</td><td class="sub">{{ l.subtotal_line | cur }}</td>{% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Economic summary -->
+<div class="section econ">
+  <h2>Riepilogo economico</h2>
+  <table>
+    <tr><td class="k">Imponibile</td><td class="v">{{ snap.quote.subtotal | cur }}</td></tr>
+    {% for vb in snap.quote.vat_breakdown %}
+      <tr><td class="k">Imponibile IVA {{ vb.rate_pct | num(0) }}%</td><td class="v">{{ vb.taxable | cur }}</td></tr>
+      <tr><td class="k">IVA {{ vb.rate_pct | num(0) }}%</td><td class="v">{{ vb.tax | cur }}</td></tr>
+    {% endfor %}
+    <tr class="total"><td class="k">Totale</td><td class="v">{{ snap.quote.total | cur }}</td></tr>
+  </table>
+</div>
+
+<!-- Payment terms -->
+<div class="payment">
+  <h3>Condizioni di pagamento</h3>
+  {% if snap.payment_terms.installments %}
+  <ul>
+    {% for inst in snap.payment_terms.installments %}
+      <li>
+        {% if inst.percent %}<b>{{ inst.percent | num(0) }}%</b>{% elif inst.amount %}<b>{{ inst.amount | cur }}</b>{% endif %}
+        {% if inst.trigger == 'signature' %}alla firma del contratto{% endif %}
+        {% if inst.trigger == 'survey' %}al termine del rilievo tecnico{% endif %}
+        {% if inst.trigger == 'goods_ready' %}ad avviso merce pronta{% endif %}
+        {% if inst.trigger == 'before_installation' %}prima dell'inizio della posa{% endif %}
+        {% if inst.trigger == 'on_completion' %}a saldo, a fine lavori{% endif %}
+        {% if inst.trigger == 'fixed_date' %}entro data fissa{% endif %}
+        {% if inst.note %} — <span class="muted">{{ inst.note }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted small">Termini di pagamento da concordare.</p>{% endif %}
+  {% if snap.payment_terms.display_note %}<div class="note">{{ snap.payment_terms.display_note }}</div>{% endif %}
+</div>
+
+<!-- Clauses -->
+{% if snap.clauses %}
+<div class="section">
+  <h2>Condizioni contrattuali</h2>
+  {% for c in snap.clauses | sort(attribute='order_index' if false else 'code') %}
+    <div class="clause">
+      <h4>{{ c.title }}{% if c.mandatory %}<span class="badge">Obbligatoria</span>{% endif %}</h4>
+      <p>{{ c.text }}</p>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Disclaimers -->
+{% if snap.template.measures_disclaimer %}
+<div class="disclaimer">
+  <b>Misure indicative.</b> {{ snap.template.measures_disclaimer }}
+</div>
+{% endif %}
+{% if snap.template.images_disclaimer %}
+<div class="disclaimer">
+  <b>Immagini illustrative.</b> {{ snap.template.images_disclaimer }}
+</div>
+{% endif %}
+{% if snap.template.privacy_notice %}
+<div class="disclaimer small">
+  <b>Informativa privacy.</b> {{ snap.template.privacy_notice }}
+</div>
+{% endif %}
+
+<!-- Notes -->
+{% if snap.quote.notes %}
+<div class="section">
+  <h2>Note</h2>
+  <p style="white-space: pre-wrap;">{{ snap.quote.notes }}</p>
+</div>
+{% endif %}
+
+<!-- Signature block -->
+<div class="signature-block">
+  <div class="box">
+    <div class="small muted">Per accettazione (Cliente)</div>
+    <div class="line">Data e firma leggibile</div>
+  </div>
+  <div class="box">
+    {% if snap.company.signature_url %}<img src="{{ snap.company.signature_url }}" style="max-height: 18mm;" />{% endif %}
+    {% if snap.company.stamp_url %}<img src="{{ snap.company.stamp_url }}" style="max-height: 18mm; margin-left: 4mm;" />{% endif %}
+    <div class="line">{{ snap.company.legal_name or snap.company.name }} — timbro e firma</div>
+  </div>
+</div>
+
+</body>
+</html>

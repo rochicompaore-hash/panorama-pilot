@@ -46,6 +46,8 @@ const NAV = [
     items: [
       { to: "/quotes", i18n: "nav.quotes", icon: FileText, perm: "quotes.view" },
       { to: "/pricelists", i18n: "nav.pricelists", icon: Hash, perm: "pricelists.view" },
+      { to: "/templates", i18n: "nav.templates", icon: FileText, perm: "quotes.view" },
+      { to: "/clauses", i18n: "nav.clauses", icon: FileText, perm: "quotes.view" },
     ],
   },
   {

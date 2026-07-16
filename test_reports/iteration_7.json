@@ -1,0 +1,54 @@
+{
+  "summary": "M3.3.2 PDF pipeline verified end-to-end: 16 pytest cases PASS + 1 xfail (documenting a real backend bug on 'missing_site' validation). Backend: seed template IE_STANDARD_2026 with is_default=true and 2×50% installments PASS; 12+ clauses with mandatory flags (CL_MISURE_INDICATIVE, CL_PAGAMENTI_50_50, CL_PRIVACY) PASS; preview flow (POST /api/quotes/{id}/pdf/preview → 200, download returns application/pdf with %PDF magic bytes) PASS; validation gate on empty quote returns 400 with error='validation_failed' and code='no_lines' PASS; definitive emission sets latest_pdf_id/hash on the quote PASS; idempotency (same snapshot_hash → idempotent_hit=true, same id) PASS; PATCH line → new snapshot_hash and new pdf id PASS; snapshot immutability (previously generated PDFs still download unchanged after quote edits) PASS; /api/quotes/scan/pricing-scope-bug returns structured report with all 6 status buckets PASS; snapshot.quote.lines correctly strips internal_cost/margin_abs/margin_pct/cost_price PASS; tenant_id in the persisted pdf doc matches super admin tenant PASS; watermark='BOZZA' on preview and null on definitive PASS; template PATCH with wrong If-Match → 409 and clause_versions/quote_template_versions archive previous snapshot PASS; filename regex ^[A-Za-z0-9._-]+\\.pdf$ (no duplicate R00) PASS; parallel double-click generate collapses onto the same pdf id with idempotent_hit=true (after warm-up) PASS. Frontend Playwright PASS: /templates shows IE_STANDARD_2026 with DEFAULT badge + v.4 + all 6 tabs (Generale/Stile/Sezioni/Pagamenti/Clausole/Campi azienda) + 2 payment installments visible in tab Pagamenti; /clauses lists 12 clauses with the mandatory codes present; QuoteEditor pdf-menu → pdf-preview click produces 'Anteprima BOZZA generata' toast and a PREVIEW row in card PDF Emessi; pdf-generate click produces a DEFINITIVE row with hash snapshot truncated shown at the bottom of the same card (3 total entries after the flow).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/quotes/{id}/pdf/generate", "issue": "validate_quote_for_definitive checks `not quote.get('site_address')` but the Quote model defaults site_address to LeadAddress() → a dict with all-None fields, which is TRUTHY in Python. As a result the 'missing_site' validation code NEVER fires, even when street/city/zip are all empty. Fix suggestion in pdf_renderer.py::validate_quote_for_definitive: `sa = quote.get('site_address') or {}; if not (sa.get('street') or sa.get('city') or sa.get('zip_code')): errs.append({..., code:'missing_site', ...})`. Test xfail'd in test_pdf_m332.py::TestValidationGate::test_definitive_reports_missing_site."},
+      {"endpoint": "GET /api/quotes/{qid}/pdfs", "issue": "Listing endpoint returns the full pdf_base64 payload for every item — for large PDFs this can grow to megabytes per response. Should strip pdf_base64 and snapshot (as /quote-pdfs/{pid} already does) OR project only metadata fields."},
+      {"endpoint": "GET /api/quotes/{qid}/pdfs", "issue": "Response items include BOTH `_id` and `id` (from_mongo maps _id→id but does not strip _id). Minor consistency/leak issue — not a security bug (id == _id) but violates the code-review guideline 'Always exclude MongoDB ObjectId `_id`'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pdf_m332.py",
+    "/app/test_reports/pytest/iteration_7_pdf.xml"
+  ],
+  "action_items": [
+    "Fix validate_quote_for_definitive so 'missing_site' actually triggers when the site_address dict has all empty fields (see backend_issues.minor[0]). This is called out explicitly in the acceptance spec for test 4.",
+    "Strip `pdf_base64` (and optionally `snapshot`) from /api/quotes/{qid}/pdfs list response — currently transports MB of base64 per row.",
+    "Ensure `from_mongo` drops the MongoDB `_id` after copying it to `id` (currently `_id` still leaks in quote_pdfs listing)."
+  ],
+  "critical_code_review_comments": [
+    "services/pdf_renderer.py::compute_snapshot_hash correctly excludes volatile keys (generated_at, pdf_hash, version, latest_pdf_*, updated_at, updated_by) recursively → the same quote state re-generated returns the same hash → idempotency is reliable (verified with 2 sequential and 2 parallel POSTs after warm-up).",
+    "services/pdf_renderer.py::build_snapshot correctly strips internal_cost/margin_abs/margin_pct/cost_price from every line before persisting the snapshot → no cost/margin leakage into the customer-facing PDF or the archived snapshot doc.",
+    "services/pdf_renderer.py::safe_filename regex [^A-Za-z0-9._-] plus the R00-in-quote-number dedupe branch in pdf_router._generate_pdf correctly avoids duplicate R00 tokens in the filename (verified against PREV-2026-01411-R00 which already contains R00).",
+    "routers/pdf_router.py::_generate_pdf: for the DEFINITIVE branch, the idempotency check runs BEFORE the render step → no wasted WeasyPrint invocations on double-clicks. However, this check is not atomic — a truly simultaneous first-time double-click could still create two definitive rows with the same snapshot_hash (there is no unique index on (tenant_id, quote_id, snapshot_hash, kind, invalidated_at=null)). Add a unique compound index in seed_pdf.py or a Mongo migration to guarantee it. In our parallel test we warmed up with one serial call first to make the second-and-third calls hit the idempotency branch reliably.",
+    "routers/pdf_router.py::_generate_pdf PREVIEW branch: no idempotency check → every /pdf/preview creates a new quote_pdfs doc even if snapshot is identical. Not a correctness bug (preview is expected to be non-consolidating), but is likely to blow up storage over time; consider retention/GC job or capping N previews per quote.",
+    "routers/pdf_router.py::update_clause and update_template correctly archive the previous doc into clause_versions / quote_template_versions BEFORE calling update_with_version → versioning history is captured with the correct pre-change snapshot even under concurrent PATCH.",
+    "PATCH /api/quote-templates/{tid} with a wrong If-Match version returns 409 as expected; PATCH with a correct If-Match increments version and archives — both verified.",
+    "GET /api/quotes/scan/pricing-scope-bug is READ-ONLY (no writes), correctly scopes by user['tenant_id'], returns the full 6-bucket structure even when no rows are affected — validated the shape and total_scanned>0.",
+    "routers/pdf_router.py::list_quote_pdfs returns snapshot AND pdf_base64 → HIGH TRAFFIC RISK (see backend_issues.minor[1]).",
+    "services/pdf_renderer.py::validate_quote_for_definitive check `if not quote.get('site_address')` is INCORRECT because Quote.site_address default is LeadAddress() (a truthy dict). Missing_site never fires. See backend_issues.minor[0].",
+    "models_pdf.py::QuotePdf: is documented as immutable but there is no DB-level guard (e.g. no unique index, no read-only projection). Fine for M3.3.2, but worth a comment or hardening in a future milestone.",
+    "Frontend QuoteEditorPage.jsx: pdf-menu → pdf-preview / pdf-generate correctly call flushNow() before the mutation → any pending autosave is committed prior to the PDF render, so the archived snapshot always reflects the latest user input (verified visually in the flow).",
+    "Frontend TemplatesPage.jsx: default template is highlighted via badge; concurrent PATCH uses If-Match (verified by pytest test_patch_wrong_ifmatch_returns_409 = 409)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pdf_m332.py (new — 17 test items: 16 PASS + 1 xfail documenting the missing_site validation bug)"
+  ],
+  "success_rate": {
+    "backend": "100% relative to implemented behavior (16 passed, 1 xfail documenting a spec-vs-impl discrepancy on missing_site — see action_items[0])",
+    "frontend": "100% (Templates + Clauses admin pages verified, QuoteEditor PDF preview & generate flows verified with toast + PDF history card entries PREVIEW+DEFINITIVE + hash snapshot displayed)"
+  },
+  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "seed_data_creation": "Several TEST_M332_PDF draft quotes on top of existing seed lead (leads[0]). Test file cleans clause CL_ANNULLAMENTO text back to original after the patch-history test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_pdf_m332.py runs in ~6s on the live preview URL and is safe to re-run (no destructive writes on seed data). It exercises: /api/auth/me shape ({user, permissions}), /api/quote-templates, /api/clauses, POST /api/quotes/{id}/pdf/preview, POST /api/quotes/{id}/pdf/generate (validation gate + idempotency + regenerate after edit), snapshot immutability (same-bytes download after later quote edits), /api/quote-pdfs/{pid}/download (%PDF magic bytes), /api/quote-pdfs/{pid} metadata (watermark), /api/quotes/{qid}/pdfs listing (used for snapshot inspection because /quote-pdfs/{pid} strips snapshot), template concurrency (If-Match wrong=409, correct=200), clause versioning (patch text with restore in teardown), filename regex + no-duplicate-R00, /api/quotes/scan/pricing-scope-bug shape, and parallel double-click generate (after a warm-up serial call). If backend fix is applied for the missing_site validation, flip the xfail(strict=True) on test_definitive_reports_missing_site to a regular assertion.",
+  "rca of the issue": "Backend spec vs impl: validate_quote_for_definitive uses `if not quote.get('site_address')` to detect an empty site. But Quote.site_address defaults to LeadAddress() which serializes to a non-empty dict {street: None, city: None, zip_code: None, province: None, country: 'IT'}. In Python, `not {'a': None, 'b': None}` is False → the check never fires and 'missing_site' is never returned to the client. Reproduction: POST /api/quotes with only lead_id (no site_address), POST /api/quotes/{id}/lines (any populated line), then POST /api/quotes/{id}/pdf/generate → response is 200 (or 400 for other reasons) but detail.errors never contains {code:'missing_site'}. Mitigation: in pdf_renderer.validate_quote_for_definitive, replace the check with `sa = quote.get('site_address') or {}; if not (sa.get('street') or sa.get('city') or sa.get('zip_code')): errs.append({field:'quote.site_address', code:'missing_site', message:'Indirizzo cantiere mancante'})`."
+}
