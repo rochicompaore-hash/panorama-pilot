@@ -1,37 +1,16 @@
 # Infissi Express Cloud — PRD
 
-## Original Problem Statement
-Piattaforma SaaS cloud (Web based App, responsive) per la gestione end-to-end del ciclo di vita commerciale, tecnico, produttivo e post-vendita di un'azienda produttrice e installatrice di infissi. ERP verticale (M1-M10).
-
-## Milestones — Completate
-
-### M1 (Fondazioni) — 2026-07-15
-Auth JWT + refresh rotation + jti, RBAC granulare (28 perms + 10 ruoli), audit append-only, allegati (S3-ready), numerazioni progressive, notifiche, sessioni, ricerca globale, dashboard, gestione utenti/ruoli/azienda. 34/34 test PASS.
-
-### M2 (CRM) — 2026-07-15
-- **Onboarding wizard** (5 step: azienda → logo → numerazioni → invito → primo lead → completato)
-- **Fase 1 CRM**: Lead con intelligenza vendita (probability, days_since_contact, next_action suggerita), Clienti (conversione da lead), Contatti, Pipeline commerciale (7 stage: Nuovo/Contattato/Qualificato/Preventivo/Trattativa/Vinto/Perso), **Timeline centrale** (ogni evento del sistema registra un'attività), Task, Note, Calendario settimanale
-- **Fase 2 CRM**: Comunicazioni telefonate (registrazione con esito/durata), email (mock provider dev, Resend prod-ready), WhatsApp (mock provider dev, Twilio prod-ready), promemoria, appuntamenti con calendar view, obiettivi (per user/periodo/metrica), regole provvigioni
-- **Fase 3 CRM**: Dashboard **role-adaptive** (endpoint /variant + rendering client) — Commerciale (lead aperti, appuntamenti oggi, task, pipeline ponderata, obiettivi, prossime azioni), Direzione (conversion rate, top performer, stage breakdown, fatturato acquisito), Produzione (placeholder M6), Posatore (placeholder M8)
-- **Global search estesa**: lead, clienti, contatti, attività, task, appuntamenti, utenti, allegati (multi-collection cross-tenant filtered)
-- 37/37 backend + 17/17 frontend test PASS
-
-## Architecture
-- Backend: FastAPI + Motor (MongoDB) + PyJWT + bcrypt, 27+ router `/api/*` modulari
-- Frontend: React 19 + Tailwind + Shadcn/UI + react-i18next + Zustand-ready + React Query
-- Storage: Local dev, S3-compatible provider ready
-- Email: Mock (dev) + Resend (prod stub)
-- WhatsApp: Mock (dev) + Twilio (prod stub)
+## Milestones Complete
+- **M1** (2026-07-15): Fondazioni — auth+RBAC+audit+attachments+sequences+search+notifications. 34/34 test PASS.
+- **M2** (2026-07-15): CRM — Onboarding wizard, Lead/Cliente/Contatto/Pipeline/Timeline centrale/Task/Calendario, Comunicazioni (call/email/WA mock), Obiettivi/Provvigioni, dashboard role-adaptive, ricerca globale estesa. 37/37 test PASS.
+- **M2 Audit** (2026-07-16): Tenant isolation, IDOR, RBAC backend, soft-delete, convert idempotency, timeline immutability. 34/34 audit test PASS.
+- **M3.1** (2026-07-16): Preventivatore Fondazioni — quotes CRUD + openings (vani) + lines + numerazione PREV-YYYY-NNNNN-R00 partenza=1350 configurabile, price engine base (base+surcharges+discount, VAT per rate), 12 status con transizioni validate, approval workflow (soglie sconto), revisioni R00→R01 con parent superseded + history, snapshot listino congelato al send, convert-to-contract con snapshot, firma elettronica FES semplice (canvas + IP + UA + SHA-256), 23 permessi granulari (quotes.*/pricelists.*/products.*/contracts.*), costi/margini mascherati senza permessi dedicati. 32/32 test PASS.
 
 ## Roadmap
-- **M3** Preventivatore + configuratori (serramenti/vetri/ferramenta/cassonetti/persiane/zanzariere) + PDF + contratti + firma
-- **M4** Rilievo tecnico + ordine esecutivo con blocco misure
-- **M5** Ordini fornitore + magazzino base + varianti/lotti
-- **M6** Produzione: distinte base + liste taglio + ottimizzazione barre + tracciabilità QR
-- **M7** Pianificazione + QC + non conformità
-- **M8** Prodotto finito + logistica + posa + verbali mobile
-- **M9** Assistenza + garanzie + portale cliente
-- **M10** Amministrazione + BI + cash flow + AI CFO
+- **M3.2**: Configuratori UI (finestre 12 tipologie, vetri, colori con regole 8/14.5/16/22+150€, tapparelle base+kit+guide+96€/m² min 1.75 m², cassonetti auto-larghezza, zanzariere 8 tipologie, posa/extra), motore listini formule versionate, soglie sconto per ruolo
+- **M3.3**: PDF professionale (reportlab), firma canvas UI completa, contratto UI, dashboard preventivi (KPI: conversion, sconto medio, marginalità autorizzata, ecc.), tracking apertura link, send email/whatsapp/link/print
+- **M4** Rilievo tecnico + ordine esecutivo + blocco misure
+- **M5-M10** Acquisti/Magazzino/Produzione/QC/Posa/Assistenza/BI/AI CFO
 
 ## Test Credentials
 `/app/memory/test_credentials.md` — admin@infissiexpress.com / Admin!2025
