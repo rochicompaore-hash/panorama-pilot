@@ -1,0 +1,42 @@
+{
+  "summary": "Blocco A — Motore BOM Avanzato: 22/23 tests PASS (95.7%). Coperti: catalogo 20 ricette (GET /pricing-hub/bom-recipes), compile ricetta con PERIMETRO_TELAIO/PERIMETRO_ANTA (formula multi-variabile L,H,central_node,nr_ante,frame_width), MONTANTE_VERTICALE con condition auto-generata, COMPONENTE_CONDIZIONALE con cast value→int, FORMULA_LIBERA con requires_permission=products.manage, unknown recipe 404. BOM-simulate: BOM-WIN-2A output row-by-row completo (tutti i 22 campi richiesti: quantity_net/quantity/waste_qty/quantity_billable/length_mm/length_mm_net/unit_price/unit_cost/line_price/line_cost/formula_applied/condition_applied/consumption_mode/bar_rounding/warnings/code/description/pricelist_origin_sell/pricelist_origin_cost + totals_by_type + snapshot_hash sha256), integrazione listino SELL-DEMO produce unit_price>0 e pricelist_origin_sell.pricelist_name popolato, DIV_ZERO su BOM-DIVTEST con nr_ante=0 restituisce blocking_errors[code=DIV_ZERO] + suggested_action, tenant isolation con bom_template_id fake restituisce errors=['BOM template non trovato'], sfrido waste_pct=2 → qty×1.02 e length×1.02, scrap_fixed_mm_per_cut=50 → length+50 prima del waste %, scrap_fixed_per_piece=1 → qty+1, minimum_billable_qty=2 con qty=1 → quantity_billable=2 e warning 'Applicato minimo fatturabile', consumption_mode='full_bar' + bar_rounding=true su profilo 4×1000mm → bars_needed=1, quantity_billable=6.4 (=1 barra utile), warning 'Barra intera imputata'. Regressione OK: /parametric/bom-templates, /parametric/bom/resolve (i nuovi campi retro-compatibili non rompono l'output), /parametric/preview. Permission gating: cost_redacted=true con include_costs=False; admin superadmin vede sempre i costi. UNICO FAIL: snapshot_hash non deterministico perché include datetime.now() (vedi issue critica).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/pricing-hub/bom-simulate",
+        "issue": "snapshot_hash NON deterministico: /app/backend/app/services/bom_engine_v2.py:246 aggiunge `computed_at: datetime.now(timezone.utc).isoformat()` dentro il dict `snapshot` prima di calcolare l'hash sha256. Due chiamate identiche producono hash diversi (es. 0339888387ac... vs 6549bef14ceb...). Il requisito Blocco A dice 'due chiamate identiche devono restituire lo stesso snapshot_hash'. FIX: escludere `computed_at` dall'input hashato (calcolarlo separatamente, o hashare solo bom_template_id+bom_version+profile_system_id+profile_system_version+params+sell_pricelist_id+cost_pricelist_id) e opzionalmente esporre `computed_at` come campo top-level fuori dallo snapshot canonico.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_bom_engine_blocco_a.py",
+    "/app/test_reports/pytest/iteration_19_blocco_a.xml"
+  ],
+  "action_items": [
+    "FIX BLOCCANTE: /app/backend/app/services/bom_engine_v2.py:238-249 — rimuovere `computed_at` dal dict `snapshot` prima di calcolare snapshot_hash, oppure separare snapshot_input (hashato) da snapshot_meta (con computed_at, non hashato). Il test TestBomSimulate::test_snapshot_deterministic riproduce il bug in ~1s.",
+    "OPZIONALE: il test test_formula_libera_denied_without_permission verifica solo indirettamente il permission gating (via metadata catalog) perché admin superadmin bypassa sempre. Per una copertura piena servirebbe un utente scratch senza `products.manage` — richiede endpoint di user provisioning che va oltre lo scope di Blocco A."
+  ],
+  "critical_code_review_comments": [
+    "GOOD: bom_recipes.py catalog completo con 20 ricette; COMPONENTE_CONDIZIONALE fa cast robusto value→int/float con fallback stringa (righe 428-433).",
+    "GOOD: parametric_engine.resolve_bom implementa correttamente l'ordine sfrido (mm/cut → % → per_piece), poi rounding, poi minimum tecnico, poi minimum_billable_qty su line_measure, poi full_bar imputato. Warnings per riga chiari in italiano.",
+    "GOOD: bom_engine_v2._build_lookups_with_origin cattura pricelist_id/name/version/status/color_id/supplier_id per ogni riga → tracciabilità completa. `_preload_anagraph` fa bulk fetch evitando N+1.",
+    "GOOD: pricing_hub.bom_simulate redige unit_cost/line_cost/materials_cost/cost_pricelist e imposta cost_redacted=true quando l'utente non ha permessi costi o include_costs=False.",
+    "BUG (HIGH): snapshot_hash include computed_at datetime.now() → hash non deterministico, viola il requisito 'stesse chiamate = stesso hash'. Vedi backend_issues.critical[0].",
+    "DEFENSIVE: /parametric/bom-templates ritorna dict {total, items} — comportamento coerente con altri endpoint, ma la doc dovrebbe chiarirlo per i consumer JS/tests. Non è un bug, è una convenzione già consolidata (verifica presente anche in test_parametric_m6.py).",
+    "OSSERVAZIONE: la 'ricetta' FORMULA_LIBERA compone quantity_formula/length_formula/area_formula dai parametri utente ma NON esegue validate_formula() dentro compile_recipe(); la validazione avviene solo in POST /bom-recipes/compile via ciclo esplicito. È OK ma se in futuro qualcuno chiama compile_recipe() da altro punto senza validate, potrebbero passare formule invalide. Considera di spostare la validazione dentro compile_recipe per DRY."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_bom_engine_blocco_a.py (nuovo — 23 test, 22 pass, 1 fail intenzionale che espone il bug snapshot_hash)"
+  ],
+  "success_rate": {"backend": "95.7% (22/23)", "frontend": "n/a (backend-only)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (superadmin tenant Infissi Express)",
+  "seed_data_creation": "Il test factory `small_bom_factory` crea 5 BOM template ad-hoc con code prefix `TEST_BLOCCOA_*` (WASTE_PCT, SCRAP_MM, SCRAP_PC, MIN_BILL, FULL_BAR) per verificare le nuove logiche di sfrido/minimo/full-bar. Cleanup: yield-finally elimina tutti gli id creati via DELETE /parametric/bom-templates/{id}. Idempotente: se il test viene rerun, il factory rimuove eventuali template preesistenti con lo stesso code prima di ricreare.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Blocco A implementato al 95.7%. UNICO bug residuo: snapshot_hash non deterministico (computed_at nel payload hashato). Fix minimale: 3 righe in bom_engine_v2.py (spostare computed_at fuori dal dict snapshot prima di json.dumps→sha256). Dopo il fix rieseguire `pytest backend/tests/test_bom_engine_blocco_a.py::TestBomSimulate::test_snapshot_deterministic -v` → deve passare. Suite completa gira in ~4.4s con xdist. Copertura pronta come regressione per Blocchi B/C/D. NOTA: il test_formula_libera_denied_without_permission è degradato a controllo metadata (superadmin non triggera 403); se in futuro c'è endpoint per creare user con permessi custom, sostituire con test end-to-end 403.",
+  "rca of the issue": "Bug snapshot_hash: in bom_engine_v2.resolve_bom_full (lines 238-249) il dict `snapshot` include `computed_at: datetime.now(timezone.utc).isoformat()` e viene poi passato a `json.dumps(snapshot, sort_keys=True, default=str, separators=(',', ':'))` per generare l'hash sha256. Ogni chiamata rigenera un timestamp diverso → hash sempre diverso. Riproduzione: 2× POST /api/pricing-hub/bom-simulate con stesso body → snapshot_hash differiscono. Mitigazione: (a) rimuovere `computed_at` dal dict snapshot prima dell'hash, mantenendolo come campo top-level della response; (b) oppure hashare solo un subset canonico stabile: {bom_template_id, bom_version, profile_system_id, profile_system_version, params, sell_pricelist_id, cost_pricelist_id}. Opzione (b) è preferibile per allineamento con lo scopo audit ('stesso input ⇒ stesso hash')."
+}

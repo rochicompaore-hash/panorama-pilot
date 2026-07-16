@@ -221,16 +221,51 @@ def resolve_bom(
             })
             continue
 
-        # Scarto tecnico waste_pct e minimo
+        # === Sfrido: % + fisso mm/taglio + fisso per pezzo ===
         waste_pct = float(comp.get("waste_pct") or 0)
+        scrap_fixed_mm_per_cut = float(comp.get("scrap_fixed_mm_per_cut") or 0)
+        scrap_fixed_per_piece = float(comp.get("scrap_fixed_per_piece") or 0)
+        consumption_mode = comp.get("consumption_mode") or "proportional"
+        bar_rounding = bool(comp.get("bar_rounding") or False)
+
+        # Quantità netta prima di qualsiasi scarto/rounding — utile per l'audit
+        qty_net = float(qty)
+        length_mm_net = float(length_mm) if length_mm is not None else None
+
+        # 1) Scarto in mm per taglio (profili): estende la length_mm
+        if length_mm is not None and scrap_fixed_mm_per_cut > 0:
+            length_mm = length_mm + scrap_fixed_mm_per_cut
+        # 2) Scarto % (già presente) — su qty e length
         qty = qty * (1.0 + waste_pct / 100.0)
         if length_mm is not None:
             length_mm = length_mm * (1.0 + waste_pct / 100.0)
-        # Rounding
+        # 3) Scarto fisso per pezzo — aggiunto alla quantità
+        if scrap_fixed_per_piece > 0:
+            qty = qty + scrap_fixed_per_piece
+
+        # 4) Rounding rule (up/down/nearest/…)
         qty = _apply_rounding(qty, comp.get("rounding_rule") or "none")
+
+        # 5) Minimo tecnico
         min_q = float(comp.get("minimum_quantity") or 0)
         if min_q > 0 and qty < min_q:
             qty = min_q
+
+        # 6) Minimo fatturabile per riga (commerciale)
+        min_billable_qty = float(comp.get("minimum_billable_qty") or 0)
+        # Sarà applicato più avanti su line_measure post-consumo
+
+        # 7) Arrotondamento alla barra intera (opt-in) — per profili
+        row_warnings: List[str] = []
+        bars_needed = 0
+        if bar_rounding and comp.get("component_type") == "profile" and length_mm and length_mm > 0:
+            # Numero barre necessarie (arrotondamento up) per soddisfare qty pezzi × length_mm
+            total_length_mm_needed = qty * length_mm
+            bars_needed_float = total_length_mm_needed / max(_usable, 1)
+            bars_needed = int(-(-bars_needed_float // 1))  # ceil
+            row_warnings.append(
+                f"Barra intera imputata: {bars_needed} barra/e da {_usable:.0f}mm utili"
+            )
 
         # Prezzo/costo unitario (dai listini)
         unit_price = 0.0
@@ -244,20 +279,68 @@ def resolve_bom(
                 comp.get("component_type"), comp.get("ref_id"), color_id, comp.get("unit_of_measure"),
             ) or 0)
 
-        # Line total: per profilo → prezzo per metro × lunghezza in m × qty
+        # ==== Consumo: proporzionale vs barra intera imputata ====
+        # line_measure = quantità × unità (m per profili, m² per vetro, pz altrimenti)
+        # In "full_bar" (o bar_rounding=True) usiamo la barra intera come unità imputata.
+        line_measure_net = float(qty_net)
+        if comp.get("component_type") == "profile" and length_mm_net:
+            line_measure_net = float(qty_net) * (length_mm_net / 1000.0)
+        elif comp.get("component_type") == "glass" and area_sqm:
+            line_measure_net = float(qty_net) * float(area_sqm)
+
         line_measure = qty
         if comp.get("component_type") == "profile" and length_mm:
             length_m = length_mm / 1000.0
             line_measure = qty * length_m
+            if consumption_mode == "full_bar" or bar_rounding:
+                # Il cliente paga barre intere: line_measure = bars × usable_m
+                if not bars_needed:
+                    total_length_mm_needed = qty * length_mm
+                    bars_needed_float = total_length_mm_needed / max(_usable, 1)
+                    bars_needed = int(-(-bars_needed_float // 1))
+                line_measure = bars_needed * (_usable / 1000.0)
+                row_warnings.append(
+                    f"Modalità 'barra intera imputata': fatturati {bars_needed} × {_usable/1000:.2f}m"
+                )
         elif comp.get("component_type") == "glass" and area_sqm:
             line_measure = qty * area_sqm
+
+        # 8) Minimo fatturabile su line_measure
+        if min_billable_qty > 0 and line_measure < min_billable_qty:
+            row_warnings.append(
+                f"Applicato minimo fatturabile: {line_measure:.3f} → {min_billable_qty}"
+            )
+            line_measure = min_billable_qty
 
         line_cost = Decimal(str(unit_cost)) * Decimal(str(line_measure))
         line_price = Decimal(str(unit_price)) * Decimal(str(line_measure))
 
+        # Warning: prezzo/costo mancanti se ref_id presente
+        if comp.get("ref_id") and lookup_price and unit_price == 0:
+            row_warnings.append("Prezzo listino non trovato per questo componente")
+        if comp.get("ref_id") and lookup_cost and unit_cost == 0:
+            row_warnings.append("Costo listino non trovato per questo componente")
+
         if comp.get("is_cost_relevant", True):
             total_cost += line_cost
         total_price += line_price
+
+        # Formula/condizione applicate (audit human-readable)
+        formula_parts = []
+        if comp.get("quantity_formula"):
+            formula_parts.append(f"qty = {comp['quantity_formula']}")
+        if comp.get("length_formula"):
+            formula_parts.append(f"len_mm = {comp['length_formula']}")
+        if comp.get("width_formula"):
+            formula_parts.append(f"w_mm = {comp['width_formula']}")
+        if comp.get("height_formula"):
+            formula_parts.append(f"h_mm = {comp['height_formula']}")
+        if comp.get("area_formula"):
+            formula_parts.append(f"area_sqm = {comp['area_formula']}")
+        formula_applied = " ; ".join(formula_parts)
+
+        # Waste_qty (in unità pezzi o ml, come segnaposto)
+        waste_qty = float(qty) - float(qty_net) if qty >= qty_net else 0.0
 
         resolved.append({
             "component_id": comp.get("id"),
@@ -265,8 +348,18 @@ def resolve_bom(
             "component_type": comp.get("component_type"),
             "ref_id": comp.get("ref_id"),
             "role": comp.get("role"),
+            # Recipe metadata per audit / UI
+            "recipe_code": comp.get("recipe_code"),
+            "recipe_params": comp.get("recipe_params") or {},
+            "description_override": comp.get("description_override"),
+            # Quantities
+            "quantity_net": float(money(Decimal(str(qty_net)), 3)),
             "quantity": float(money(Decimal(str(qty)), 3)),
+            "waste_qty": float(money(Decimal(str(waste_qty)), 3)),
+            "quantity_billable": float(money(Decimal(str(line_measure)), 4)),
+            "bars_needed": bars_needed if bars_needed else None,
             "length_mm": float(money(Decimal(str(length_mm)), 1)) if length_mm is not None else None,
+            "length_mm_net": float(money(Decimal(str(length_mm_net)), 1)) if length_mm_net is not None else None,
             "width_mm": float(money(Decimal(str(width_c)), 1)) if width_c is not None else None,
             "height_mm": float(money(Decimal(str(height_c)), 1)) if height_c is not None else None,
             "area_sqm": float(money(Decimal(str(area_sqm)), 4)) if area_sqm is not None else None,
@@ -275,14 +368,23 @@ def resolve_bom(
             "unit_price": float(money(Decimal(str(unit_price)))),
             "unit_cost": float(money(Decimal(str(unit_cost)))),
             "line_measure": float(money(Decimal(str(line_measure)), 4)),
+            "line_measure_net": float(money(Decimal(str(line_measure_net)), 4)),
             "line_price": float(money(line_price)),
             "line_cost": float(money(line_cost)),
             "waste_pct": waste_pct,
+            "scrap_fixed_mm_per_cut": scrap_fixed_mm_per_cut,
+            "scrap_fixed_per_piece": scrap_fixed_per_piece,
+            "consumption_mode": consumption_mode,
+            "bar_rounding": bar_rounding,
+            "min_billable_qty": min_billable_qty,
+            "formula_applied": formula_applied,
+            "condition_applied": comp.get("condition") or [],
             "is_cutting_relevant": bool(comp.get("is_cutting_relevant", True)),
             "is_customer_visible": bool(comp.get("is_customer_visible", True)),
             "is_optional": bool(comp.get("is_optional", False)),
             "color_category_id": comp.get("color_category_id_override") or color_category_id,
             "color_id": color_id,
+            "warnings": row_warnings,
         })
 
     return {

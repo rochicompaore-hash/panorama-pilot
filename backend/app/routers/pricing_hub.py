@@ -18,7 +18,9 @@ from app.db import get_db
 from app.deps import require_permission
 from app.mongo_utils import to_mongo, from_mongo
 from app.models import BaseDoc, utcnow
-from app.services.formula import eval_formula, FormulaError, strict_mode
+from app.services.formula import eval_formula, FormulaError, strict_mode, validate_formula
+from app.services.bom_recipes import list_recipes, get_recipe, compile_recipe
+from app.services.bom_engine_v2 import resolve_bom_full
 
 
 PricingMethod = Literal[
@@ -333,3 +335,128 @@ async def seed_defaults(user: dict = Depends(require_permission("pricelists.mana
         await db.pricing_method_configs.insert_one(to_mongo(inst.model_dump(by_alias=True)))
         created += 1
     return {"ok": True, "created": created, "total": len(DEFAULT_METHODS)}
+
+
+# =====================================================================
+# BOM RECIPES — motore ricette visuale (Blocco A)
+# =====================================================================
+
+class BomRecipeCompileRequest(BaseModel):
+    """Richiesta compilazione ricetta → BomComponent parziale."""
+    recipe_code: str
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BomSimulateRequest(BaseModel):
+    """Simulatore BOM: dato un template + parametri → output esteso.
+    Se sell_pricelist_id/cost_pricelist_id assenti, prezzi/costi risulteranno 0
+    e verrà emesso un warning per riga (utile per debug tecnico)."""
+    bom_template_id: str
+    width_mm: int
+    height_mm: int
+    nr_ante: int = 1
+    nr_traversi: int = 0
+    nr_montanti: int = 0
+    nr_fissi: int = 0
+    color_category_id: Optional[str] = None
+    color_id: Optional[str] = None
+    glass_type_id: Optional[str] = None
+    hardware_kit_id: Optional[str] = None
+    sell_pricelist_id: Optional[str] = None
+    cost_pricelist_id: Optional[str] = None
+    include_costs: bool = True
+    extra_params: Dict[str, Any] = Field(default_factory=dict)
+
+
+@router.get("/bom-recipes")
+async def bom_recipes_list(user: dict = Depends(require_permission("bom_templates.view"))):
+    """Catalogo ricette disponibili (metadata). Filtra quelle che richiedono
+    permessi elevati (es. FORMULA_LIBERA) in base al ruolo dell'utente."""
+    recipes = list_recipes()
+    can_advanced = (user.get("is_superadmin") or user.get("is_platform_owner")
+                    or "products.manage" in (user.get("_perms") or []))
+    if not can_advanced:
+        recipes = [r for r in recipes if not r.get("requires_permission")]
+    return {"items": recipes, "count": len(recipes)}
+
+
+@router.post("/bom-recipes/compile")
+async def bom_recipes_compile(payload: BomRecipeCompileRequest,
+                              user: dict = Depends(require_permission("bom_templates.view"))):
+    """Compila una ricetta con i suoi parametri → BomComponent parziale.
+    L'UI visuale usa questo endpoint per mostrare live le formule generate
+    prima di salvarle nel template BOM.
+    """
+    recipe = get_recipe(payload.recipe_code)
+    if not recipe:
+        raise HTTPException(404, f"Ricetta '{payload.recipe_code}' non trovata")
+    if recipe.get("requires_permission"):
+        perm = recipe["requires_permission"]
+        if not (user.get("is_superadmin") or user.get("is_platform_owner")
+                or perm in (user.get("_perms") or [])):
+            raise HTTPException(403, f"Ricetta '{payload.recipe_code}' richiede il permesso {perm}")
+    try:
+        compiled = compile_recipe(payload.recipe_code, payload.params or {})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    # Validazione formule generate (assicura AST safe)
+    validation_errors: List[str] = []
+    for field in ("quantity_formula", "length_formula", "width_formula",
+                   "height_formula", "area_formula", "weight_formula"):
+        expr = compiled.get(field)
+        if not expr:
+            continue
+        ok, err = validate_formula(expr)
+        if not ok:
+            validation_errors.append(f"{field}: {err}")
+    return {
+        "recipe": recipe,
+        "compiled": compiled,
+        "validation_errors": validation_errors,
+    }
+
+
+@router.post("/bom-simulate")
+async def bom_simulate(payload: BomSimulateRequest,
+                       user: dict = Depends(require_permission("pricelists.view"))):
+    """Simulatore BOM esteso — output row-by-row con:
+      componente, codice, descrizione, quantità netta, sfrido, quantità fatturata,
+      unità, costo/prezzo unit., costo/prezzo tot., formula/ricetta, condizione,
+      origine listino, versione, warning, errore bloccante.
+
+    Restituisce anche aggregati per tipologia e uno snapshot hash per audit.
+    """
+    can_see_costs = (user.get("is_superadmin") or user.get("is_platform_owner")
+                     or "pricelists.manage" in (user.get("_perms") or [])
+                     or "quotes.view_costs" in (user.get("_perms") or [])
+                     or "pricing.mode.view_cost_basis" in (user.get("_perms") or []))
+    include_costs = payload.include_costs and can_see_costs
+    params = {
+        "width_mm": payload.width_mm, "height_mm": payload.height_mm,
+        "nr_ante": payload.nr_ante, "nr_traversi": payload.nr_traversi,
+        "nr_montanti": payload.nr_montanti, "nr_fissi": payload.nr_fissi,
+        "color_category_id": payload.color_category_id,
+        "color_id": payload.color_id,
+        "glass_type_id": payload.glass_type_id,
+        "hardware_kit_id": payload.hardware_kit_id,
+        **(payload.extra_params or {}),
+    }
+    result = await resolve_bom_full(
+        tenant_id=user["tenant_id"],
+        bom_template_id=payload.bom_template_id,
+        params=params,
+        sell_pricelist_id=payload.sell_pricelist_id,
+        cost_pricelist_id=payload.cost_pricelist_id,
+        include_costs=include_costs,
+    )
+    # Se costi non visibili, redigi
+    if not include_costs:
+        for c in result.get("components") or []:
+            c["unit_cost"] = None
+            c["line_cost"] = None
+            c["pricelist_origin_cost"] = None
+        result["materials_cost"] = None
+        result["cost_pricelist"] = None
+        result["cost_redacted"] = True
+    return result
+

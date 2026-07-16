@@ -519,15 +519,24 @@ class BomComponent(BaseModel):
     weight_formula: Optional[str] = None
     condition: List[Dict[str, Any]] = Field(default_factory=list)  # condition engine
     unit_of_measure: str = "piece"
-    waste_pct: float = 0.0                                # scarto tecnico
+    waste_pct: float = 0.0                                # scarto tecnico %
+    scrap_fixed_mm_per_cut: float = 0.0                   # sfrido fisso mm per taglio (profili)
+    scrap_fixed_per_piece: float = 0.0                    # sfrido fisso per pezzo (qualsiasi UM)
     rounding_rule: RoundingRule = "none"
-    minimum_quantity: float = 0.0
+    minimum_quantity: float = 0.0                         # min quantità (tecnica)
+    minimum_billable_qty: float = 0.0                     # min FATTURABILE (commerciale)
+    consumption_mode: Literal["proportional", "full_bar"] = "proportional"
+    bar_rounding: bool = False                            # arrotondamento alla barra intera (default OFF)
     application_scope: ApplicationScope = "per_piece"
     is_optional: bool = False
     is_customer_visible: bool = True
     is_cost_relevant: bool = True
     is_cutting_relevant: bool = True
     notes: Optional[str] = None
+    description_override: Optional[str] = None            # descrizione ad-hoc
+    # Origine ricetta (per UI visuale — non usato in eval)
+    recipe_code: Optional[str] = None
+    recipe_params: Dict[str, Any] = Field(default_factory=dict)
     # Override colore (raro): forza uno specifico ColorCategory su questo componente
     color_category_id_override: Optional[str] = None
 
