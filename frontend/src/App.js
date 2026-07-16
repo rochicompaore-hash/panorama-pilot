@@ -51,6 +51,7 @@ import SiteConditionsForm from "@/pages/SiteConditionsForm";
 import LandingPage from "@/pages/LandingPage";
 import PlatformSiteConfigPage from "@/pages/PlatformSiteConfigPage";
 import QuoteStructurePage from "@/pages/QuoteStructurePage";
+import PricingHubPage from "@/pages/PricingHubPage";
 import AppLayout from "@/layouts/AppLayout";
 
 function Protected({ children }) {
@@ -137,6 +138,7 @@ function App() {
           <Route path="platform-site-config" element={<PlatformSiteConfigPage />} />
           <Route path="quote-structure" element={<QuoteStructurePage />} />
           <Route path="quote-structure/:quoteId" element={<QuoteStructurePage />} />
+          <Route path="pricing-hub" element={<PricingHubPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

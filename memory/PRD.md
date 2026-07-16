@@ -88,3 +88,37 @@ Copertura end-to-end: Lead → Preventivo → Contratto → Rilievo → Produzio
 ### Testing
 - Iter 16: 20/21 backend PASS. 1 Critical trovato: migration lock usava campo sbagliato → **FIXED**.
 - Iter 17: 3/3 fix confermati (lock uses quote_status, migration idempotent con no_changes, migration_required corretto).
+
+## Iter 18-19 — Listini e Regole di Calcolo (Pricing Hub) — Feb 2026
+### Fatto
+- Nuovo router `pricing_hub.py` + modello `PricingMethodConfig`:
+  - Metodi supportati: A `per_sqm`, B `tabular`, C `per_piece`, D `per_linear`, E `bom`, F `hybrid`, G `formula`, H `manual_temporarily`.
+  - Per categoria: minimum_billable_sqm, minimum_billable_price, maggiorazione colore/urgenza, versione, published/bozza, valid_from/to.
+- Endpoint `/api/pricing-hub/*`:
+  - `GET/POST/PATCH /methods` — CRUD metodi per categoria
+  - `POST /methods/{id}/publish` — validazione + pubblicazione (formula obbligatoria per method=formula, ecc.)
+  - `POST /simulate` — simulatore prezzi (verifica minimo fatturabile, colore, urgenza, VAT, override manuale)
+  - `POST /seed-defaults` — crea 15 metodi default per categorie (finestra/portafinestra/fisso/scorrevole/portoncino/persiana/scuro/tapparella/zanzariera/cassonetto/vetro/accessorio/montaggio/smontaggio/smaltimento)
+- Frontend `PricingHubPage.jsx`:
+  - Tab Categorie: cambia metodo, min m², prezzo unitario, colore%, publish per categoria
+  - Tab Simulatore: form (categoria, W×H, Q, ml, colore, urgenza) → risultato dettagliato con superficie reale/fatturata, subtotale, maggiorazioni, netto/IVA
+  - Tab Riferimenti tecnici: link ai motori esistenti (listini, engine parametrico, catalogo prodotti)
+- Voce menu **"Listini e regole di calcolo"** aggiunta in "Configurazione tecnica"
+- Permessi: pricing.view/manage/publish/test/override, bom_templates, formulas, custom_configurations.create, price_lists.import
+
+### Continuità con motori esistenti
+- Il Pricing Hub è il **layer di configurazione unificato** che sceglie il metodo di calcolo per categoria.
+- I motori esistenti (**parametric engine**, **BOM templates**, **price_matrices**, **item_pricelists**) rimangono attivi e vengono referenziati:
+  - `listino_ref` → item_pricelists (esistente)
+  - `price_matrix_ref` → price_matrices (esistente)
+  - `bom_template_ref` → bom_templates (esistente)
+  - `formula_expr` → services/formula.py (AST safe eval con strict_mode)
+- Nel Preventivatore commerciale nulla cambia: il calcolo passa attraverso i motori esistenti; l'admin configura solo il metodo per categoria.
+
+### Test smoke
+- Zanzariera 1000×1200mm → superficie 1.2m² < min 1.5 → applicato min → 78€/m² × 1.5 = **117€** ✅
+- Tapparella 1000×1200mm → min 1.75 → 96€/m² × 1.75 = **168€** (uguale a esempio specifica) ✅
+- Auth/Multi-company/SaaS/Landing/Preventivatore: 49/49 test regression PASS in iter 18.
+
+### Deployment
+Chiama il tool "Deploy" dall'interfaccia Emergent per pubblicare. deployment_agent = PASS su iter precedente.

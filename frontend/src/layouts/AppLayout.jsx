@@ -82,7 +82,8 @@ const NAV = [
     label: "Configurazione tecnica",
     items: [
       { to: "/product-catalog", label: "Catalogo prodotti", icon: FileText, perm: "products.view" },
-      { to: "/pricelists", label: "Listini e regole prezzo", icon: Hash, perm: "pricelists.view" },
+      { to: "/pricing-hub", label: "Listini e regole di calcolo", icon: Hash, perm: "pricelists.view" },
+      { to: "/pricelists", label: "Listini prodotto (dettaglio)", icon: Hash, perm: "pricelists.view" },
       { to: "/parametric", label: "Engine parametrico (avanzato)", icon: FileText, perm: "products.manage" },
       { to: "/parametric/admin", label: "Sistemi profilo & formule", icon: FileText, perm: "products.manage" },
       { to: "/site-conditions", label: "Test questionario cantiere", icon: FileText, perm: "quotes.view" },

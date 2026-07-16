@@ -279,6 +279,19 @@ PERMISSION_CATALOG = [
     ("access_surcharges.manage", "Supplementi accesso", "edit", "Gestisce regole supplementi"),
     ("platform_costs.manage", "Costi piattaforma", "edit", "Gestisce costi piattaforma"),
     ("municipal_authorizations.manage", "Autorizzazioni comunali", "edit", "Gestisce costi autorizzazioni"),
+    # Pricing hub
+    ("pricing.view", "Pricing hub", "view", "Visualizza metodi calcolo prezzi"),
+    ("pricing.manage", "Pricing hub", "edit", "Gestisce metodi calcolo"),
+    ("pricing.publish", "Pricing hub", "approve", "Pubblica listino/metodo"),
+    ("pricing.test", "Pricing hub", "view", "Usa simulatore prezzi"),
+    ("pricing.override", "Pricing hub", "approve", "Override prezzo manuale"),
+    ("bom_templates.view", "BOM templates", "view", "Visualizza template BOM"),
+    ("bom_templates.manage", "BOM templates", "edit", "Gestisce template BOM"),
+    ("formulas.view", "Formule", "view", "Visualizza formule"),
+    ("formulas.manage", "Formule", "edit", "Gestisce formule"),
+    ("formulas.publish", "Formule", "approve", "Pubblica formule"),
+    ("custom_configurations.create", "Configurazioni personalizzate", "create", "Crea serramenti fuori standard"),
+    ("price_lists.import", "Import listini", "edit", "Importa listini XLS/CSV"),
 ]
 
 # Predefined roles with permissions
