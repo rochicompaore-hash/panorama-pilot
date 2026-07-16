@@ -47,11 +47,30 @@ ALLOWED_FUNCTIONS = {
 }
 
 ALLOWED_VARIABLES = {
+    # legacy pricing rules
     "width", "height", "area", "billable_area", "perimeter",
     "linear_meters", "quantity", "leaves", "weight",
     "base_price", "base_cost",
-    # extended
     "sqm", "min_billable_sqm",
+    # parametric engine — dimensioni foro/luce
+    "L", "H", "width_mm", "height_mm",
+    # parametric engine — contatori
+    "nr_ante", "nr_traversi", "nr_montanti", "nr_fissi", "nr_vetri",
+    # parametric engine — taglio
+    "kerf", "bar_length",
+    # parametric engine — profilo/sistema (tech params)
+    "frame_width", "frame_depth", "sash_width", "sash_depth",
+    "frame_clearance", "sash_clearance", "glass_clearance",
+    "glazing_bead_clearance", "weld_allowance",
+    "overlap", "rebate", "threshold_height",
+    "mullion_offset", "transom_offset", "coupling_gap",
+    "installation_gap", "profile_length_adjustment", "central_node",
+    "glass_deduction",
+    # derived
+    "glass_width", "glass_height", "glass_area", "glass_weight",
+    "profile_weight", "total_weight",
+    # per componente
+    "component_index",
 }
 
 

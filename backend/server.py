@@ -66,6 +66,7 @@ from app.routers.service_tickets import router as service_tickets_router
 from app.routers.admin_finance import pp_router, p_router, inv_router as invoices_router
 from app.routers.bi import router as bi_router
 from app.routers.ai_cfo import router as ai_cfo_router
+from app.routers.parametric import router as parametric_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -153,6 +154,7 @@ api.include_router(p_router)
 api.include_router(invoices_router)
 api.include_router(bi_router)
 api.include_router(ai_cfo_router)
+api.include_router(parametric_router)
 
 app.include_router(api)
 

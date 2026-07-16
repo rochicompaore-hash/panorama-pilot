@@ -71,4 +71,18 @@ async def ensure_indexes():
     # ---------- AI CFO ----------
     await db.ai_cfo_suggestions.create_index([("tenant_id", 1), ("is_dismissed", 1), ("generated_at", -1)], name="ix_aicfo_active")
 
+    # ---------- Parametric Engine (M6.PAR) ----------
+    for coll in ("profile_systems", "profiles", "color_categories", "colors",
+                  "glass_types", "hardware_kits", "accessories",
+                  "item_pricelists", "price_matrices", "bom_templates",
+                  "pricing_mode_configs", "cutting_lists", "scrap_stock",
+                  "bar_optimization_runs", "parametric_snapshots"):
+        await db[coll].create_index([("tenant_id", 1), ("created_at", -1)], name=f"ix_{coll}_tenant_created")
+        await db[coll].create_index([("tenant_id", 1), ("deleted_at", 1)], name=f"ix_{coll}_tenant_deleted")
+    await db.profiles.create_index([("tenant_id", 1), ("system_id", 1), ("role", 1)], name="ix_profiles_sys_role")
+    await db.bom_templates.create_index([("tenant_id", 1), ("product_key", 1), ("bom_status", 1)], name="ix_bom_product_status")
+    await db.price_matrices.create_index([("tenant_id", 1), ("product_key", 1), ("pm_status", 1)], name="ix_matrix_product_status")
+    await db.pricing_mode_configs.create_index([("tenant_id", 1), ("scope", 1), ("product_key", 1), ("scope_ref_id", 1)], name="ix_pricing_mode_scope")
+    await db.scrap_stock.create_index([("tenant_id", 1), ("profile_id", 1), ("color_id", 1), ("scrap_status", 1)], name="ix_scrap_prof_col_st")
+
     logger.info("MongoDB indexes ensured.")

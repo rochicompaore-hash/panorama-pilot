@@ -232,6 +232,13 @@ async def run_seed():
     # Seed PDF templates + clauses (M3.3.2)
     from app.seed_pdf import run_pdf_seed
     await run_pdf_seed(company_id)
+    # Seed Parametric Engine demo data (M6.PAR) — sistemi, profili, colori, BOM, matrici
+    try:
+        from app.seed_parametric import seed_parametric_demo
+        pdemo = await seed_parametric_demo(company_id)
+        logger.info("Parametric demo seed: %s", pdemo.get("ok"))
+    except Exception as e:
+        logger.warning("Parametric demo seed issue (non-fatal): %s", e)
     # Platform Owner (globale, sopra Super Admin del tenant)
     from app.platform_owner import run_platform_owner_seed
     po = await run_platform_owner_seed()

@@ -176,6 +176,18 @@ PERMISSION_CATALOG = [
     # M17 — AI CFO
     ("ai_cfo.view", "AI CFO", "view", "Visualizza suggerimenti AI CFO"),
     ("ai_cfo.generate", "AI CFO", "edit", "Rigenera suggerimenti AI CFO"),
+    # Parametric Engine (M6.PAR) — BOM parametrica, matrici, modalità pricing A/B/C
+    ("pricing.mode.view", "Pricing Modalità", "view", "Visualizza modalità pricing applicata"),
+    ("pricing.mode.override", "Pricing Modalità", "approve", "Override modalità sulla riga (con motivazione)"),
+    ("pricing.mode.manage_defaults", "Pricing Modalità", "edit", "Gestisce default modalità (tenant/prodotto/sistema)"),
+    ("pricing.mode.view_cost_basis", "Pricing Modalità", "view_financials", "Visualizza base di costo (BOM/listino costo)"),
+    ("parametric.bom.view", "BOM Parametrica", "view", "Visualizza template BOM parametrici"),
+    ("parametric.bom.manage", "BOM Parametrica", "edit", "Gestisce template BOM e formule"),
+    ("parametric.matrix.view", "Matrici Prezzo", "view", "Visualizza matrici prezzi"),
+    ("parametric.matrix.manage", "Matrici Prezzo", "edit", "Gestisce matrici prezzi"),
+    ("parametric.color.manage", "Categorie Colore", "edit", "Gestisce categorie colore e policy residui"),
+    ("parametric.nesting.run", "Nesting 1D", "edit", "Esegue algoritmi FFD/BFD"),
+    ("parametric.svg.generate", "Disegno SVG", "view", "Genera disegni SVG parametrici"),
 ]
 
 # Predefined roles with permissions

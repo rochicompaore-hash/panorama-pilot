@@ -39,6 +39,8 @@ import {
   ItemsPage, ProductionOrdersPage, QCPage, ServiceTicketsPage,
   InstallationPlansPage, PaymentPlansPage, AICFOPage,
 } from "@/pages/ErpModulePages";
+import ParametricConfiguratorPage from "@/pages/ParametricConfiguratorPage";
+import ParametricAdminPage from "@/pages/ParametricAdminPage";
 import AppLayout from "@/layouts/AppLayout";
 
 function Protected({ children }) {
@@ -112,6 +114,8 @@ function App() {
           <Route path="installation-plans" element={<InstallationPlansPage />} />
           <Route path="payment-plans" element={<PaymentPlansPage />} />
           <Route path="ai-cfo" element={<AICFOPage />} />
+          <Route path="parametric" element={<ParametricConfiguratorPage />} />
+          <Route path="parametric/admin" element={<ParametricAdminPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

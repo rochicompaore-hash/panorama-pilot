@@ -1,0 +1,293 @@
+"""Parametric BOM Engine — risolve una BOM parametrica in una BOM concreta.
+
+Input:
+  - BomTemplate + set di parametri (L, H, nr_ante, color_category_id, glass_id, hardware_id, …)
+Output:
+  - Lista di componenti concreti con: quantità, lunghezza, area, peso, unità
+  - Aggregato di costi (dal listino costo)
+  - Preview lista taglio preliminare (opzionale)
+
+Design:
+- Nessun eval(): usa services/formula.eval_formula (parser AST).
+- Condizioni di applicabilità: usa services/conditions.evaluate_conditions.
+- Rounding: applicabile per componente (`rounding_rule`).
+- Scarto tecnico waste_pct: applicato alla quantità/lunghezza post-formula.
+"""
+from __future__ import annotations
+from decimal import Decimal, ROUND_HALF_UP, ROUND_UP, ROUND_DOWN
+from typing import Dict, Any, List, Optional, Tuple
+
+from app.services.formula import eval_formula, FormulaError, money
+from app.services.conditions import evaluate_conditions
+
+
+def build_formula_context(
+    *,
+    width_mm: int,
+    height_mm: int,
+    nr_ante: int = 1,
+    nr_traversi: int = 0,
+    nr_montanti: int = 0,
+    nr_fissi: int = 0,
+    nr_vetri: int = 0,
+    ps_tech: Optional[Dict[str, Any]] = None,
+    extra: Optional[Dict[str, Any]] = None,
+    component_index: int = 0,
+) -> Dict[str, Any]:
+    """Costruisce il contesto variabili per il parser formule.
+    Legenda:
+      L, H, width_mm, height_mm  → dimensioni foro (mm)
+      area                        → area in m² (foro)
+      perimeter                   → perimetro in m (foro)
+      frame_width, frame_depth, … → parametri sistema profilo
+    """
+    tech = ps_tech or {}
+    L = float(width_mm or 0)
+    H = float(height_mm or 0)
+    area = (L / 1000.0) * (H / 1000.0) if L > 0 and H > 0 else 0.0
+    perimeter = ((L + H) * 2.0) / 1000.0 if L > 0 and H > 0 else 0.0
+    ctx: Dict[str, Any] = {
+        "L": L, "H": H, "width_mm": L, "height_mm": H,
+        "width": L / 1000.0, "height": H / 1000.0,
+        "area": area, "sqm": area, "billable_area": area, "min_billable_sqm": 0.0,
+        "perimeter": perimeter, "linear_meters": perimeter,
+        "quantity": 1.0, "leaves": float(nr_ante), "weight": 0.0,
+        "base_price": 0.0, "base_cost": 0.0,
+        # contatori
+        "nr_ante": float(nr_ante or 0),
+        "nr_traversi": float(nr_traversi or 0),
+        "nr_montanti": float(nr_montanti or 0),
+        "nr_fissi": float(nr_fissi or 0),
+        "nr_vetri": float(nr_vetri or 0),
+        # taglio
+        "kerf": float(tech.get("kerf_mm", 3.0)),
+        "bar_length": float(tech.get("bar_length_mm", 6500)),
+        # sistema profilo
+        "frame_width": float(tech.get("frame_width_mm", 70.0)),
+        "frame_depth": float(tech.get("frame_depth_mm", 70.0)),
+        "sash_width": float(tech.get("sash_width_mm", 78.0)),
+        "sash_depth": float(tech.get("sash_depth_mm", 78.0)),
+        "central_node": float(tech.get("central_node_mm", 108.0)),
+        "rebate": float(tech.get("rebate_mm", 20.0)),
+        "glass_clearance": float(tech.get("glass_clearance_mm", 4.0)),
+        "glass_deduction": float(tech.get("glass_deduction_mm", 60.0)),
+        "weld_allowance": float(tech.get("weld_allowance_mm", 0.0)),
+        "glazing_bead_clearance": float(tech.get("glazing_bead_clearance_mm", 2.0)),
+        "frame_clearance": float(tech.get("frame_clearance_mm", 6.0)),
+        "sash_clearance": float(tech.get("sash_clearance_mm", 4.0)),
+        "overlap": float(tech.get("overlap_mm", 8.0)),
+        "threshold_height": float(tech.get("threshold_height_mm", 0.0)),
+        "mullion_offset": float(tech.get("mullion_offset_mm", 0.0)),
+        "transom_offset": float(tech.get("transom_offset_mm", 0.0)),
+        "coupling_gap": float(tech.get("coupling_gap_mm", 0.0)),
+        "installation_gap": float(tech.get("installation_gap_mm", 10.0)),
+        "profile_length_adjustment": float(tech.get("profile_length_adjustment_mm", 0.0)),
+        # derived (default 0, calcolabili tramite formule)
+        "glass_width": 0.0, "glass_height": 0.0, "glass_area": 0.0, "glass_weight": 0.0,
+        "profile_weight": 0.0, "total_weight": 0.0,
+        "component_index": float(component_index),
+    }
+    if extra:
+        ctx.update({k: (float(v) if isinstance(v, (int, float, Decimal)) else v)
+                    for k, v in extra.items()
+                    if isinstance(v, (int, float, Decimal))})
+    return ctx
+
+
+def _apply_rounding(value: float, rule: str) -> float:
+    if rule == "up":
+        return float(Decimal(str(value)).to_integral_value(rounding=ROUND_UP))
+    if rule == "down":
+        return float(Decimal(str(value)).to_integral_value(rounding=ROUND_DOWN))
+    if rule == "nearest":
+        return float(Decimal(str(value)).to_integral_value(rounding=ROUND_HALF_UP))
+    if rule == "nearest_5":
+        return float((Decimal(str(value)) / 5).to_integral_value(ROUND_HALF_UP) * 5)
+    if rule == "nearest_10":
+        return float((Decimal(str(value)) / 10).to_integral_value(ROUND_HALF_UP) * 10)
+    return value
+
+
+def resolve_bom(
+    *,
+    bom_template: Dict[str, Any],
+    profile_system: Dict[str, Any],
+    params: Dict[str, Any],
+    lookup_price: Optional[callable] = None,
+    lookup_cost: Optional[callable] = None,
+) -> Dict[str, Any]:
+    """Risolve un BomTemplate per un set di parametri.
+
+    Args:
+        bom_template: doc bom_templates
+        profile_system: doc profile_systems
+        params: {width_mm, height_mm, nr_ante, ..., color_category_id, glass_type_id, hardware_kit_id}
+        lookup_price(ref_type, ref_id, color_id, unit) -> unit_price (sell)
+        lookup_cost(ref_type, ref_id, color_id, unit) -> unit_cost
+
+    Returns:
+        {
+          "components": [ { ...resolved... } ],
+          "materials_cost": float,
+          "materials_price": float,
+          "warnings": [str],
+        }
+    """
+    warnings: List[str] = []
+    tech = (profile_system or {}).get("tech") or {}
+    width_mm = int(params.get("width_mm") or 0)
+    height_mm = int(params.get("height_mm") or 0)
+    nr_ante = int(params.get("nr_ante") or 1)
+    nr_traversi = int(params.get("nr_traversi") or 0)
+    nr_montanti = int(params.get("nr_montanti") or 0)
+    nr_fissi = int(params.get("nr_fissi") or 0)
+    color_category_id = params.get("color_category_id") or bom_template.get("color_category_default_id")
+    color_id = params.get("color_id")
+
+    resolved: List[Dict[str, Any]] = []
+    total_cost = Decimal("0")
+    total_price = Decimal("0")
+
+    for idx, comp in enumerate(bom_template.get("components") or []):
+        # Condizione di applicabilità
+        conditions = comp.get("condition") or []
+        if not evaluate_conditions(conditions, params):
+            continue
+        ctx = build_formula_context(
+            width_mm=width_mm, height_mm=height_mm,
+            nr_ante=nr_ante, nr_traversi=nr_traversi, nr_montanti=nr_montanti,
+            nr_fissi=nr_fissi,
+            ps_tech=tech, extra=params, component_index=idx,
+        )
+        try:
+            qty = float(eval_formula(comp.get("quantity_formula") or "1", ctx))
+        except FormulaError as e:
+            warnings.append(f"[{comp.get('role') or comp.get('component_type')}] quantity_formula: {e}")
+            continue
+        length_mm: Optional[float] = None
+        area_sqm: Optional[float] = None
+        weight_kg: Optional[float] = None
+        width_c: Optional[float] = None
+        height_c: Optional[float] = None
+        if comp.get("length_formula"):
+            try:
+                length_mm = float(eval_formula(comp["length_formula"], ctx))
+            except FormulaError as e:
+                warnings.append(f"[{comp.get('role')}] length_formula: {e}")
+        if comp.get("width_formula"):
+            try:
+                width_c = float(eval_formula(comp["width_formula"], ctx))
+            except FormulaError as e:
+                warnings.append(f"[{comp.get('role')}] width_formula: {e}")
+        if comp.get("height_formula"):
+            try:
+                height_c = float(eval_formula(comp["height_formula"], ctx))
+            except FormulaError as e:
+                warnings.append(f"[{comp.get('role')}] height_formula: {e}")
+        if comp.get("area_formula"):
+            try:
+                area_sqm = float(eval_formula(comp["area_formula"], ctx))
+            except FormulaError as e:
+                warnings.append(f"[{comp.get('role')}] area_formula: {e}")
+        elif width_c and height_c:
+            area_sqm = (width_c / 1000.0) * (height_c / 1000.0)
+        if comp.get("weight_formula"):
+            try:
+                weight_kg = float(eval_formula(comp["weight_formula"], ctx))
+            except FormulaError as e:
+                warnings.append(f"[{comp.get('role')}] weight_formula: {e}")
+
+        # Scarto tecnico waste_pct e minimo
+        waste_pct = float(comp.get("waste_pct") or 0)
+        qty = qty * (1.0 + waste_pct / 100.0)
+        if length_mm is not None:
+            length_mm = length_mm * (1.0 + waste_pct / 100.0)
+        # Rounding
+        qty = _apply_rounding(qty, comp.get("rounding_rule") or "none")
+        min_q = float(comp.get("minimum_quantity") or 0)
+        if min_q > 0 and qty < min_q:
+            qty = min_q
+
+        # Prezzo/costo unitario (dai listini)
+        unit_price = 0.0
+        unit_cost = 0.0
+        if lookup_price:
+            unit_price = float(lookup_price(
+                comp.get("component_type"), comp.get("ref_id"), color_id, comp.get("unit_of_measure"),
+            ) or 0)
+        if lookup_cost:
+            unit_cost = float(lookup_cost(
+                comp.get("component_type"), comp.get("ref_id"), color_id, comp.get("unit_of_measure"),
+            ) or 0)
+
+        # Line total: per profilo → prezzo per metro × lunghezza in m × qty
+        line_measure = qty
+        if comp.get("component_type") == "profile" and length_mm:
+            length_m = length_mm / 1000.0
+            line_measure = qty * length_m
+        elif comp.get("component_type") == "glass" and area_sqm:
+            line_measure = qty * area_sqm
+
+        line_cost = Decimal(str(unit_cost)) * Decimal(str(line_measure))
+        line_price = Decimal(str(unit_price)) * Decimal(str(line_measure))
+
+        if comp.get("is_cost_relevant", True):
+            total_cost += line_cost
+        total_price += line_price
+
+        resolved.append({
+            "component_id": comp.get("id"),
+            "sequence": comp.get("sequence", 0),
+            "component_type": comp.get("component_type"),
+            "ref_id": comp.get("ref_id"),
+            "role": comp.get("role"),
+            "quantity": float(money(Decimal(str(qty)), 3)),
+            "length_mm": float(money(Decimal(str(length_mm)), 1)) if length_mm is not None else None,
+            "width_mm": float(money(Decimal(str(width_c)), 1)) if width_c is not None else None,
+            "height_mm": float(money(Decimal(str(height_c)), 1)) if height_c is not None else None,
+            "area_sqm": float(money(Decimal(str(area_sqm)), 4)) if area_sqm is not None else None,
+            "weight_kg": float(money(Decimal(str(weight_kg)), 3)) if weight_kg is not None else None,
+            "unit_of_measure": comp.get("unit_of_measure"),
+            "unit_price": float(money(Decimal(str(unit_price)))),
+            "unit_cost": float(money(Decimal(str(unit_cost)))),
+            "line_measure": float(money(Decimal(str(line_measure)), 4)),
+            "line_price": float(money(line_price)),
+            "line_cost": float(money(line_cost)),
+            "waste_pct": waste_pct,
+            "is_cutting_relevant": bool(comp.get("is_cutting_relevant", True)),
+            "is_customer_visible": bool(comp.get("is_customer_visible", True)),
+            "is_optional": bool(comp.get("is_optional", False)),
+            "color_category_id": comp.get("color_category_id_override") or color_category_id,
+            "color_id": color_id,
+        })
+
+    return {
+        "components": resolved,
+        "materials_cost": float(money(total_cost)),
+        "materials_price": float(money(total_price)),
+        "warnings": warnings,
+    }
+
+
+def collect_cutting_inputs(resolved_bom: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Estrae dai componenti risolti solo quelli rilevanti per il taglio (profile con lunghezza).
+    Ogni entry: {profile_id, length_mm, quantity, role, color_category_id, color_id, bom_component_id}
+    """
+    out: List[Dict[str, Any]] = []
+    for c in resolved_bom.get("components") or []:
+        if c.get("component_type") != "profile":
+            continue
+        if not c.get("is_cutting_relevant", True):
+            continue
+        if not c.get("length_mm") or c.get("quantity", 0) <= 0:
+            continue
+        out.append({
+            "profile_id": c.get("ref_id"),
+            "length_mm": float(c["length_mm"]),
+            "quantity": int(round(c["quantity"])) if c["quantity"] >= 1 else 1,
+            "role": c.get("role"),
+            "color_category_id": c.get("color_category_id"),
+            "color_id": c.get("color_id"),
+            "bom_component_id": c.get("component_id"),
+        })
+    return out
