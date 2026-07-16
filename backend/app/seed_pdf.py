@@ -202,5 +202,17 @@ async def seed_default_clauses(tenant_id: str):
 
 
 async def run_pdf_seed(tenant_id: str):
+    from app.db import get_db
+    db = get_db()
+    # Ensure unique index for idempotency on parallel double-click
+    try:
+        await db.quote_pdfs.create_index(
+            [("tenant_id", 1), ("quote_id", 1), ("snapshot_hash", 1), ("kind", 1)],
+            name="ux_pdf_idempotent",
+            unique=True,
+            partialFilterExpression={"invalidated_at": None, "kind": "definitive"},
+        )
+    except Exception:
+        pass  # Index may already exist
     await seed_default_clauses(tenant_id)
     await seed_default_template(tenant_id)

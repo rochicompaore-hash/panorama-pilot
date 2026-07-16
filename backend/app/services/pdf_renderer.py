@@ -140,8 +140,12 @@ def validate_quote_for_definitive(quote: dict, company: dict, template: dict) ->
     if not (quote.get("customer_id") or quote.get("lead_id")):
         errs.append({"field": "quote.customer", "code": "missing_customer", "message": "Cliente/Lead non assegnato"})
 
-    # Site address recommended
-    if not quote.get("site_address"):
+    # Site address recommended (check nested fields, not just presence — LeadAddress defaults are truthy dict)
+    sa = quote.get("site_address") or {}
+    if isinstance(sa, dict):
+        if not (sa.get("street") or sa.get("city") or sa.get("zip_code")):
+            errs.append({"field": "quote.site_address", "code": "missing_site", "message": "Indirizzo cantiere mancante"})
+    elif not sa:
         errs.append({"field": "quote.site_address", "code": "missing_site", "message": "Indirizzo cantiere mancante"})
 
     # Payment terms present

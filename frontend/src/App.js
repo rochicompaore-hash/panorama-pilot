@@ -32,6 +32,7 @@ import QuoteEditorPage from "@/pages/QuoteEditorPage";
 import PricelistsPage from "@/pages/PricelistsPage";
 import TemplatesPage from "@/pages/TemplatesPage";
 import ClausesPage from "@/pages/ClausesPage";
+import PublicQuotePage from "@/pages/PublicQuotePage";
 import OnboardingWizard from "@/pages/OnboardingWizard";
 import AppLayout from "@/layouts/AppLayout";
 
@@ -54,6 +55,7 @@ function App() {
     <div className="App">
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/p/:token" element={<PublicQuotePage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />

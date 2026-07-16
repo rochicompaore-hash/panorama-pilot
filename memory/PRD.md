@@ -90,3 +90,35 @@ Vedi `/app/memory/test_credentials.md`.
 - P1: Badge risparmio (solo con snapshot valido)
 - P1: KPI dashboard preventivi (conversion, avg deal, WoW)
 - P2: Template Excel import listini
+
+## Iteration 7 (2026-02) — M3.3.2 PDF Professionale
+
+### Backend
+- **Modelli**: `Clause`, `QuoteTemplate`, `QuotePdf` (con snapshot_hash+pdf_hash), `PaymentTermsSchema` (rate strutturate), `Company` estesa (legal_name, commercial_name, PEC, IBAN, REA, certifications, colori, logo, signature, stamp).
+- **Servizio** `pdf_renderer.py`: WeasyPrint HTML→PDF, `build_snapshot` (esclude internal_cost/margin), `compute_snapshot_hash` (esclude volatili → idempotenza), `validate_quote_for_definitive` (gate: lines, subtotal, cliente, site_address con check nested), `safe_filename` (regex whitelist + dedup R00).
+- **Template HTML** `templates/quote_pdf.html`: A4, running header/footer, page-break, watermark BOZZA/SUPERATO, IVA multi-aliquota, badge OBBLIGATORIA sulle clausole, tabelle vani con codice/desc/misure, blocco firma cliente+azienda, disclaimer misure/immagini/privacy.
+- **Router**: `/clauses` CRUD + versionamento (`clause_versions`), `/quote-templates` CRUD + versionamento, `/quotes/{id}/pdf/preview|generate` con validation gate e idempotency by snapshot_hash, `/quote-pdfs/{pid}/download|invalidate`, `/quotes/scan/pricing-scope-bug` read-only.
+- **Seed**: 12 clausole standard (misure, posa, opere murarie, smaltimento, accessibilità, pagamenti 50/50, garanzia 24m, detrazioni, variazioni, annullamento, immagini, privacy) + template `IE_STANDARD_2026` con 8 sezioni.
+- **Permessi nuovi**: `quotes.preview_pdf/generate_pdf/download_pdf/invalidate_pdf/manage_templates/manage_clauses`.
+- **Indice Mongo**: `ux_pdf_idempotent` unique parziale su `(tenant_id, quote_id, snapshot_hash, kind)` con `kind=definitive, invalidated_at=null` → previene race parallel double-click.
+
+### Frontend
+- **/templates**: editor 6-tab (Generale, Stile, Sezioni, Pagamenti, Clausole, Campi azienda) con PATCH concurrency-safe.
+- **/clauses**: libreria con filtro categoria, editor con versioning storico, badge Obbligatoria.
+- **QuoteEditor**: dropdown "PDF" con Anteprima BOZZA / Emetti definitivo / Scarica ultimo. Card "PDF emessi" con storico + hash snapshot troncato.
+
+### Test coverage (iteration_7)
+- Backend 16/16 PASS + 1 xfail iniziale (poi fixato)
+- Frontend Playwright 100%
+- 3 minor fixati: `missing_site` validation, list endpoint no base64/no `_id` leak, unique index race protection.
+
+### Rendering PDF verificato visualmente
+PDF 4 pagine, header ripetuto "Infissi Express · Preventivo PREV-2026-01383-R00", cover con dati cliente/cantiere/riferimento, riepilogo oggetto, dettaglio prodotti per vano con codici V1/V2, riepilogo economico con IVA 10%+22% suddivisa, condizioni pagamento 50/50 con nota "Saldo dovuto ad avviso merce pronta", 12 clausole formattate con badge OBBLIGATORIA in rosso, disclaimer evidenziati, blocco firma cliente+azienda. Simboli €, accenti italiani e page counter "Pag. X di Y" correttamente renderizzati.
+
+### Backlog M3.3 residuo (ordine)
+- M3.3.3 Link pubblico read-only con token high-entropy + revoca + rate limit + audit accessi
+- M3.3.4 Firma elettronica canvas legata a snapshot+revisione (FES)
+- M3.3.5 Azioni portale cliente: Accetta&Firma / Richiedi modifica / Rifiuta con motivazione
+- M3.3.6 Conversione contratto idempotente con snapshot completo
+- P1: Badge risparmio, KPI dashboard preventivi
+- P2: Import Excel listini

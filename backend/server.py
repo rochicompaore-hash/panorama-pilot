@@ -40,6 +40,7 @@ from app.routers.quotes import router as quotes_router
 from app.routers.contracts import router as contracts_router
 from app.routers.pricing import router as pricing_router
 from app.routers.pdf_router import router as pdf_router
+from app.routers.public import admin_router as public_admin_router, public_router as public_router_open
 
 logging.basicConfig(
     level=logging.INFO,
@@ -96,6 +97,8 @@ api.include_router(quotes_router)
 api.include_router(contracts_router)
 api.include_router(pricing_router)
 api.include_router(pdf_router)
+api.include_router(public_admin_router)
+api.include_router(public_router_open)
 
 app.include_router(api)
 

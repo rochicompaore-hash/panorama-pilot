@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, formatApiError } from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ import { useConflict, getVersion, withVersion, withForce } from "@/hooks/useConf
 import { useAutosave } from "@/hooks/useAutosave";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { FilePdf, Download, Eye, CaretDown } from "@phosphor-icons/react";
+import { FilePdf, Download, Eye, CaretDown, Link, Copy, XCircle } from "@phosphor-icons/react";
 
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0); } catch { return "€ 0"; } }
 
@@ -167,6 +168,47 @@ export default function QuoteEditorPage() {
     });
   };
 
+  // Public link (M3.3.3)
+  const [publicLinkOpen, setPublicLinkOpen] = React.useState(false);
+  const { data: linksResp } = useQuery({
+    queryKey: ["public-links", id],
+    queryFn: async () => (await api.get(`/quotes/${id}/public-links`)).data,
+    enabled: !!q && has("quotes.public_link.view"),
+  });
+  const links = linksResp?.items || [];
+  const activeLink = links.find((l) => l.status === "active");
+  const [freshRawToken, setFreshRawToken] = React.useState(null);
+  const createLink = useMutation({
+    mutationFn: async (opts = {}) => (await api.post(`/quotes/${id}/public-links`, { validity_days: 30, ...opts })).data,
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: ["public-links", id] });
+      if (d.raw_token) {
+        setFreshRawToken(d.raw_token);
+        toast.success("Link pubblico creato — copia ora il token, non sarà più visibile");
+      } else if (d.idempotent_hit) {
+        toast.info("Link attivo già esistente. Usa 'Rigenera' per un nuovo token.");
+      }
+    },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail)),
+  });
+  const revokeLink = useMutation({
+    mutationFn: async ({ lid, reason }) => (await api.post(`/quotes/${id}/public-links/${lid}/revoke`, { reason })).data,
+    onSuccess: () => { toast.success("Link revocato"); qc.invalidateQueries({ queryKey: ["public-links", id] }); },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail)),
+  });
+  const regenerateLink = useMutation({
+    mutationFn: async () => (await api.post(`/quotes/${id}/public-links/regenerate`, { validity_days: 30 })).data,
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: ["public-links", id] });
+      if (d.raw_token) { setFreshRawToken(d.raw_token); toast.success("Nuovo token generato"); }
+    },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail)),
+  });
+  const copyPortalUrl = (raw) => {
+    const url = `${window.location.origin}/p/${raw}`;
+    navigator.clipboard.writeText(url).then(() => toast.success("Link copiato negli appunti"));
+  };
+
   if (!q) return <div className="text-sm text-muted-foreground">Caricamento…</div>;
 
   const allowForce = editable;
@@ -234,6 +276,7 @@ export default function QuoteEditorPage() {
               {latestDef && <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => downloadPdf(latestDef.id, latestDef.filename)} data-testid="pdf-download"><Download size={14} className="mr-2" /> Scarica ultimo definitivo</DropdownMenuItem>
+                {has("quotes.public_link.view") && <DropdownMenuItem onClick={() => setPublicLinkOpen(true)} data-testid="public-link-open"><Link size={14} className="mr-2" /> Link pubblico</DropdownMenuItem>}
               </>}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -429,7 +472,90 @@ export default function QuoteEditorPage() {
 
       <ConfiguratorDialog open={cfgOpen} onOpenChange={setCfgOpen} onConfirm={onConfiguratorConfirm} canSeeCosts={canSeeCosts} />
       <ConflictModal {...conflict.modalProps} />
+
+      <PublicLinkDialog
+        open={publicLinkOpen}
+        onOpenChange={(v) => { setPublicLinkOpen(v); if (!v) setFreshRawToken(null); }}
+        links={links}
+        activeLink={activeLink}
+        freshRawToken={freshRawToken}
+        canCreate={has("quotes.public_link.create") && !!latestDef}
+        canRevoke={has("quotes.public_link.revoke")}
+        canRegenerate={has("quotes.public_link.regenerate")}
+        onCreate={() => createLink.mutate({})}
+        onRegenerate={() => regenerateLink.mutate()}
+        onRevoke={(lid) => {
+          const reason = prompt("Motivazione per la revoca");
+          if (reason && reason.trim()) revokeLink.mutate({ lid, reason });
+        }}
+        onCopy={copyPortalUrl}
+      />
     </div>
+  );
+}
+
+function PublicLinkDialog({ open, onOpenChange, links, activeLink, freshRawToken, canCreate, canRevoke, canRegenerate, onCreate, onRegenerate, onRevoke, onCopy }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl rounded-sm" data-testid="public-link-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Link size={18} /> Link pubblico preventivo</DialogTitle>
+          <DialogDescription>Il cliente può consultare il preventivo e scaricare il PDF senza creare un account. Il link scade dopo 30 giorni ed è revocabile in ogni momento.</DialogDescription>
+        </DialogHeader>
+
+        {freshRawToken && (
+          <div className="rounded-sm border border-emerald-500/40 bg-emerald-500/5 p-3" data-testid="fresh-token-panel">
+            <div className="text-xs overline mb-1 text-emerald-700">Nuovo token — copia ora, non sarà più visibile</div>
+            <div className="flex gap-2">
+              <Input readOnly value={`${window.location.origin}/p/${freshRawToken}`} className="rounded-sm font-mono-plex text-xs" data-testid="fresh-token-url" />
+              <Button size="sm" className="rounded-sm" onClick={() => onCopy(freshRawToken)} data-testid="fresh-token-copy"><Copy size={12} className="mr-1" /> Copia</Button>
+            </div>
+          </div>
+        )}
+
+        {activeLink ? (
+          <Card className="rounded-sm border-border p-4">
+            <div className="flex items-center justify-between mb-2">
+              <Badge className="rounded-sm bg-emerald-500">ATTIVO</Badge>
+              <div className="text-xs font-mono-plex text-muted-foreground">Scade: {activeLink.expires_at ? new Date(activeLink.expires_at).toLocaleDateString("it-IT") : "—"}</div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div><div className="overline">Accessi</div><div className="font-mono-plex font-bold">{activeLink.access_count || 0}</div></div>
+              <div><div className="overline">Ultimo</div><div className="font-mono-plex text-xs">{activeLink.last_access_at ? new Date(activeLink.last_access_at).toLocaleString("it-IT") : "Mai"}</div></div>
+              <div><div className="overline">Azioni</div><div className="text-xs">{(activeLink.allowed_actions || []).join(", ")}</div></div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {canRegenerate && <Button size="sm" variant="outline" className="rounded-sm" onClick={onRegenerate} data-testid="regenerate-link"><ArrowsClockwise size={12} className="mr-1" /> Rigenera token</Button>}
+              {canRevoke && <Button size="sm" variant="destructive" className="rounded-sm" onClick={() => onRevoke(activeLink.id)} data-testid="revoke-link"><XCircle size={12} className="mr-1" /> Revoca</Button>}
+            </div>
+            <div className="mt-3 text-[10px] text-muted-foreground">Nota: per motivi di sicurezza il token non è consultabile dopo la creazione. Rigenera per ottenerne uno nuovo.</div>
+          </Card>
+        ) : (
+          canCreate ? (
+            <Button size="lg" className="rounded-sm w-full" onClick={onCreate} data-testid="create-public-link"><Link size={16} className="mr-2" /> Crea link pubblico (30 giorni)</Button>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              Emetti un PDF definitivo prima di generare il link pubblico.
+            </div>
+          )
+        )}
+
+        {links.filter((l) => l.status !== "active").length > 0 && (
+          <div className="mt-4">
+            <div className="overline mb-2">Storico ({links.filter((l) => l.status !== "active").length})</div>
+            <div className="space-y-1 max-h-40 overflow-auto">
+              {links.filter((l) => l.status !== "active").map((l) => (
+                <div key={l.id} className="flex items-center justify-between text-xs py-1 border-b">
+                  <Badge variant="outline" className="rounded-sm text-[10px] uppercase">{l.status}</Badge>
+                  <span className="font-mono-plex text-muted-foreground">{l.revoked_at ? new Date(l.revoked_at).toLocaleDateString("it-IT") : ""}</span>
+                  <span className="text-[10px] truncate max-w-[200px]" title={l.revocation_reason}>{l.revocation_reason || ""}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

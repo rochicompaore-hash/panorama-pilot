@@ -240,8 +240,17 @@ async def _resolve_quote_full(tenant_id: str, quote_id: str) -> Optional[dict]:
 @router.get("/quotes/{qid}/pdfs")
 async def list_quote_pdfs(qid: str, user: dict = Depends(require_permission("quotes.view"))):
     db = get_db()
-    docs = await db.quote_pdfs.find({"quote_id": qid, "tenant_id": user["tenant_id"]}).sort("generated_at", -1).to_list(50)
-    return {"items": [from_mongo(d) for d in docs]}
+    # Project out heavy fields — return metadata only
+    docs = await db.quote_pdfs.find(
+        {"quote_id": qid, "tenant_id": user["tenant_id"]},
+        {"pdf_base64": 0, "snapshot": 0},
+    ).sort("generated_at", -1).to_list(50)
+    items = []
+    for d in docs:
+        m = from_mongo(d)
+        m.pop("_id", None)  # from_mongo maps _id→id; drop the residual _id
+        items.append(m)
+    return {"items": items}
 
 
 @router.post("/quotes/{qid}/pdf/preview")
@@ -352,8 +361,28 @@ async def _generate_pdf(qid: str, body: GeneratePdfRequest, request: Request, us
     filename = safe_filename(*filename_parts, ext="pdf")
 
     now = datetime.now(timezone.utc)
+    pdf_id = new_id()
+    # Try to store in object storage; fall back to inline base64 on failure
+    from app.services import object_storage
+    storage_key = None
+    storage_provider = "inline"
+    pdf_base64_field = None
+    try:
+        if object_storage.is_available():
+            rev_label = quote.get("revision_label") or f"R{int(quote.get('revision', 0)):02d}"
+            storage_key = object_storage.build_pdf_path(user["tenant_id"], qid, rev_label, pdf_id)
+            object_storage.put_pdf(storage_key, pdf_bytes)
+            storage_provider = "emergent"
+        else:
+            pdf_base64_field = base64.b64encode(pdf_bytes).decode("ascii")
+    except Exception as ex:
+        # Fallback to inline
+        storage_key = None
+        storage_provider = "inline"
+        pdf_base64_field = base64.b64encode(pdf_bytes).decode("ascii")
+
     pdf_doc = {
-        "_id": new_id(),
+        "_id": pdf_id,
         "tenant_id": user["tenant_id"],
         "quote_id": qid,
         "quote_number": quote.get("number"),
@@ -366,11 +395,12 @@ async def _generate_pdf(qid: str, body: GeneratePdfRequest, request: Request, us
         "snapshot_hash": snapshot_hash,
         "pdf_hash": pdf_hash,
         "filename": filename,
-        "storage_key": None,  # persist bytes in gridfs OR base64 inline for now
+        "storage_provider": storage_provider,
+        "storage_key": storage_key,
         "size_bytes": len(pdf_bytes),
         "mime_type": "application/pdf",
         "snapshot": snapshot,
-        "pdf_base64": base64.b64encode(pdf_bytes).decode("ascii"),  # inline storage (small docs)
+        "pdf_base64": pdf_base64_field,  # None when in object storage
         "generated_by": user["id"],
         "generated_at": now.isoformat(),
         "created_at": now.isoformat(),
@@ -378,7 +408,24 @@ async def _generate_pdf(qid: str, body: GeneratePdfRequest, request: Request, us
         "version": 1,
         "deleted_at": None,
     }
-    await db.quote_pdfs.insert_one(pdf_doc)
+    try:
+        await db.quote_pdfs.insert_one(pdf_doc)
+    except Exception as ex:
+        # Race with parallel emission — fetch the winning doc
+        if "duplicate key" in str(ex).lower() or "E11000" in str(ex):
+            winner = await db.quote_pdfs.find_one({
+                "tenant_id": user["tenant_id"], "quote_id": qid,
+                "snapshot_hash": snapshot_hash, "kind": kind, "invalidated_at": None,
+            })
+            if winner:
+                return {
+                    "id": winner["_id"], "kind": winner["kind"],
+                    "filename": winner["filename"], "snapshot_hash": winner["snapshot_hash"],
+                    "pdf_hash": winner["pdf_hash"], "size_bytes": winner["size_bytes"],
+                    "generated_at": winner["generated_at"], "validation_errors": [],
+                    "idempotent_hit": True,
+                }
+        raise
 
     # For definitive: update quote to reference latest_pdf_id + timeline
     if not is_preview:
@@ -416,14 +463,32 @@ async def download_pdf(pid: str, user: dict = Depends(require_permission("quotes
     db = get_db()
     d = await db.quote_pdfs.find_one({"_id": pid, "tenant_id": user["tenant_id"]})
     if not d: raise HTTPException(status_code=404, detail="PDF non trovato")
+    pdf_bytes = await _fetch_pdf_bytes(d)
+    return Response(
+        content=pdf_bytes, media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{d.get("filename", "preventivo.pdf")}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+async def _fetch_pdf_bytes(d: dict) -> bytes:
+    """Resolve PDF bytes: object storage first, inline base64 fallback."""
+    from app.services import object_storage
+    if d.get("storage_provider") == "emergent" and d.get("storage_key"):
+        try:
+            return object_storage.get_pdf(d["storage_key"])
+        except Exception as ex:
+            # Fallback if storage temporarily unavailable
+            if d.get("pdf_base64"):
+                return base64.b64decode(d["pdf_base64"])
+            raise HTTPException(status_code=503, detail=f"Storage non disponibile: {ex}")
     b64 = d.get("pdf_base64")
     if not b64:
         raise HTTPException(status_code=410, detail="Contenuto PDF non più archiviato")
-    pdf_bytes = base64.b64decode(b64)
-    return Response(
-        content=pdf_bytes, media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{d.get("filename", "preventivo.pdf")}"'},
-    )
+    return base64.b64decode(b64)
 
 
 @router.get("/quote-pdfs/{pid}")

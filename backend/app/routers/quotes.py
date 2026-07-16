@@ -551,6 +551,9 @@ async def create_revision(qid: str, request: Request, user: dict = Depends(requi
     await db.quotes.insert_one(new_q)
     # Mark parent superseded (but keep readable)
     await db.quotes.update_one({"_id": parent["_id"]}, {"$set": {"is_current": False, "quote_status": "superseded", "updated_at": new_q["updated_at"], "updated_by": user["id"]}})
+    # Invalidate any active public tokens for the previous revision (M3.3.3)
+    from app.routers.public import invalidate_tokens_for_previous_revisions
+    await invalidate_tokens_for_previous_revisions(user["tenant_id"], parent["_id"])
     await record_audit(action="quotes.revision_create", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=new_q["_id"], after={"revision": rev_label, "parent": parent["_id"]})
     await record_activity(tenant_id=user["tenant_id"], type="quote_revision_created",
                           subject=f"Nuova revisione {new_q['number']}",

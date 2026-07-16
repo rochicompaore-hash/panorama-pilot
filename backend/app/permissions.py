@@ -115,6 +115,13 @@ PERMISSION_CATALOG = [
     ("quotes.invalidate_pdf", "Preventivi", "approve", "Annulla PDF definitivo"),
     ("quotes.manage_templates", "Preventivi", "create", "Gestisce template PDF preventivi"),
     ("quotes.manage_clauses", "Preventivi", "create", "Gestisce libreria clausole contrattuali"),
+    # Public links (M3.3.3)
+    ("quotes.public_link.create", "Preventivi", "create", "Crea link pubblico read-only"),
+    ("quotes.public_link.view", "Preventivi", "view", "Visualizza link pubblici emessi"),
+    ("quotes.public_link.revoke", "Preventivi", "approve", "Revoca link pubblico con motivazione"),
+    ("quotes.public_link.regenerate", "Preventivi", "approve", "Rigenera link pubblico (revoca+crea)"),
+    ("quotes.public_link.configure", "Preventivi", "create", "Configura durata/OTP/max accessi"),
+    ("quotes.public_access_logs.view", "Preventivi", "view", "Visualizza log accessi portale pubblico"),
 ]
 
 # Predefined roles with permissions
