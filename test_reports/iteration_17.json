@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 17 — Focused re-validation of the 3 fixes from iter16. ALL 3 fixes verified: (1) CRITICAL migrate-structure lock now correctly uses q.get('quote_status'); a quote transitioned to 'sent' returns ok:false, reason:'quote_locked' (was ok:true previously). (2) Migration is idempotent: 2nd call on a clean quote returns ok:true, no_changes:true via early-return (counters all zero, tree unchanged). (3) tree.migration_required is now True whenever orphan_openings exist, even without any environments (was requiring both). Regression: full iter16 suite re-run = 21/21 pass. New focused suite = 5/5 pass. Grand total: 26/26.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_quote_structure_iter16.py",
+    "/app/backend/tests/test_quote_structure_iter17.py",
+    "/app/test_reports/pytest/iteration_17_regression.xml",
+    "/app/test_reports/pytest/iteration_17_focused.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "GOOD: quote_structure.py::migrate_quote guard at line 387 correctly uses q.get('quote_status') and covers the full immutable set ('sent','accepted','signed','converted').",
+    "GOOD: idempotency early-return at line ~397 correctly checks both orphan_openings==[] AND all lines have role+opening_id, preventing spurious version bumps.",
+    "GOOD: tree endpoint migration_required = len(orphan_openings) > 0 — clean semantics, UI can now surface migration CTA on fully-legacy quotes with zero envs.",
+    "NOTE (not a bug): the idempotency early-return does NOT re-check whether any line is missing a role/opening_id — the guard `all(l.get('role') and l.get('opening_id') for l in lines)` handles that, so mixed states still fall through to the full migration path. Verified via test_migrate_twice_returns_no_changes_on_second_call."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_quote_structure_iter17.py (new — 5 focused tests, 5/5 pass)"
+  ],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "n/a (backend-only per request)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (superadmin)",
+  "seed_data_creation": "Created tenant-scoped TEST_LOCK17_*, TEST_DRAFT17_*, TEST_IDEMP17_*, TEST_ORPHTREE17_*, TEST_CLEAN17_* quotes attached to first existing customer. All discoverable by title prefix TEST_*17.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 3 fixes for iter16 (critical lock guard, migration_required flag, idempotent no-op) are verified GREEN. Two suites present: /app/backend/tests/test_quote_structure_iter16.py (21 tests, regression) and /app/backend/tests/test_quote_structure_iter17.py (5 tests, focused fix verification). Together they take ~8s with xdist. If quote-structure changes further, run both suites. No open bugs on quote_structure router.",
+  "rca of the issue": "Not applicable — all previously reported issues are now resolved and verified via automated tests. See iteration_16.json for original RCA (field name mismatch quote.status vs quote.quote_status at /app/backend/app/routers/quote_structure.py:387). Fix confirmed line 387 now reads q.get('quote_status'); locked-quote reproduction returns ok:false, reason:quote_locked."
+}

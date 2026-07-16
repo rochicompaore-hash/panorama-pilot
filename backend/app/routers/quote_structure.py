@@ -355,7 +355,7 @@ async def quote_tree(quote_id: str, user: dict = Depends(require_permission("quo
         "quote_id": quote_id,
         "environments": tree,
         "orphan_openings": orphan_openings,
-        "migration_required": len(orphan_openings) > 0 and len(envs) > 0,
+        "migration_required": len(orphan_openings) > 0,
     }
 
 
@@ -384,7 +384,7 @@ async def migrate_quote(quote_id: str,
     openings = list(q.get("openings") or [])
     lines = list(q.get("lines") or [])
 
-    if q.get("status") in ("sent", "accepted", "signed", "converted"):
+    if q.get("quote_status") in ("sent", "accepted", "signed", "converted"):
         # snapshot immutabile — non modificare
         return {"ok": False, "reason": "quote_locked",
                 "message": "Preventivo già inviato/firmato: nessuna modifica automatica per preservare snapshot."}
@@ -393,9 +393,16 @@ async def migrate_quote(quote_id: str,
     review_flags: List[str] = []
     orphan_openings = [o for o in openings if not o.get("environment_id")]
 
+    # Se non ci sono orfani e nessun cambiamento da fare → early return (idempotenza)
+    if not orphan_openings and all(l.get("role") and l.get("opening_id") for l in lines):
+        return {
+            "ok": True, "environments_created": 0, "openings_migrated": 0,
+            "lines_role_assigned": 0, "review_flags": [], "migration_review_required": False,
+            "no_changes": True,
+        }
+
+    rooms: Dict[str, str] = {}
     if orphan_openings:
-        # Group by "room" field se presente, altrimenti "Non specificato"
-        rooms: Dict[str, str] = {}
         for o in orphan_openings:
             key = (o.get("room") or o.get("floor") or "Non specificato").strip()
             if key not in rooms:
