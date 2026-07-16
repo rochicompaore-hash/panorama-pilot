@@ -225,6 +225,26 @@ PERMISSION_CATALOG = [
     ("handoff.view", "Passaggi", "view", "Visualizza pratiche in passaggio"),
     ("handoff.reassign", "Passaggi", "edit", "Riassegna handoff con motivazione"),
     ("leads.webhook.manage", "Lead Intake", "edit", "Gestisce configurazioni webhook lead"),
+    # M7.TREASURY
+    ("treasury.view", "Tesoreria", "view", "Visualizza tesoreria/dashboard"),
+    ("treasury.manage", "Tesoreria", "edit", "Gestisce pagamenti/movimenti/tesoreria"),
+    ("treasury.configure", "Tesoreria", "edit", "Configura tassi/aliquote fiscali"),
+    ("treasury.approve_transfers", "Tesoreria", "approve", "Approva/rifiuta suggerimenti trasferimento"),
+    ("treasury.import_statements", "Tesoreria", "edit", "Importa estratti conto"),
+    ("treasury.reconcile", "Tesoreria", "edit", "Riconcilia movimenti bancari"),
+    ("vat.view", "IVA", "view", "Visualizza registri IVA"),
+    ("vat.manage", "IVA", "edit", "Gestisce voci IVA"),
+    ("vat.close_period", "IVA", "approve", "Chiude periodo IVA"),
+    ("withholding.view", "Ritenute", "view", "Visualizza ritenute bancarie"),
+    ("withholding.reconcile", "Ritenute", "edit", "Riconcilia ritenute"),
+    ("tax_payments.view", "F24", "view", "Visualizza F24/imposte"),
+    ("tax_payments.manage", "F24", "edit", "Gestisce F24"),
+    ("funds.view", "Fondi", "view", "Visualizza fondi virtuali"),
+    ("funds.configure", "Fondi", "edit", "Configura fondi/allocazioni"),
+    ("ai_cfo.run", "AI CFO", "edit", "Esegue analisi AI CFO"),
+    ("ai_cfo.configure", "AI CFO", "edit", "Configura AI CFO"),
+    ("financial_statements.view", "Bilancio", "view", "Visualizza bilancio"),
+    ("financial_statements.import", "Bilancio", "edit", "Importa bilancio"),
 ]
 
 # Predefined roles with permissions

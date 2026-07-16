@@ -117,4 +117,18 @@ async def ensure_indexes():
     await db.consents.create_index([("tenant_id", 1), ("customer_id", 1), ("kind", 1)], name="ix_consents_customer_kind")
     await db.conversations.create_index([("tenant_id", 1), ("channel_kind", 1), ("conv_status", 1)], name="ix_conv_status")
 
+    # ---------- M7.TREASURY ----------
+    for coll in ("bank_accounts", "virtual_funds", "payments_received", "bank_statement_imports",
+                  "bank_movements", "vat_entries", "vat_closings", "f24_payments",
+                  "suggested_transfers", "allocation_policies", "allocation_runs",
+                  "ai_cfo_insights", "treasury_alerts", "treasury_scenarios",
+                  "tax_deduction_rates"):
+        await db[coll].create_index([("tenant_id", 1), ("created_at", -1)], name=f"ix_{coll}_tenant_created")
+    await db.bank_movements.create_index([("tenant_id", 1), ("dedup_hash", 1)], name="ix_bmov_dedup", unique=True, sparse=True)
+    await db.bank_movements.create_index([("tenant_id", 1), ("bank_account_id", 1), ("op_date", -1)], name="ix_bmov_acct_date")
+    await db.vat_entries.create_index([("tenant_id", 1), ("period", 1), ("kind", 1)], name="ix_vat_period_kind")
+    await db.vat_closings.create_index([("tenant_id", 1), ("period", 1)], name="ix_vat_closing_period", unique=True, sparse=True)
+    await db.f24_payments.create_index([("tenant_id", 1), ("due_date", 1), ("f24_status", 1)], name="ix_f24_due_status")
+    await db.payments_received.create_index([("tenant_id", 1), ("recon_status", 1), ("payment_date", -1)], name="ix_pay_recon_date")
+
     logger.info("MongoDB indexes ensured.")

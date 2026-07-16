@@ -380,3 +380,65 @@ Copertura: DIV_ZERO strict + legacy compat, quote→contract convert, sign hook 
 - **P1** UI variante economica cliente-firmabile
 - **P2** Auto-generation dell'ordine esecutivo con productive_bom_snapshot piena (attualmente snapshot minimale)
 - **P2** Integrazione con production_orders → tracking cliente eventi mappati (`production:cutting` → "Produzione in corso")
+
+## Iteration 14+15 (2026-02) — M6.OPS + M7.TREASURY
+
+### M6.OPS Test: 24/25 backend PASS (iteration_14.json)
+Handoff CRUD+idempotency+ack+overdue, user-groups, assignment-rules, dashboards (company/team/my con benchmark 30%), commission engine tiers verificato per tutte le fasce (Fascia 1 <10% pending, F2 10-15% 5%, F3 >15% 10%, F3+MD→5%), lead webhook receive+dedup+auto-handoff+consents+timeline, template/consents/inbox.
+
+### M7.TREASURY — Tesoreria intelligente
+
+#### Modelli (`models_treasury.py`)
+`TaxDeductionRate` (aliquote versionate con fonte normativa) · `BankAccount` (reali/virtuali) · `VirtualFund` (IVA/imprevisti/investimenti/urgenze/imposte/stipendi/fornitori/free_liquidity) · `PaymentReceived` (con withholding calc + expected_bank_credit + recon states) · `BankStatementImport` + `BankMovement` (dedup_hash unique) · `VATEntry` + `VATClosing` (versioning) · `F24Payment` (con consistency_flags + professional_verification_required) · `SuggestedTransfer` (proposte, NO esec auto) · `AllocationPolicy` + `AllocationRun` (versionati) · `AICFOInsight` (data_sources, missing_data, confidence, requires_approval) · `TreasuryAlert` · `TreasuryScenario`.
+
+#### Formule (spiegabili + configurabili)
+- Ritenuta: `base = gross / (1 + vat_rate); withholding = base * rate; expected_credit = gross - withholding` (verificato: 10.000€ IVA 22% ritenuta 11% → base 8.196,72€ ritenuta 901,64€ credito 9.098,36€)
+- IVA periodo: `net_vat = sales_vat_exigible - purchases_vat_detrattable` (esempio: 2.200€ sales - 660€ purchases = **1.540€ debito**)
+- Base allocabile: `bank_credit - vat_reserve - imposte_ritenute - pagamenti_imminenti - fondi_vincolati` → poi 15%/15%/10% imprevisti/investimenti/urgenze + residuo a free_liquidity
+- Tutte le percentuali/formule sono `AllocationPolicy` versionata (versioning append-only)
+
+#### Endpoint (`/api/treasury/*`)
+- `POST withholding/calculate` — calcolatore ritenute con formula esplicita
+- `GET|POST bank-accounts` — conti reali/virtuali con IBAN mascherato + iban_hash
+- `GET|POST|PATCH funds` — fondi virtuali configurabili
+- `POST payments-received` — registra pagamento (con withholding auto-calcolato) + trigger AllocationRun automatica
+- `GET|POST allocation-policy` — policy versionata
+- `GET allocation-runs` — cronologia allocazioni
+- `GET|POST vat/entries` — registri IVA
+- `POST vat/close-period` — chiusura periodo IVA idempotente (rifiuta 409 se già chiuso)
+- `GET|POST f24` — F24 con consistency flags
+- `GET|POST transfers/suggest` + `approve` + `reject` + `mark-executed` — MAI esec auto
+- `POST statements/import` — import CSV con dedup_hash unique
+- `POST reconcile/auto` — match automatico movimenti↔pagamenti con tolleranza
+- `GET dashboard` — disponibilità/IVA/fondi/alerts/contatori/**disclaimer commercialista**
+- `POST ai-cfo/run` — genera insight con data_sources+confidence+missing_data+risk_level
+- `GET|POST scenarios` — simulazioni base/prudent/stress/growth con formula esplicita
+- `GET|POST tax-deduction-rates` — aliquote versionate (bonus ristrutturazione, ecobonus, ecc.)
+
+#### Regole di sicurezza
+- Nessuna esecuzione automatica di bonifici/F24
+- Ogni output AI ha `data_sources[]`, `missing_data[]`, `confidence`, `formula`, `risk_level`
+- Dashboard TUTTE le response contengono `disclaimer` "NON sostitutivo del commercialista"
+- Permessi granulari: treasury.view/manage/configure/approve_transfers/import_statements/reconcile · vat.view/manage/close_period · withholding.view/reconcile · tax_payments.view/manage · funds.view/configure · ai_cfo.view/run/configure · financial_statements.view/import
+- IBAN sempre mascherato (ultime 4 cifre) + `iban_hash` sha256 per lookup
+
+#### Test live end-to-end (verificati con curl)
+- Withholding 10.000€ IVA 22% 11% → **9.098,36€ credit** ✅
+- Pagamento con ritenuta → AllocationRun trigger → fondi contingency/investments aggiornati automaticamente ✅
+- VAT closing 2026-02 → 1.540€ debito calcolato ✅
+- AI CFO run con soli dati reali (no invenzioni) → insight generato con data_sources ✅
+- Dashboard con disclaimer "NON sostitutivo del commercialista" ✅
+
+#### Limiti / MOCKED
+- **PDF F24**: solo campo receipt_id, upload/parsing PDF non implementato
+- **Open Banking**: predisposto ma non integrato (import solo CSV/Excel via payload rows)
+- **Bilancio**: modelli predisposti (`financial_statements.*` permessi) ma modulo full non ancora costruito
+- **AI CFO**: usa solo dati reali del DB — NON usa LLM esterno in questa iter, tutti gli insight sono rule-based (no allucinazioni)
+- **Nessuna esecuzione bonifici**: solo suggerimenti + mark-executed manuale
+
+#### Next Actions (P0)
+1. UI Treasury dashboard + tab IVA/Fondi/Ritenute/F24/Scenari
+2. Endpoint upload ricevuta F24 con Object Storage privato + URL temporanei
+3. Integrazione LLM Emergent per AI CFO enhanced (Claude/GPT con prompt "cita sempre fonte")
+4. Import CBI/CAMT053 parser
+5. Bilancio module (import CE/SP + riclassificazione + DSCR/EBITDA/PFN)
