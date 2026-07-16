@@ -1,0 +1,32 @@
+{
+  "summary": "Iterazione 24 — Verifica FOLLOWUP del CRITICAL di iter23 (Role model esteso + provision_owner.py con permission_keys + cleanup duplicati). 22/22 test PASS. Il fix è pienamente verificato: (1) DB roles per tenant PanoramaPilot ha esattamente 1 doc attivo con code='tenant_owner', permission_keys=247, is_protected=true, is_system=true, name='Proprietario'; (2) i 2 duplicati preesistenti sono soft-deleted (deleted_at != None); (3) rerun idempotente di provision_owner.py restituisce state.role='updated', state.user='existing_no_change', state.tenant='existing' senza creare nuovi duplicati; (4) login owner OK con flag corretti (must_change_password=true, is_superadmin=true, is_platform_owner=false, is_protected=true); (5) tutti gli endpoint owner (customers, quotes, leads, contracts, geometry/templates, pricing-hub/bom-recipes, parametric/bom-templates) rispondono 200; (6) tenant isolation OK (owner Panorama → 0 customer, admin Infissi → >=20); (7) NESSUN leak della password 'Burgugnao' in log supervisor, response API di login (success & 401), stdout script; (8) regressioni gating listini OK: SELL-DEMO active→materials_price>0, draft→materials_price=0 con blocking_errors PRICELIST_NOT_PUBLISHED; SELL-DEMO ripristinato a 'active' a fine test (verificato in DB); (9) bom-recipes count=20 confermato.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/backend/scripts/provision_owner.py", "issue": "Il filtro cleanup usa '$or' con {code:None, name:'Proprietario'} + {code:'tenant_owner'} + {name:'Proprietario'}. Il terzo criterio è ridondante col primo e potrebbe catturare role non-owner con name=Proprietario in futuro. Valutare match più stringente (es. is_system=True AND name=Proprietario)."},
+      {"endpoint": "/backend/app/models.py Role", "issue": "extra='ignore' su BaseDoc rimane un rischio latente: continua a scartare silenziosamente kwargs non dichiarati. Considerare extra='forbid' almeno per script di seed/provisioning."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_owner_role_fix_iter24.py",
+    "/app/test_reports/pytest/iteration_24.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FIX verificato: models.py Role ora contiene code (Optional[str]) + is_protected (bool default False); permission_keys era già presente e viene ora popolato correttamente dallo script.",
+    "provision_owner.ensure_owner_role() ora esegue cleanup dei duplicati via soft-delete (deleted_at set) tenendo il role più vecchio come keeper e aggiornandolo con permission_keys=247, code='tenant_owner', is_protected=True.",
+    "Sicurezza: la password non appare in nessun log, response, audit o stdout dello script (verificato con grep sui log supervisor e ispezione response body)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_owner_role_fix_iter24.py",
+    "/app/test_reports/iteration_24.json"
+  ],
+  "success_rate": {"backend": "100% (22/22 pass)", "frontend": "N/A (backend only)"},
+  "test_credentials": "Owner: pilot@panoramapilot.com / *** (letto da env OWNER_INIT_PASSWORD_TEST, mai stampato). Admin Infissi: admin@infissiexpress.com / Admin!2025. IDs: SELL-DEMO=4db4b91f-22c9-422b-aa7f-e235967b6698, tenant PanoramaPilot=ae9168f6-d96e-4c5d-bb33-25acbb9a8410, role attivo tenant_owner id=e4a05b01-2b75-4273-908d-417af991b407.",
+  "seed_data_creation": "Nessun seed persistente creato. Rerun di /app/backend/scripts/provision_owner.py durante il test di idempotenza: NON ha creato nuovi role (state.role='updated'), NON ha creato nuovi user (state.user='existing_no_change'), NON ha creato nuovi tenant. SELL-DEMO passato temporaneamente a 'draft' durante test gating, poi ripristinato a 'active' (verificato in Mongo post-run: ipl_status='active'). Duplicati role restano soft-deleted con deleted_at popolato (comportamento atteso).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Il CRITICAL di iter23 è chiuso. Stato attuale DB: db.roles.find({tenant_id:'ae9168f6-d96e-4c5d-bb33-25acbb9a8410'}) ritorna 3 doc totali → 1 active (id=e4a05b01-... con code=tenant_owner, permission_keys=247, is_protected=true) + 2 soft-deleted (deleted_at valorizzato). Il pilot@panoramapilot.com.role_ids punta al keeper e4a05b01-... . SELL-DEMO ipl_status='active'. Nessuna azione pending per il main agent.",
+  "rca_of_the_issue": "N/A — fix già applicato e verificato. Il fix consisteva in: (1) app/models.py Role: aggiunta di code:Optional[str]=None e is_protected:bool=False (righe 132, 136); (2) provision_owner.py ensure_owner_role(): passa permission_keys invece di permissions al costruttore Role; (3) aggiunta logica cleanup duplicati che ordina per created_at, tiene il più vecchio come keeper e soft-delete gli altri con notes='merged into <keeper_id>'; (4) update statement aggiorna anche code + name + is_protected sul keeper."
+}

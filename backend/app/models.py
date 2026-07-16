@@ -129,9 +129,11 @@ class Permission(BaseDoc):
 
 class Role(BaseDoc):
     name: str
+    code: Optional[str] = None                        # slug tecnico (es. tenant_owner)
     description: Optional[str] = None
     permission_keys: List[str] = Field(default_factory=list)
     is_system: bool = False
+    is_protected: bool = False                        # non eliminabile via API
 
 
 class RoleCreate(BaseModel):

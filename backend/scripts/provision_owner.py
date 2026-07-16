@@ -50,16 +50,31 @@ async def ensure_tenant(db):
 
 
 async def ensure_owner_role(db, tenant_id):
-    existing = await db.roles.find_one({
-        "tenant_id": tenant_id, "code": OWNER_ROLE_CODE, "deleted_at": None,
-    })
+    # Cleanup: se ci sono più role duplicati per il tenant (con code null o tenant_owner), unifica
+    duplicates = await db.roles.find({
+        "tenant_id": tenant_id,
+        "$or": [{"code": OWNER_ROLE_CODE}, {"name": OWNER_ROLE_NAME}, {"code": None, "name": OWNER_ROLE_NAME}],
+        "deleted_at": None,
+    }).to_list(50)
+    if len(duplicates) > 1:
+        # Tieni il più vecchio, marca gli altri come deleted (soft)
+        duplicates.sort(key=lambda d: d.get("created_at") or datetime.min.replace(tzinfo=timezone.utc))
+        keeper = duplicates[0]
+        for dup in duplicates[1:]:
+            await db.roles.update_one({"_id": dup["_id"]},
+                                        {"$set": {"deleted_at": datetime.now(timezone.utc),
+                                                    "notes": f"soft-deleted duplicate, merged into {keeper['_id']}"}})
+        existing = keeper
+    else:
+        existing = duplicates[0] if duplicates else None
     all_perm_codes = [p[0] for p in PERMISSION_CATALOG]
     tenant_perms = all_perm_codes   # tutti i permessi tenant-scoped (equivalente a "*")
     if existing:
         # aggiorna permessi in caso di nuovi permessi aggiunti al sistema
         await db.roles.update_one(
             {"_id": existing["_id"]},
-            {"$set": {"permissions": tenant_perms, "is_protected": True,
+            {"$set": {"permission_keys": tenant_perms, "is_protected": True,
+                        "code": OWNER_ROLE_CODE, "name": OWNER_ROLE_NAME,
                         "updated_at": datetime.now(timezone.utc)}},
         )
         return existing["_id"], "updated"
@@ -67,7 +82,7 @@ async def ensure_owner_role(db, tenant_id):
         id=new_id(), tenant_id=tenant_id,
         code=OWNER_ROLE_CODE, name=OWNER_ROLE_NAME,
         description="Proprietario del tenant — controllo completo sulla propria azienda.",
-        permissions=tenant_perms,
+        permission_keys=tenant_perms,
         is_protected=True, is_system=True,
     )
     doc = to_mongo(r.model_dump(by_alias=True))
