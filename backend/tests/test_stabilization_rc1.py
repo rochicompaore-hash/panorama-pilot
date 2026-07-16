@@ -17,13 +17,13 @@ import time
 import uuid
 import pytest
 import requests
+from tests._creds import (
+    SUPER_ADMIN, TENANT_ADMIN, PLATFORM_OWNER, PLATFORM_OWNER_ID,
+)  # env-sourced credentials — DO NOT hardcode
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://serramento-ops.preview.emergentagent.com").rstrip("/")
-
-SUPER_ADMIN = ("admin@infissiexpress.com", "Admin!2025")
-TENANT_ADMIN = ("admin.tenant@infissiexpress.com", "Tenant#Admin!2026Ok")
-PLATFORM_OWNER = ("rochicompaore@gmail.com", "Platform#Owner_2026!Secure")
-PLATFORM_OWNER_ID = "fb1dcd05-e872-4707-9b67-5da6aed098a0"
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+if not BASE_URL:
+    raise RuntimeError("REACT_APP_BACKEND_URL must be set for stabilization tests")
 
 
 def _login(email, password):

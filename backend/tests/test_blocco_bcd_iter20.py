@@ -17,11 +17,11 @@ import time
 import uuid
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PWD  # env-sourced credentials
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PWD = "Admin!2025"
-
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PWD moved to tests._creds
 # Costanti seed note dell'ambiente
 SELL_PL_ID = "4db4b91f-22c9-422b-aa7f-e235967b6698"
 COST_PL_ID = "dea703b4-d488-4ad5-a374-8360962e719e"

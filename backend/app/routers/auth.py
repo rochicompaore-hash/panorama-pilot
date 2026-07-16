@@ -19,6 +19,10 @@ from app.models import (
 from app.mongo_utils import to_mongo, from_mongo
 from app.services.audit import record_audit
 from app.services.email import send_email, render_password_reset
+from app.services.auth_helpers import (
+    to_public_user, check_brute_force, record_failed_login, clear_failed_login,
+    create_login_session, upsert_user_from_invitation,
+)
 import jwt
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -41,40 +45,18 @@ def _clear_auth_cookies(response: Response) -> None:
 
 
 def _to_public(user: dict) -> UserPublic:
-    return UserPublic(**{k: user.get(k) for k in UserPublic.model_fields.keys()})
+    return to_public_user(user)
 
 
-async def _check_brute_force(db, identifier: str) -> None:
-    doc = await db.login_attempts.find_one({"identifier": identifier})
-    if not doc:
-        return
-    lu = doc.get("locked_until")
-    if lu:
-        if isinstance(lu, str):
-            lu = datetime.fromisoformat(lu)
-        if lu > datetime.now(timezone.utc):
-            wait_s = int((lu - datetime.now(timezone.utc)).total_seconds())
-            raise HTTPException(
-                status_code=429,
-                detail=f"Troppi tentativi. Riprova tra {max(wait_s, 1)}s.",
-            )
-
-
-async def _record_failed(db, identifier: str) -> None:
-    now = datetime.now(timezone.utc)
-    doc = await db.login_attempts.find_one({"identifier": identifier})
-    attempts = (doc or {}).get("attempts", 0) + 1
-    update = {"identifier": identifier, "attempts": attempts, "last_at": now.isoformat()}
-    if attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
-        update["locked_until"] = (now + timedelta(minutes=settings.LOGIN_LOCK_MINUTES)).isoformat()
-        update["attempts"] = 0
-    await db.login_attempts.update_one(
-        {"identifier": identifier}, {"$set": update}, upsert=True,
+async def _audit_login_failure(db, email: str, ip: str, user_agent: str | None,
+                                user_doc: dict | None, reason: str) -> None:
+    await record_audit(
+        action="auth.login_failed",
+        tenant_id=(user_doc or {}).get("tenant_id"),
+        user_id=(user_doc or {}).get("_id"),
+        user_email=email, ip=ip, user_agent=user_agent,
+        meta={"reason": reason},
     )
-
-
-async def _clear_failed(db, identifier: str) -> None:
-    await db.login_attempts.delete_one({"identifier": identifier})
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -83,54 +65,34 @@ async def login(body: LoginRequest, request: Request, response: Response):
     ip = get_client_ip(request)
     email = body.email.lower().strip()
     identifier = f"{ip}:{email}"
+    ua = request.headers.get("user-agent")
 
-    await _check_brute_force(db, identifier)
+    wait = await check_brute_force(db, identifier, settings)
+    if wait is not None:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Troppi tentativi. Riprova tra {wait}s.",
+        )
 
     user_doc = await db.users.find_one({"email": email, "deleted_at": None})
-    if not user_doc or not user_doc.get("is_active", True) or not user_doc.get("password_hash"):
-        await _record_failed(db, identifier)
-        await record_audit(
-            action="auth.login_failed", tenant_id=user_doc.get("tenant_id") if user_doc else None,
-            user_email=email, ip=ip, user_agent=request.headers.get("user-agent"),
-            meta={"reason": "user_not_found_or_inactive"},
-        )
+    is_valid_user = bool(
+        user_doc and user_doc.get("is_active", True) and user_doc.get("password_hash")
+    )
+    if not is_valid_user:
+        await record_failed_login(db, identifier, settings)
+        await _audit_login_failure(db, email, ip, ua, user_doc, "user_not_found_or_inactive")
         raise HTTPException(status_code=401, detail="Credenziali non valide")
 
     if not verify_password(body.password, user_doc["password_hash"]):
-        await _record_failed(db, identifier)
-        await record_audit(
-            action="auth.login_failed", tenant_id=user_doc.get("tenant_id"),
-            user_id=user_doc["_id"], user_email=email, ip=ip,
-            user_agent=request.headers.get("user-agent"),
-            meta={"reason": "bad_password"},
-        )
+        await record_failed_login(db, identifier, settings)
+        await _audit_login_failure(db, email, ip, ua, user_doc, "bad_password")
         raise HTTPException(status_code=401, detail="Credenziali non valide")
 
-    await _clear_failed(db, identifier)
-
-    # Create session with refresh token
-    session_id = new_id()
-    refresh = create_refresh_token(user_doc["_id"], user_doc["tenant_id"], session_id)
-    access = create_access_token(user_doc["_id"], user_doc["tenant_id"], user_doc.get("is_superadmin", False))
-    session = SessionModel(
-        id=session_id,
-        tenant_id=user_doc["tenant_id"],
-        user_id=user_doc["_id"],
-        refresh_token_hash=hash_token(refresh),
-        ip=ip,
-        user_agent=request.headers.get("user-agent"),
-        device_info=request.headers.get("user-agent"),
-        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-    )
-    await db.sessions.insert_one(to_mongo(session.model_dump(by_alias=True)))
-    await db.users.update_one(
-        {"_id": user_doc["_id"]},
-        {"$set": {"last_login_at": datetime.now(timezone.utc).isoformat()}},
-    )
+    await clear_failed_login(db, identifier)
+    access, refresh = await create_login_session(db, user_doc, ip, ua, settings)
     await record_audit(
         action="auth.login", tenant_id=user_doc["tenant_id"],
-        user_id=user_doc["_id"], user_email=email, ip=ip,
-        user_agent=request.headers.get("user-agent"),
+        user_id=user_doc["_id"], user_email=email, ip=ip, user_agent=ua,
     )
 
     _set_auth_cookies(response, access, refresh)
@@ -335,13 +297,8 @@ async def reset_password(body: ResetPasswordRequest, request: Request):
     return {"ok": True}
 
 
-@router.post("/accept-invitation")
-async def accept_invitation(body: AcceptInvitationRequest, request: Request):
-    db = get_db()
-    if len(body.password) < 8:
-        raise HTTPException(status_code=400, detail="La password deve avere almeno 8 caratteri")
-    th = hash_token(body.token)
-    inv = await db.invitations.find_one({"token_hash": th})
+def _validate_invitation_or_raise(inv: dict | None) -> None:
+    """Return None if the invitation is fresh & unused; raise 400 otherwise."""
     if not inv or inv.get("accepted_at"):
         raise HTTPException(status_code=400, detail="Invito non valido o già utilizzato")
     exp = inv["expires_at"]
@@ -350,52 +307,37 @@ async def accept_invitation(body: AcceptInvitationRequest, request: Request):
     if exp < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invito scaduto")
 
-    email = inv["email"].lower().strip()
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        # link existing user: update password & activate
-        await db.users.update_one(
-            {"_id": existing["_id"]},
-            {"$set": {
-                "password_hash": hash_password(body.password),
-                "role_ids": inv.get("role_ids", []),
-                "is_active": True,
-                "must_change_password": False,
-                "first_name": body.first_name or existing.get("first_name"),
-                "last_name": body.last_name or existing.get("last_name"),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }},
-        )
-        user_id = existing["_id"]
-    else:
-        from app.models import User
-        u = User(
-            id=new_id(),
-            tenant_id=inv["tenant_id"],
-            email=email,
-            password_hash=hash_password(body.password),
-            role_ids=inv.get("role_ids", []),
-            first_name=body.first_name,
-            last_name=body.last_name,
-            is_active=True,
-            must_change_password=False,
-        )
-        await db.users.insert_one(to_mongo(u.model_dump(by_alias=True)))
-        user_id = u.id
+
+async def _revoke_sessions_after_owner_activation(db, inv: dict, user_id: str) -> None:
+    if inv.get("kind") != "platform_owner_activation":
+        return
+    await db.sessions.update_many(
+        {"user_id": user_id},
+        {"$set": {"revoked_at": datetime.now(timezone.utc).isoformat()}},
+    )
+
+
+@router.post("/accept-invitation")
+async def accept_invitation(body: AcceptInvitationRequest, request: Request):
+    db = get_db()
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="La password deve avere almeno 8 caratteri")
+    inv = await db.invitations.find_one({"token_hash": hash_token(body.token)})
+    _validate_invitation_or_raise(inv)
+
+    user_id = await upsert_user_from_invitation(
+        db, inv, body.password, body.first_name, body.last_name,
+    )
+    now_iso = datetime.now(timezone.utc).isoformat()
     await db.invitations.update_one(
         {"_id": inv["_id"]},
-        {"$set": {"accepted_at": datetime.now(timezone.utc).isoformat(),
-                   "consumed_at": datetime.now(timezone.utc).isoformat()},
+        {"$set": {"accepted_at": now_iso, "consumed_at": now_iso},
          "$unset": {"debug_raw_token": ""}},
     )
-    # Platform owner activation: revoke any pre-existing sessions for security
-    if inv.get("kind") == "platform_owner_activation":
-        await db.sessions.update_many(
-            {"user_id": user_id},
-            {"$set": {"revoked_at": datetime.now(timezone.utc).isoformat()}},
-        )
+    await _revoke_sessions_after_owner_activation(db, inv, user_id)
     await record_audit(
         action="auth.invitation_accepted", tenant_id=inv["tenant_id"],
-        user_id=user_id, user_email=email, ip=get_client_ip(request),
+        user_id=user_id, user_email=inv["email"].lower().strip(),
+        ip=get_client_ip(request),
     )
     return {"ok": True}

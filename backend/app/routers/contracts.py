@@ -22,6 +22,11 @@ from app.services.contract_pdf import render_contract_pdf, store_contract_pdf, g
 from app.services.signature_provider import list_providers as list_sign_providers
 from app.services.otp import create_otp as otp_create, verify_otp as otp_verify, mask_email
 from app.services.email import send_email as email_send
+from app.services.contracts_helpers import (
+    load_quote_or_400, assert_no_active_contract, next_contract_number,
+    build_contract_snapshot, compute_snapshot_hash, build_signature_hash,
+    load_valid_signing_token, verify_public_otp,
+)
 from app.config import settings
 import secrets
 from fastapi.responses import Response, StreamingResponse
@@ -114,88 +119,23 @@ async def get_contract(cid: str, user: dict = Depends(require_permission("contra
 async def generate_from_quote(body: GenerateFromQuoteRequest, request: Request,
                                 user: dict = Depends(require_permission("contracts.generate"))):
     db = get_db()
-    quote = await db.quotes.find_one({
-        "_id": body.quote_id, "tenant_id": user["tenant_id"], "deleted_at": None,
-    })
-    if not quote:
-        raise HTTPException(404, "Preventivo non trovato")
-    if quote.get("status") not in ("sent", "accepted", "won", "active", "approved"):
-        raise HTTPException(400, f"Preventivo in stato {quote.get('status')}: deve essere sent/accepted/active")
+    tenant_id = user["tenant_id"]
+    quote = await load_quote_or_400(db, tenant_id, body.quote_id)
+    await assert_no_active_contract(db, tenant_id, body.quote_id)
 
-    # Verifica: contratto già esistente per questo quote?
-    existing = await db.contracts.find_one({
-        "tenant_id": user["tenant_id"], "quote_id": body.quote_id,
-        "contract_status": {"$nin": ["cancelled", "superseded", "rejected"]},
-        "deleted_at": None,
-    })
-    if existing:
-        raise HTTPException(400, f"Contratto già esistente per questo preventivo (id: {existing['_id']})")
-
-    # Assembla snapshot
-    company = await db.companies.find_one({"tenant_id": user["tenant_id"], "deleted_at": None}) or {}
-    customer = None
-    if quote.get("customer_id"):
-        customer = await db.customers.find_one({"_id": quote["customer_id"], "tenant_id": user["tenant_id"]})
-
-    # Environments + openings + products
-    environments = await db.quote_environments.find({
-        "tenant_id": user["tenant_id"], "quote_id": body.quote_id, "deleted_at": None,
-    }).to_list(500)
-    openings = await db.quote_openings.find({
-        "tenant_id": user["tenant_id"], "quote_id": body.quote_id, "deleted_at": None,
-    }).to_list(500)
-    opening_products = await db.opening_products.find({
-        "tenant_id": user["tenant_id"], "quote_id": body.quote_id, "deleted_at": None,
-    }).to_list(2000)
-    clauses = quote.get("clauses") or []
-
-    # Sequence
-    seq_doc = await db.sequences.find_one_and_update(
-        {"tenant_id": user["tenant_id"], "type": "contract"},
-        {"$inc": {"current": 1}, "$setOnInsert": {
-            "tenant_id": user["tenant_id"], "type": "contract",
-            "prefix": "CT-", "padding": 5,
-        }},
-        upsert=True, return_document=True,
+    number, seq_n, _ = await next_contract_number(db, tenant_id)
+    snapshot = await build_contract_snapshot(db, tenant_id, quote, body.payment_terms)
+    snap_hash = compute_snapshot_hash(
+        body.quote_id, number, quote.get("total"), snapshot.pop("_products_count", 0),
     )
-    n = seq_doc.get("current", 1)
-    year = datetime.now(timezone.utc).year
-    number = f"CT-{year}-{str(n).zfill(seq_doc.get('padding', 5))}"
-
-    snapshot = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "quote_id": body.quote_id,
-        "quote_number": quote.get("number"),
-        "quote_revision": quote.get("revision", 0),
-        "quote_totals": {
-            "subtotal": quote.get("subtotal"), "discount": quote.get("discount"),
-            "tax": quote.get("tax"), "total": quote.get("total"),
-            "materials_cost": quote.get("materials_cost"),
-            "margin": quote.get("margin"),
-        },
-        "environments": [from_mongo(e) for e in environments],
-        "openings": [from_mongo(o) for o in openings],
-        "products": [from_mongo(p) for p in opening_products],
-        "company": {
-            "name": company.get("name"), "vat": company.get("vat"),
-            "address": company.get("address"), "email": company.get("email"),
-            "phone": company.get("phone"), "logo_url": company.get("logo_url"),
-        },
-        "customer": from_mongo(customer) if customer else {},
-        "clauses": clauses,
-        "payment_terms": body.payment_terms,
-    }
-    snap_hash = hashlib.sha256(
-        f"{body.quote_id}|{number}|{quote.get('total')}|{len(opening_products)}".encode()
-    ).hexdigest()
     snapshot["snapshot_hash"] = snap_hash
 
     now = datetime.now(timezone.utc)
     contract_id = new_id()
     doc = {
         "_id": contract_id,
-        "tenant_id": user["tenant_id"],
-        "number": number, "number_int": n,
+        "tenant_id": tenant_id,
+        "number": number, "number_int": seq_n,
         "quote_id": body.quote_id,
         "quote_revision": quote.get("revision", 0),
         "customer_id": quote.get("customer_id"),
@@ -213,13 +153,13 @@ async def generate_from_quote(body: GenerateFromQuoteRequest, request: Request,
     }
     await db.contracts.insert_one(doc)
     await record_audit(
-        action="contracts.generate", tenant_id=user["tenant_id"],
+        action="contracts.generate", tenant_id=tenant_id,
         user_id=user["id"], user_email=user["email"], ip=get_client_ip(request),
         entity_type="contract", entity_id=contract_id,
         after={"quote_id": body.quote_id, "number": number, "snapshot_hash": snap_hash},
     )
     await record_activity(
-        tenant_id=user["tenant_id"], type="contract_generated",
+        tenant_id=tenant_id, type="contract_generated",
         subject=f"Contratto {number} generato da preventivo {quote.get('number')}",
         customer_id=quote.get("customer_id"),
         user_id=user["id"], user_email=user["email"],
@@ -412,33 +352,13 @@ class PublicSignRequest(BaseModel):
 @router.post("/public/{token}/sign")
 async def public_sign(token: str, body: PublicSignRequest, request: Request):
     db = get_db()
-    tk = await db.contract_signing_tokens.find_one({"_id": token, "consumed": False})
-    if not tk:
-        raise HTTPException(404, "Token non valido o già consumato")
-    if tk.get("expires_at"):
-        exp = tk["expires_at"]
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        if exp < datetime.now(timezone.utc):
-            raise HTTPException(410, "Token scaduto")
+    tk = await load_valid_signing_token(db, token)
     if not body.accept_terms:
         raise HTTPException(400, "Accettazione condizioni obbligatoria")
+    otp_used = False
     if body.otp_code:
-        # OTP reale via services.otp — request_id obbligatorio in prod, fallback dev accetta 123456 solo con OTP_DEBUG_ENABLED
-        req_id = body.otp_request_id
-        otp_ok = False
-        if req_id:
-            ok, reason, _ = await otp_verify(request_id=req_id, code=body.otp_code)
-            otp_ok = ok
-            if not ok:
-                raise HTTPException(400, f"OTP non valido: {reason}")
-        else:
-            # Fallback dev only
-            from app.config import is_dev_or_test
-            if is_dev_or_test() and body.otp_code == "123456":
-                otp_ok = True
-            if not otp_ok:
-                raise HTTPException(400, "OTP request_id mancante (necessario in produzione)")
+        otp_used = await verify_public_otp(db, body.otp_request_id, body.otp_code)
+
     doc = await db.contracts.find_one({
         "_id": tk["contract_id"], "tenant_id": tk["tenant_id"], "deleted_at": None,
     })
@@ -446,11 +366,13 @@ async def public_sign(token: str, body: PublicSignRequest, request: Request):
         raise HTTPException(404, "Contratto non trovato")
     if doc.get("contract_status") == "signed":
         raise HTTPException(400, "Contratto già firmato")
+
     now = datetime.now(timezone.utc)
     ip = get_client_ip(request)
     ua = request.headers.get("user-agent", "")
-    payload = f"{doc['_id']}|{body.signer_name}|{ip}|{ua}|{now.isoformat()}|{doc.get('number')}|{doc.get('snapshot_hash')}"
-    signature_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    signature_hash = build_signature_hash(doc["_id"], body.signer_name, ip, ua, now, doc)
+    signature_type = "electronic_simple_otp" if otp_used else "electronic_simple"
+
     await db.contracts.update_one({"_id": doc["_id"]}, {"$set": {
         "contract_status": "signed",
         "signed_at": now,
@@ -459,7 +381,7 @@ async def public_sign(token: str, body: PublicSignRequest, request: Request):
         "signed_ip": ip, "signed_ua": ua,
         "signature_data_url": body.signature_data_url,
         "signature_hash": signature_hash,
-        "signature_type": "electronic_simple_otp" if body.otp_code else "electronic_simple",
+        "signature_type": signature_type,
         "updated_at": now,
     }, "$push": {"state_history": {
         "state": "signed", "at": now.isoformat(),
@@ -473,8 +395,8 @@ async def public_sign(token: str, body: PublicSignRequest, request: Request):
                         user_id=None, user_email=tk.get("to_email"), ip=ip,
                         entity_type="contract", entity_id=doc["_id"],
                         after={"signer": body.signer_name, "hash": signature_hash,
-                                "otp": bool(body.otp_code)})
-    # Hook workflow → create Survey
+                                "otp": otp_used})
+    # Hook workflow → create Survey (isolato: fallimenti hook NON annullano la firma)
     try:
         from app.services.workflow_engine import ensure_survey_from_contract
         updated = await db.contracts.find_one({"_id": doc["_id"]})
@@ -482,9 +404,11 @@ async def public_sign(token: str, body: PublicSignRequest, request: Request):
             tenant_id=tk["tenant_id"], contract=updated, actor_id=None,
         )
     except Exception:
-        pass
+        # Log but do not fail signature (workflow is idempotent, will re-run)
+        import logging
+        logging.getLogger("contracts").exception("survey hook failed after public sign")
     return {"ok": True, "signature_hash": signature_hash,
-             "signature_type": "electronic_simple_otp" if body.otp_code else "electronic_simple"}
+             "signature_type": signature_type}
 
 
 # =====================================================================

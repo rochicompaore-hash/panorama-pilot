@@ -9,11 +9,12 @@ import re
 import uuid
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PW  # env-sourced credentials
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PW = "Admin!2025"
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PW moved to tests._creds
 T = 20  # timeout
 
 

@@ -16,13 +16,13 @@ import uuid
 from typing import Any, Dict, Optional
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD  # env-sourced credentials
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
-
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PASSWORD moved to tests._creds
 SELL_DEMO_ID = "4db4b91f-22c9-422b-aa7f-e235967b6698"
 BOM_WIN_2A_ID = "76d7b931-09b7-419f-bb79-1e47281a915e"
 CONTRACT_ID = "899c4115-d4be-41a3-8d57-b1cdfb488754"

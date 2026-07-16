@@ -24,13 +24,12 @@ import hashlib
 import pytest
 import requests
 from typing import Optional, Tuple
+from tests._creds import ADMIN_EMAIL, ADMIN_PWD  # env-sourced credentials
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://serramento-ops.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PWD = "Admin!2025"
-
-
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PWD moved to tests._creds
 # Small helper: valid 1x1 PNG signature (>200 bytes required by parse_signature_data_url)
 def _make_signature_data_url() -> str:
     # 200-ish random bytes wrapped as PNG-ish? Actually the parser only validates:

@@ -10,6 +10,7 @@ import time
 import concurrent.futures
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASS  # env-sourced credentials
 
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
 if not BASE_URL:
@@ -20,10 +21,8 @@ if not BASE_URL:
                 BASE_URL = ln.split("=", 1)[1].strip().rstrip("/")
                 break
 
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASS = "Admin!2025"
-
-
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PASS moved to tests._creds
 # ---------- Fixtures ----------
 @pytest.fixture(scope="session")
 def s():

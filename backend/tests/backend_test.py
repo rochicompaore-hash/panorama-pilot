@@ -12,6 +12,7 @@ import time
 import uuid
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD  # env-sourced credentials
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
@@ -26,9 +27,8 @@ if not BASE_URL:
         pass
 assert BASE_URL, "REACT_APP_BACKEND_URL not set"
 
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
-
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PASSWORD moved to tests._creds
 STATE: dict = {}
 
 

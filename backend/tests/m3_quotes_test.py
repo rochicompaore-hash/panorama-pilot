@@ -17,11 +17,11 @@ from __future__ import annotations
 import os, uuid, asyncio, base64
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PWD  # env-sourced credentials
 
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0]).rstrip("/")
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PWD = "Admin!2025"
-
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PWD moved to tests._creds
 # ---------------- Fixtures ----------------
 
 @pytest.fixture(scope="module")

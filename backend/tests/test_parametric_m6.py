@@ -17,18 +17,16 @@ import os
 import re
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASS, LIMITED_EMAIL, LIMITED_PASS  # env-sourced credentials
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASS = "Admin!2025"
-
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PASS moved to tests._creds
 # Test user created (or reused) with only Viewer permissions (no quotes.view_costs,
 # no pricing.mode.override) to verify permission guards
 VIEWER_ROLE_ID = "fee3d45d-8ae8-46af-b3c5-e9e374af7d4e"
-LIMITED_EMAIL = "test_parametric@example.com"
-LIMITED_PASS = "Test!2026Param"
-
-
+# scrubbed: LIMITED_EMAIL moved to tests._creds
+# scrubbed: LIMITED_PASS moved to tests._creds
 # --- fixtures ---------------------------------------------------------
 
 @pytest.fixture(scope="session")

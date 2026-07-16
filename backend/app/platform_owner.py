@@ -16,6 +16,7 @@ import logging
 import os
 import secrets
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 from app.db import get_db
 from app.config import settings, is_dev_or_test
 from app.models import User, Role, new_id, Permission
@@ -68,60 +69,44 @@ def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-async def ensure_platform_owner_user(role_id: str) -> tuple[str, dict]:
-    """Crea l'utente proprietario (se assente) + un invitation token monouso quando non ha password.
+async def _upsert_platform_owner_flags(db, existing: dict, role_id: str) -> tuple[str, bool]:
+    """Update flags on existing user; return (user_id, already_active_with_password)."""
+    await db.users.update_one({"_id": existing["_id"]}, {"$set": {
+        "is_platform_owner": True, "platform_role": PLATFORM_OWNER_ROLE_KEY,
+        "is_protected": True, "is_active": True, "is_superadmin": True,
+        "tenant_id": None,
+        "role_ids": list(set((existing.get("role_ids") or []) + [role_id])),
+    }})
+    return existing["_id"], bool(existing.get("password_hash"))
 
-    Ritorna (user_id, {invitation_token, expires_at}) — invitation token è None se già attivato.
-    """
-    db = get_db()
-    email = PLATFORM_OWNER_EMAIL
-    existing = await db.users.find_one({"email": email})
-    now = datetime.now(timezone.utc)
-    inv_info = {"invitation_token_id": None, "invitation_created_at": None, "expires_at": None,
-                "raw_token_debug": None, "already_active": False}
 
-    if existing:
-        # Ensure platform_owner flags always on
-        await db.users.update_one({"_id": existing["_id"]}, {"$set": {
-            "is_platform_owner": True, "platform_role": PLATFORM_OWNER_ROLE_KEY,
-            "is_protected": True, "is_active": True, "is_superadmin": True,
-            "tenant_id": None,  # global user — no single tenant
-            "role_ids": list(set((existing.get("role_ids") or []) + [role_id])),
-        }})
-        # If already has password → skip invite generation
-        if existing.get("password_hash"):
-            inv_info["already_active"] = True
-            return existing["_id"], inv_info
-        user_id = existing["_id"]
-    else:
-        u = User(
-            id=new_id(), tenant_id=None,
-            email=email, password_hash=None,
-            first_name="Platform", last_name="Owner",
-            role_ids=[role_id],
-            is_superadmin=True, is_platform_owner=True, is_protected=True,
-            platform_role=PLATFORM_OWNER_ROLE_KEY,
-            platform_permissions=PLATFORM_OWNER_PERMISSIONS,
-            is_active=True, must_change_password=False,
-            locale="it",
-        )
-        await db.users.insert_one(to_mongo(u.model_dump(by_alias=True)))
-        user_id = u.id
-        logger.info("Platform Owner user created (no password): %s", email)
+async def _create_platform_owner_user(db, email: str, role_id: str) -> str:
+    u = User(
+        id=new_id(), tenant_id=None,
+        email=email, password_hash=None,
+        first_name="Platform", last_name="Owner",
+        role_ids=[role_id],
+        is_superadmin=True, is_platform_owner=True, is_protected=True,
+        platform_role=PLATFORM_OWNER_ROLE_KEY,
+        platform_permissions=PLATFORM_OWNER_PERMISSIONS,
+        is_active=True, must_change_password=False,
+        locale="it",
+    )
+    await db.users.insert_one(to_mongo(u.model_dump(by_alias=True)))
+    logger.info("Platform Owner user created (no password): %s", email)
+    return u.id
 
-    # Reuse existing pending invitation if fresh (<7 days), else create new
-    active_inv = await db.invitations.find_one({
+
+async def _reuse_active_invitation(db, email: str, now: datetime) -> Optional[dict]:
+    return await db.invitations.find_one({
         "email": email, "consumed_at": None,
         "expires_at": {"$gt": now.isoformat()},
     })
-    if active_inv:
-        inv_info["invitation_token_id"] = active_inv["_id"]
-        inv_info["invitation_created_at"] = active_inv.get("created_at")
-        inv_info["expires_at"] = active_inv.get("expires_at")
-        # Never expose the raw token if already generated (only stored as hash)
-        return user_id, inv_info
 
-    # Create invitation
+
+async def _create_activation_invitation(db, email: str, user_id: str, role_id: str,
+                                        now: datetime) -> tuple[str, str, datetime]:
+    """Insert a new activation invitation. Returns (inv_id, raw_token, expires_at)."""
     raw = secrets.token_urlsafe(32)
     token_hash = _hash_token(raw)
     inv_id = new_id()
@@ -143,15 +128,49 @@ async def ensure_platform_owner_user(role_id: str) -> tuple[str, dict]:
         "version": 1,
         "status": "active",
     })
+    if is_dev_or_test():
+        await db.invitations.update_one({"_id": inv_id}, {"$set": {"debug_raw_token": raw}})
+    logger.info("Platform Owner invitation created (id=%s, expires=%s)", inv_id, expires.isoformat())
+    return inv_id, raw, expires
+
+
+async def ensure_platform_owner_user(role_id: str) -> tuple[str, dict]:
+    """Crea l'utente proprietario (se assente) + un invitation token monouso quando non ha password.
+
+    Ritorna (user_id, {invitation_token, expires_at}) — invitation token è None se già attivato.
+    """
+    db = get_db()
+    email = PLATFORM_OWNER_EMAIL
+    now = datetime.now(timezone.utc)
+    inv_info: dict = {
+        "invitation_token_id": None, "invitation_created_at": None, "expires_at": None,
+        "raw_token_debug": None, "already_active": False,
+    }
+
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        user_id, already_active = await _upsert_platform_owner_flags(db, existing, role_id)
+        if already_active:
+            inv_info["already_active"] = True
+            return user_id, inv_info
+    else:
+        user_id = await _create_platform_owner_user(db, email, role_id)
+
+    active_inv = await _reuse_active_invitation(db, email, now)
+    if active_inv:
+        inv_info["invitation_token_id"] = active_inv["_id"]
+        inv_info["invitation_created_at"] = active_inv.get("created_at")
+        inv_info["expires_at"] = active_inv.get("expires_at")
+        return user_id, inv_info
+
+    inv_id, raw, expires = await _create_activation_invitation(
+        db, email, user_id, role_id, now,
+    )
     inv_info["invitation_token_id"] = inv_id
     inv_info["invitation_created_at"] = now.isoformat()
     inv_info["expires_at"] = expires.isoformat()
-    # ONLY expose raw token in dev/test via debug endpoint reference — never in logs
     if is_dev_or_test():
         inv_info["raw_token_debug"] = raw
-        # Persist a debug field on the invitation doc so `/api/debug/platform-owner-invite` can fetch
-        await db.invitations.update_one({"_id": inv_id}, {"$set": {"debug_raw_token": raw}})
-    logger.info("Platform Owner invitation created (id=%s, expires=%s)", inv_id, expires.isoformat())
     return user_id, inv_info
 
 

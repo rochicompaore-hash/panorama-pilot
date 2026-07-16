@@ -13,12 +13,12 @@ import os
 import copy
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD  # env-sourced credentials
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
-
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PASSWORD moved to tests._creds
 EXPECTED_RECIPES = {
     "PERIMETRO_TELAIO", "PERIMETRO_ANTA", "PERIMETRO_SPECCHIATURA", "SUPERFICIE_VETRO",
     "MONTANTE_VERTICALE", "TRAVERSO_ORIZZONTALE", "SCAMBIO_BATTUTA",

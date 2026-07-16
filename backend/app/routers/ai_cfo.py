@@ -82,6 +82,75 @@ class GenerateBody(BaseModel):
     force_regen: bool = False
 
 
+def _cash_flow_suggestion(tenant: str, cash: Dict[str, Any], now: datetime) -> AICFOSuggestion | None:
+    if cash["expected_in_next_30d"] <= 0 and cash["current_overdue"] <= 0:
+        return None
+    return AICFOSuggestion(
+        id=new_id(), tenant_id=tenant,
+        period_from=_today(), period_to=_today() + timedelta(days=30),
+        category="cash_flow",
+        title=f"Incassi previsti nei prossimi 30 giorni: € {cash['expected_in_next_30d']:.0f}",
+        body=(f"In base alle rate configurate, si prevedono incassi per €{cash['expected_in_next_30d']:.2f}. "
+              f"Sono già in stato scaduto €{cash['current_overdue']:.2f}. "
+              f"Fonte: piano pagamenti attivi con due_date valorizzato."),
+        action_suggested="Verifica gli scaduti; invia solleciti sui piani con importo residuo > 0.",
+        confidence=0.85, risk_level="medium" if cash["current_overdue"] > 0 else "low",
+        data_sources=["payment_plans", "payments"],
+        computed_metrics=cash, generated_at=now,
+    )
+
+
+def _receivables_suggestion(tenant: str, recv: Dict[str, Any], now: datetime) -> AICFOSuggestion | None:
+    if recv["count"] <= 0:
+        return None
+    return AICFOSuggestion(
+        id=new_id(), tenant_id=tenant,
+        period_from=_today() - timedelta(days=90), period_to=_today(),
+        category="receivables",
+        title=f"{recv['count']} cliente/i con scaduti > 30 giorni",
+        body=("Individuati clienti con rate scadute da oltre 30 giorni e piano pagamenti ancora attivo. "
+              "Fonte: piani pagamenti con installments.due_date < oggi - 30gg e installment_status != 'paid'."),
+        action_suggested="Contatta i clienti evidenziati; considera piani di rientro o azioni di recupero.",
+        confidence=0.9, risk_level="high",
+        data_sources=["payment_plans"], computed_metrics=recv, generated_at=now,
+    )
+
+
+def _conversion_suggestion(tenant: str, conv: Dict[str, Any], now: datetime) -> AICFOSuggestion | None:
+    if conv["delta_pp"] >= -5:
+        return None
+    return AICFOSuggestion(
+        id=new_id(), tenant_id=tenant,
+        period_from=_today() - timedelta(days=180), period_to=_today(),
+        category="risk",
+        title=f"Calo del tasso di conversione preventivi ({conv['delta_pp']} punti percentuali)",
+        body=(f"Il tasso di conversione degli ultimi 90 giorni è {conv['conversion_last_90d']}%, "
+              f"contro {conv['conversion_prev_90d']}% dei 90 giorni precedenti. "
+              f"Fonte: aggregazione preventivi con quote_status."),
+        action_suggested="Analizza i motivi di rifiuto recenti e verifica listini/margini con la Direzione Commerciale.",
+        confidence=0.7, risk_level="medium",
+        data_sources=["quotes"], computed_metrics=conv, generated_at=now,
+    )
+
+
+async def _persist_suggestions(db, tenant: str, user: dict, suggestions: List[AICFOSuggestion],
+                                force_regen: bool, now: datetime) -> List[dict]:
+    if not force_regen:
+        await db.ai_cfo_suggestions.update_many(
+            {"tenant_id": tenant, "is_dismissed": False},
+            {"$set": {"is_dismissed": True, "dismissed_at": now.isoformat(),
+                       "dismissed_by": "system_regeneration"}},
+        )
+    stored: List[dict] = []
+    for s in suggestions:
+        s.tenant_id = tenant
+        s.created_by = user["id"]
+        s.updated_by = user["id"]
+        await db.ai_cfo_suggestions.insert_one(to_mongo(s.model_dump(by_alias=True)))
+        stored.append(from_mongo(await db.ai_cfo_suggestions.find_one({"_id": s.id})))
+    return stored
+
+
 @router.post("/generate")
 async def generate_suggestions(body: GenerateBody,
                                 user: dict = Depends(require_permission("ai_cfo.generate"))):
@@ -89,75 +158,18 @@ async def generate_suggestions(body: GenerateBody,
     tenant = user["tenant_id"]
     now = _now()
 
-    # Compute base metrics
     cash = await _cash_flow_next30(tenant, db)
     recv = await _receivables_at_risk(tenant, db)
     conv = await _quotes_conversion(tenant, db)
 
-    suggestions: List[AICFOSuggestion] = []
-
-    # 1. Cash flow next 30 days
-    if cash["expected_in_next_30d"] > 0 or cash["current_overdue"] > 0:
-        s = AICFOSuggestion(
-            id=new_id(), tenant_id=tenant,
-            period_from=_today(), period_to=_today() + timedelta(days=30),
-            category="cash_flow",
-            title=f"Incassi previsti nei prossimi 30 giorni: € {cash['expected_in_next_30d']:.0f}",
-            body=(f"In base alle rate configurate, si prevedono incassi per €{cash['expected_in_next_30d']:.2f}. "
-                  f"Sono già in stato scaduto €{cash['current_overdue']:.2f}. "
-                  f"Fonte: piano pagamenti attivi con due_date valorizzato."),
-            action_suggested="Verifica gli scaduti; invia solleciti sui piani con importo residuo > 0.",
-            confidence=0.85, risk_level="medium" if cash["current_overdue"] > 0 else "low",
-            data_sources=["payment_plans", "payments"],
-            computed_metrics=cash, generated_at=now,
-        )
-        suggestions.append(s)
-
-    # 2. Receivables at risk
-    if recv["count"] > 0:
-        s = AICFOSuggestion(
-            id=new_id(), tenant_id=tenant,
-            period_from=_today() - timedelta(days=90), period_to=_today(),
-            category="receivables",
-            title=f"{recv['count']} cliente/i con scaduti > 30 giorni",
-            body=("Individuati clienti con rate scadute da oltre 30 giorni e piano pagamenti ancora attivo. "
-                  "Fonte: piani pagamenti con installments.due_date < oggi - 30gg e installment_status != 'paid'."),
-            action_suggested="Contatta i clienti evidenziati; considera piani di rientro o azioni di recupero.",
-            confidence=0.9, risk_level="high",
-            data_sources=["payment_plans"], computed_metrics=recv, generated_at=now,
-        )
-        suggestions.append(s)
-
-    # 3. Quotes conversion
-    if conv["delta_pp"] < -5:
-        s = AICFOSuggestion(
-            id=new_id(), tenant_id=tenant,
-            period_from=_today() - timedelta(days=180), period_to=_today(),
-            category="risk",
-            title=f"Calo del tasso di conversione preventivi ({conv['delta_pp']} punti percentuali)",
-            body=(f"Il tasso di conversione degli ultimi 90 giorni è {conv['conversion_last_90d']}%, "
-                  f"contro {conv['conversion_prev_90d']}% dei 90 giorni precedenti. "
-                  f"Fonte: aggregazione preventivi con quote_status."),
-            action_suggested="Analizza i motivi di rifiuto recenti e verifica listini/margini con la Direzione Commerciale.",
-            confidence=0.7, risk_level="medium",
-            data_sources=["quotes"], computed_metrics=conv, generated_at=now,
-        )
-        suggestions.append(s)
-
-    # Persist
-    if not body.force_regen:
-        # Invalidate previous non-dismissed
-        await db.ai_cfo_suggestions.update_many(
-            {"tenant_id": tenant, "is_dismissed": False},
-            {"$set": {"is_dismissed": True, "dismissed_at": now.isoformat(),
-                       "dismissed_by": "system_regeneration"}},
-        )
-    for s in suggestions:
-        s.tenant_id = tenant
-        s.created_by = user["id"]; s.updated_by = user["id"]
-        await db.ai_cfo_suggestions.insert_one(to_mongo(s.model_dump(by_alias=True)))
-
-    return {"generated": len(suggestions), "items": [from_mongo(await db.ai_cfo_suggestions.find_one({"_id": s.id})) for s in suggestions]}
+    builders = (
+        _cash_flow_suggestion(tenant, cash, now),
+        _receivables_suggestion(tenant, recv, now),
+        _conversion_suggestion(tenant, conv, now),
+    )
+    suggestions: List[AICFOSuggestion] = [s for s in builders if s is not None]
+    stored = await _persist_suggestions(db, tenant, user, suggestions, body.force_regen, now)
+    return {"generated": len(suggestions), "items": stored}
 
 
 @router.get("/suggestions")

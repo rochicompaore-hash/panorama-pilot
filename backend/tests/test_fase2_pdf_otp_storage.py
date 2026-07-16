@@ -15,11 +15,12 @@ import time
 import hashlib
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD  # env-sourced credentials
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://serramento-ops.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
+# scrubbed: ADMIN_EMAIL moved to tests._creds
+# scrubbed: ADMIN_PASSWORD moved to tests._creds
 TEST_CONTRACT_ID = "899c4115-d4be-41a3-8d57-b1cdfb488754"
 
 
@@ -127,9 +128,11 @@ class TestPdfPermissions:
             pytest.skip(f"cannot create role: {r_role.status_code} {r_role.text[:200]}")
         role = r_role.json()
         role_id = role.get("id") or role.get("_id")
-        # Create user
+        # Create user with ephemeral password from env-driven helper
+        from tests._creds import ephemeral_password
+        _test_user_pw = ephemeral_password("NoDown")
         user_payload = {
-            "email": "TEST_nodown@example.com", "password": "Test!2025aa",
+            "email": "TEST_nodown@example.com", "password": _test_user_pw,
             "first_name": "No", "last_name": "Download",
             "role_ids": [role_id] if role_id else [],
         }
