@@ -354,3 +354,43 @@ Action `tenant.cleanup.demo_data_removed` registrato in `audit_logs` con `tenant
 
 ### Note
 Il tenant era già in stato desiderato dalla nascita (creato da `provision_owner.py` senza seed demo). Lo script cleanup è idempotente: rieseguibile in sicurezza.
+
+## Iteration 25 — Code Quality Refactor (Feb 2026)
+
+**P0 Security**
+- `simpleeval==1.0.7` aggiunto a requirements.txt
+- Creato `app/services/formula_security.py` con:
+  - Guard `_assert_no_eval_in_module` che rifiuta a import-time la presenza di `eval()/exec()/compile()` in `formula.py`, `parametric_engine.py`, `breakeven.py`
+  - Classe `SafeExpression` (wrapper simpleeval) per casi non-Decimal
+- **Conferma**: nessun `eval()` reale era presente nel codebase — `formula.py` usava già un AST parser strict con whitelist (Decimal-safe, node/depth/length caps). Report esterno era falso positivo su matching `_eval`/`eval_formula`.
+- Test secrets scrubbing: creato `backend/tests/_creds.py` env-sourced; rimossi hardcoded `ADMIN_EMAIL`/`ADMIN_PASSWORD` da 24 file di test; anche `TENANT_ADMIN`/`PLATFORM_OWNER` letti da env.
+- Nessun segreto reale rimane nel repo (verificato con grep).
+
+**P1 Refactoring cyclomatic complexity**
+- `auth.py::login` — estratti `check_brute_force / record_failed_login / clear_failed_login / create_login_session / _audit_login_failure` in `services/auth_helpers.py`
+- `auth.py::accept_invitation` — estratti `_validate_invitation_or_raise / upsert_user_from_invitation / _revoke_sessions_after_owner_activation`
+- `contracts.py::generate_from_quote` — estratti `load_quote_or_400 / assert_no_active_contract / next_contract_number / build_contract_snapshot / compute_snapshot_hash` in `services/contracts_helpers.py`. Hash snapshot preservato identico.
+- `contracts.py::public_sign` — estratti `load_valid_signing_token / verify_public_otp / build_signature_hash`. Fallimento hook workflow ora loggato (prima: silenzioso).
+- `bi.py::quotes_kpi` — estratti `_sum_total / _avg_hours_between / _pipeline_conversion_rate / _pipeline_weighted_value / _rejection_reasons`. Costante `QUOTE_STATUSES`.
+- `ai_cfo.py::generate_suggestions` — estratti `_cash_flow_suggestion / _receivables_suggestion / _conversion_suggestion / _persist_suggestions`.
+- `platform_owner.py::ensure_platform_owner_user` — estratti `_upsert_platform_owner_flags / _create_platform_owner_user / _reuse_active_invitation / _create_activation_invitation`.
+
+**P1 server.py import cleanup**
+- Import raggruppati per dominio (Foundations, CRM, Quoting, Ops, Finance/BI, Public)
+- Router registrati via 6 liste raggruppate (`FOUNDATION_ROUTERS`, `CRM_ROUTERS`, ...)
+- Estratto endpoint `/api/config/production-status` in helper locale, semplificato lookup OTP status.
+- Rimosso import inutilizzato `os`.
+
+**Testing**
+- Nuovo `tests/test_code_quality_regression.py` (14 test): login, accept-invitation guards, quotes KPI shape, AI CFO generate, public sign 404, formula math determinism, formula rejects unknown vars/functions/div-zero, formula_security guard.
+- `tests/test_iter25_smoke.py` (6 test aggiunti dal testing subagent) — health, /auth/me shape, login token, generate-from-quote 404, KPI period_days, openapi route count.
+- **Risultato**: 20/20 PASS. Zero regressioni.
+
+**Vincoli rispettati**
+- ✅ Punto di ripristino creato (commit `58d0e41`)
+- ✅ Significato formule invariato (Decimal, whitelist, strict mode)
+- ✅ Nessun fallback silenzioso a zero (FormulaError bloccante in strict; nessun `except: pass` reintrodotto — solo l'hook workflow post-firma ora logga)
+- ✅ Segreti solo da env/fixture (`tests/_creds.py`)
+- ✅ API/permessi/snapshot/contratti firmati preservati (test 404/400 error paths verdi)
+
+**Files aggiunti/modificati**: 30+ file (vedi `git log --stat 58d0e41..HEAD`).
