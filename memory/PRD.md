@@ -1,444 +1,69 @@
-# Infissi Express Cloud — PRD & Roadmap
+# Infissi Express Cloud — PRD & Progress Log
 
-## Original problem
-ERP verticale per aziende di serramenti. Copertura end-to-end: Lead → Preventivo → Contratto → Rilievo → Produzione → Posa → Assistenza. Multi-tenant ready, API-first, RBAC granulare.
+## Vision
+ERP verticale SaaS multi-tenant per aziende produttrici/installatrici di serramenti.
+Copertura end-to-end: Lead → Preventivo → Contratto → Rilievo → Produzione → Posa → Assistenza → Cash → AI CFO.
 
-## Architecture
-- Backend: FastAPI + MongoDB (Motor async). Pydantic v2, BaseDoc con `version:int=1`, tenant_id obbligatorio, audit append-only.
-- Frontend: React 19 + Tailwind + shadcn/ui + Zustand + React Query + i18next (IT).
-- Auth: JWT access+refresh, RBAC (`*` wildcard superadmin), ABAC-ready.
+## Latest completed — M7.CONSOLIDATION (Feb 2026)
+- Multi-company: LegalEntity + LegalEntityMembership (Enerhia Srl + Auxer Srl seed in to_complete state — nessun P.IVA fittizia inserita, blocco fiscale automatico).
+- Intercompany: auto-mirroring source(revenue/credit) + target(cost/debit), riconciliazione, storno con credit_note pair, reconciliation-report con detection di mismatch (importo, IVA, valuta, missing counterpart).
+- SaaS Modularization: 13 moduli, 11 dipendenze, 3 piani seed (starter/professional/enterprise), TenantEntitlement con override module_states, gating middleware `require_module()` con stati (active/trial/grace_period/read_only/suspended/expired/disabled).
+- Management Control: FixedCost + PersonnelCost + Payable/Receivable scadenziario + Budget/BudgetScenario con 3 preset (base/prudent/growth) + simulator what-if (20+ variabili) + break-even engine (revenue/stability/growth/EBITDA/waterfall) + Investment tracking.
+- Consolidation: eliminazioni intercompany, vista per legal entity + totale lordo + eliminazioni + consolidato.
+- Product Catalog: 18 tipologie prodotto (finestra 1/2/3 ante con fissa laterale/centrale, portafinestra, scorrevole, alzante, persiana, zanzariera, tapparella, cassonetto, portoncino, oscurante). SVG advanced renderer con simbologia aperture (battente, ribalta, battente-ribalta, scorrevole, fisso), sopraluce/sottoluce/fiancoluce, quote esterne, legenda tecnica, watermark preventivo.
+- Installation Pricing Rules: 10 regole seed per tipologia. Costo interno / prezzo cliente separati (nascosti al commerciale).
+- Site Conditions: questionario cantiere (piano, ascensore, piattaforma, autorizzazioni, ZTL, occupazione suolo), engine di valutazione con classificazione complessità (simple/ordinary/complex/with_platform/to_verify/not_quotable_without_survey), risk_level, snapshot supplementi applicati.
+- Access Surcharge Rules: 6 regole seed configurabili (piano senza ascensore, ascensore inadeguato, piattaforma, ZTL, occupazione suolo, autorizzazione comunale).
+- Landing Page pubblica: hero + moduli + pacchetti + form consulenza + auto-suggerimento pacchetto in base a risposte (multi_company+ai_cfo→enterprise, produzione→production, treasury→finance, ecc.).
+- Public Lead intake: dedup via SHA256(email+phone+vat), creazione automatica CRM lead + activity timeline nel tenant default, invio email a destinatari configurati (con validazione strict — `checonpaorechioccilagmail.com` respinto perché non è un email valido).
+- Platform Owner: pagina configurazione sito pubblico (contenuti, CTA, destinatari email, pacchetti, SEO, contatti). Stato email `configuration_required` finché non è settato un destinatario valido. I lead vengono sempre salvati anche senza email configurata.
 
-## Milestones status
-- **M1 Fondazioni** ✅ (auth, ruoli, permessi, audit, allegati S3, notifiche, ricerca, numerazioni).
-- **M2 CRM** ✅ (leads/customers/contacts, pipeline, timeline, dashboard, WhatsApp/Email log).
-- **M3.1 Preventivatore** ✅ (Quote/Opening/Line, price engine base, approval flow, revisioni, conversione contratto).
-- **M3.2 Configuratori + Live Pricing** ✅
-- **M3.3.1** Autosave ✅ · **M3.3.2** PDF WeasyPrint ✅ · **M3.3.3** Object Storage + link pubblico ✅
-- **M3.3.4** Firma Elettronica Semplice ✅ (Redis rate limiter, OTP mock, canvas, evidence hash, PDF firmato con timbro, azioni portale)
-- **M3.3.5** KPI preventivi ✅ (`/api/bi/quotes/kpi` — 15+ metriche)
-- **M3.3.6** Contratti idempotenti da firma ✅
-- **M4** Rilievo tecnico ✅ backend + UI base
-- **M5** Ordini cliente + Fornitori + PO + Ricevimenti ✅ backend + UI base
-- **M6** Magazzino ✅ backend + UI base (items, movimenti append-only, giacenze, inventari)
-- **M7** Produzione ✅ backend (BOM versionate, cutting-list FFD, fasi)
-- **M8** Pianificazione produzione 🟡 base (fasi + KPI; scheduling avanzato TBD)
-- **M9** QC ✅ backend (checklist finale 14 controlli + non-conformità)
-- **M10** Prodotto finito + Spedizioni ✅ backend base
-- **M11** Pianificazione posa ✅ backend + UI base
-- **M12** Verbale posa ✅ backend base
-- **M13** Assistenza ✅ backend + UI base
-- **M14** Amministrazione ✅ backend base (payment plans, payments, invoices)
-- **M15** Costi/Margini 🟡 struttura base
-- **M16** BI ✅ base (direction KPI + quote KPI)
-- **M17** AI CFO ✅ rule-based (no LLM); ogni suggerimento con fonti + confidence
-- **M18-M25**: parziali/backlog — vedi HANDOVER.md
+## Architecture — nuovi files
+### Backend
+- `models_multi_company.py` — LegalEntity, LegalEntityMembership, IntercompanyTransaction
+- `models_saas.py` — SubscriptionPlan, SubscriptionModule, ModuleDependency, TenantEntitlement, UsageCounter, BillingEvent
+- `models_control.py` — FixedCost, PersonnelCost, ManagementAccount, Payable, Receivable, BudgetScenario, BudgetInputs/Outputs, Investment
+- `models_product_types.py` — ProductType, WindowComposition, WindowModule, InstallationPricingRule, AccessSurchargeRule, PlatformCostRule, MunicipalAuthCostRule, SiteConditions, TechnicalDrawingSnapshot
+- `models_landing.py` — PublicSiteConfig, PackageConfig, LandingLead, LandingLeadSubmission
+- `routers/legal_entities.py`
+- `routers/saas_platform.py`
+- `routers/management_control.py`
+- `routers/intercompany.py`
+- `routers/product_catalog.py`
+- `routers/landing.py` (public_site_router + platform_site_router)
+- `services/module_gating.py` (require_module, evaluate_module, resolve_module_dependencies)
+- `services/breakeven.py` (compute_budget_outputs + PRESET_SCENARIOS)
+- `services/consolidation.py` (compute_consolidation)
+- `services/access_rules.py` (evaluate_site_conditions)
+- `services/svg_advanced.py` (render_composition)
+- `seed_extensions.py` (idempotent seed for LEs, modules, plans, product types, install rules, access rules, management demo)
 
-## Regole economiche seed (11)
-- Colori: avorio massa +8%, film ext/int +14.5%, film both +16%, film int-only +16%, film diff +22% e +€150 fisso
-- Tapparella RAL +8%, effetto legno/metallizzata +30%, abbinata a serramento -30%
-- Motorizzazione: meccanica +€180, radio +€260
-
-## Concorrenza — entità protette
-`quotes`, `quote_openings`, `quote_lines`, `contracts`, `pricelists`, `price_rules`, `products`, `customers`, `leads`, `contacts`.
-
-Non-versionate (append-only): `audit_logs`, `notifications`, timeline `activities`, email/WA log.
+### Frontend
+- `pages/LandingPage.jsx` (public route `/landing`)
+- `pages/LegalEntitiesPage.jsx`
+- `pages/TreasuryCFOPage.jsx` (13 tabs: overview/banks/funds/vat/payables/fixed/personnel/budget/breakeven/simulator/intercompany/consolidated/ai_cfo/alerts)
+- `pages/SaaSPlatformPage.jsx`
+- `pages/ProductCatalogPage.jsx` (with visual configurator + live SVG preview)
+- `pages/SiteConditionsForm.jsx` (reusable questionnaire)
+- `pages/PlatformSiteConfigPage.jsx`
 
 ## Test coverage
-- iteration_5.json: 22/22 backend PASS, frontend E2E 100%.
-
-## Backlog residuo
-- P0: Auto-save preventivo con indicator "salvato"
-- P0: Badge "Risparmio vs listino" (permission-gated)
-- P0: Prezzo formule con base cost / margin flow completo
-- P1: M3.3 PDF preventivo + Firma FES canvas + Contratti finalizzati
-- P1: M4 Rilievo tecnico + blocco misure
-- P1: Multi-azienda operativa (feature flag)
-- P2: Portale posatore PWA
-- P2: Simulatore marginalità what-if
-- P2: Event bus interno per notifiche/audit disaccoppiati
-
-## Test credentials
-Vedi `/app/memory/test_credentials.md`.
-
-## Iteration 6 (2026-02) — Correzione economica + Autosalvataggio
-### Fix ambiguità applicazione regole
-- Campi espliciti su PriceRuleV2:
-  - `application_scope`: unit | line | opening | quote (default unit)
-  - `apply_before_quantity` (default true; scope=unit)
-  - `once_per_line` (default false; se true su fixed+unit → deferimento a line)
-- Motore pricing_v2 rifatto in 3 passi: (1) unit rules → (2) quantity mult → (3) line/once-per-line rules
-- Migrate DB one-shot: `COLOR_FILM_DIFF_FIXED`, `ROLLER_MOTOR_MECHANICAL`, `ROLLER_MOTOR_RADIO` → scope=line
-- Breakdown v2: ogni entry ha `scope`, `unit_before/after`, `line_before/after`, `per_piece`
-- Response arricchita: `unit_price_pre_qty` (per pezzo prima quantità) + `unit_price_final` (per pezzo effettivo = subtotale/qty)
-
-### Verifica economica
-| Qty | Base unit | +22% unit | €150 (line) | Subtotale | Precedente (buggy) |
-|-----|-----------|-----------|-------------|-----------|--------------------|
-| 1 | 806,40 | 177,41 | 150,00 (×1) | 1.133,81 | 1.133,81 |
-| 2 | 806,40 | 177,41 | 150,00 (×1) | **2.117,62** | 2.267,62 ❌ |
-| 5 | 806,40 | 177,41 | 150,00 (×1) | **5.069,05** | 5.669,05 ❌ |
-
-### Autosalvataggio (M3.3.1)
-- Endpoint `POST /api/quotes/{id}/autosave` (whitelist campi, version check, blocco consolidati)
-- Hook `useAutosave`: debounce 800ms, AbortController, request_id out-of-order guard, beforeunload guard
-- `AutosaveIndicator`: 6 stati (idle/dirty/saving/saved/error/conflict) + retry manuale
-- Integrato: title (inline editable), notes, payment_terms, delivery_days, warranty_months, valid_until, internal_notes
-- Auto-flush prima di azioni critiche (invia, revise, converti)
-
-### Test coverage
-- `tests/test_pricing_scope.py`: 10/10 (qty 1/2/5, deterministic order, once_per_line, min_billable, scope line/unit)
-- iteration_6.json: backend 22/22 · frontend Playwright 100%
-
-## Backlog M3.3 residuo (ordine confermato)
-- P0: PDF professionale con snapshot revisione (template configurabile)
-- P0: Link pubblico read-only sicuro (token high-entropy, hash, scadenza, rate limit)
-- P0: Firma elettronica canvas legata a hash+revisione
-- P0: Azioni portale cliente: Accetta&Firma / Richiedi modifica / Rifiuta (con motivazione configurabile)
-- P0: Conversione contratto idempotente con snapshot completo
-- P1: Badge risparmio (solo con snapshot valido)
-- P1: KPI dashboard preventivi (conversion, avg deal, WoW)
-- P2: Template Excel import listini
-
-## Iteration 7 (2026-02) — M3.3.2 PDF Professionale
-
-### Backend
-- **Modelli**: `Clause`, `QuoteTemplate`, `QuotePdf` (con snapshot_hash+pdf_hash), `PaymentTermsSchema` (rate strutturate), `Company` estesa (legal_name, commercial_name, PEC, IBAN, REA, certifications, colori, logo, signature, stamp).
-- **Servizio** `pdf_renderer.py`: WeasyPrint HTML→PDF, `build_snapshot` (esclude internal_cost/margin), `compute_snapshot_hash` (esclude volatili → idempotenza), `validate_quote_for_definitive` (gate: lines, subtotal, cliente, site_address con check nested), `safe_filename` (regex whitelist + dedup R00).
-- **Template HTML** `templates/quote_pdf.html`: A4, running header/footer, page-break, watermark BOZZA/SUPERATO, IVA multi-aliquota, badge OBBLIGATORIA sulle clausole, tabelle vani con codice/desc/misure, blocco firma cliente+azienda, disclaimer misure/immagini/privacy.
-- **Router**: `/clauses` CRUD + versionamento (`clause_versions`), `/quote-templates` CRUD + versionamento, `/quotes/{id}/pdf/preview|generate` con validation gate e idempotency by snapshot_hash, `/quote-pdfs/{pid}/download|invalidate`, `/quotes/scan/pricing-scope-bug` read-only.
-- **Seed**: 12 clausole standard (misure, posa, opere murarie, smaltimento, accessibilità, pagamenti 50/50, garanzia 24m, detrazioni, variazioni, annullamento, immagini, privacy) + template `IE_STANDARD_2026` con 8 sezioni.
-- **Permessi nuovi**: `quotes.preview_pdf/generate_pdf/download_pdf/invalidate_pdf/manage_templates/manage_clauses`.
-- **Indice Mongo**: `ux_pdf_idempotent` unique parziale su `(tenant_id, quote_id, snapshot_hash, kind)` con `kind=definitive, invalidated_at=null` → previene race parallel double-click.
-
-### Frontend
-- **/templates**: editor 6-tab (Generale, Stile, Sezioni, Pagamenti, Clausole, Campi azienda) con PATCH concurrency-safe.
-- **/clauses**: libreria con filtro categoria, editor con versioning storico, badge Obbligatoria.
-- **QuoteEditor**: dropdown "PDF" con Anteprima BOZZA / Emetti definitivo / Scarica ultimo. Card "PDF emessi" con storico + hash snapshot troncato.
-
-### Test coverage (iteration_7)
-- Backend 16/16 PASS + 1 xfail iniziale (poi fixato)
-- Frontend Playwright 100%
-- 3 minor fixati: `missing_site` validation, list endpoint no base64/no `_id` leak, unique index race protection.
-
-### Rendering PDF verificato visualmente
-PDF 4 pagine, header ripetuto "Infissi Express · Preventivo PREV-2026-01383-R00", cover con dati cliente/cantiere/riferimento, riepilogo oggetto, dettaglio prodotti per vano con codici V1/V2, riepilogo economico con IVA 10%+22% suddivisa, condizioni pagamento 50/50 con nota "Saldo dovuto ad avviso merce pronta", 12 clausole formattate con badge OBBLIGATORIA in rosso, disclaimer evidenziati, blocco firma cliente+azienda. Simboli €, accenti italiani e page counter "Pag. X di Y" correttamente renderizzati.
-
-### Backlog M3.3 residuo (ordine)
-- M3.3.3 Link pubblico read-only con token high-entropy + revoca + rate limit + audit accessi
-- M3.3.4 Firma elettronica canvas legata a snapshot+revisione (FES)
-- M3.3.5 Azioni portale cliente: Accetta&Firma / Richiedi modifica / Rifiuta con motivazione
-- M3.3.6 Conversione contratto idempotente con snapshot completo
-- P1: Badge risparmio, KPI dashboard preventivi
-- P2: Import Excel listini
-
-## Iteration 8-9 (2026-02) — M3.3.3 Link pubblico + Object Storage
-
-### Storage migration (Emergent Object Storage)
-- Nuovo servizio `services/object_storage.py`: init lazy con `EMERGENT_LLM_KEY`, retry+backoff, path deterministica `infissi-express/tenants/{tid}/quotes/{qid}/{revision}/{pdf_id}.pdf`.
-- `pdf_router._generate_pdf` scrive su Emergent storage (nuovi PDF) con fallback base64 in caso di storage_unavailable.
-- `_fetch_pdf_bytes` legge da storage prima, fallback base64 per PDF pre-migrazione.
-- Documento MongoDB `quote_pdfs` conserva `storage_provider`, `storage_key`, `pdf_base64=None` per i nuovi.
-
-### Modello token pubblico (`QuotePublicToken`)
-Campi: `id, tenant_id, quote_id, quote_number, quote_revision, quote_pdf_id, snapshot_hash, token_hash (sha256), status (active|expired|revoked|invalidated|consumed|blocked), expires_at, revoked_at/by/reason, last_access_at, access_count, maximum_accesses, requires_otp, allowed_actions, invalidated_by_revision_id, metadata, version`.
-
-Il raw token (43 char URL-safe, 256 bit entropia da `secrets.token_urlsafe(32)`) viene restituito **una sola volta** al momento della creazione. In DB solo `token_hash` (sha256). Nessun UUID interno usato come credenziale.
-
-### Sessione pubblica
-Non JWT internal reuse. Ogni request al portale è stateless: il token risolve tenant + quote + pdf; il rate limiter è per (IP, token_prefix). Non c'è sessione persistente.
-
-### Strategia hashing
-- Token → `hashlib.sha256(raw).hexdigest()` (deterministico, 64 char hex)
-- IP → `sha256("iph:"+ip)[:16]` per logs (pseudonimizzazione)
-- Nessun HMAC secret (il token stesso è random 256 bit, hash-only per look-up rapido con index B-tree)
-
-### Endpoint pubblici (no auth)
-- `GET /api/public/quotes/{token}` → DTO PublicQuoteResponse (nessun ID interno, no cost/margin)
-- `GET /api/public/quotes/{token}/pdf` → stream con security headers
-
-### Endpoint admin (tenant-scoped)
-- `GET /api/quotes/{qid}/public-links` (mai token_hash o raw esposti)
-- `POST /api/quotes/{qid}/public-links` (idempotente, guard: PDF definitivo esistente, quote current, non cancelled)
-- `POST /api/quotes/{qid}/public-links/{tid}/revoke` (motivazione obbligatoria)
-- `POST /api/quotes/{qid}/public-links/regenerate`
-- `GET /api/quotes/{qid}/public-access-logs`
-
-### Security headers portale pubblico
-- `Cache-Control: private, no-store`
-- `X-Content-Type-Options: nosniff`
-- `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet`
-- `Referrer-Policy: no-referrer`
-- `X-Frame-Options: SAMEORIGIN`
-- Frontend `<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">`
-
-### Rate limiting
-Token bucket in-memory `(IP, token_prefix)` → 30 req/min → 429. Nessun blocco permanente. Da migrare a Redis in produzione multi-nodo.
-
-### Automatic invalidation
-Su `POST /quotes/{id}/revise` chiamato `invalidate_tokens_for_previous_revisions` → tutti i token attivi delle revisioni precedenti passano a `status=invalidated`, `revocation_reason=superseded_by_new_revision`.
-
-### Idempotenza
-- Create link: se esiste token attivo per (quote, pdf, snapshot_hash) → torna `{idempotent_hit:true, raw_token:null}`.
-- Il doppio click NON crea due token validi.
-- `Rigenera link` esplicito revoca il precedente + crea nuovo.
-
-### Isolamento tenant
-- Nessun `tenant_id` accettato dal client pubblico.
-- Risoluzione da `token_hash` → `tenant_id` interno.
-- Cross-tenant test: token di A non può accedere a PDF di B (verificato).
-
-### Compatibilità futura (M3.3.4-5)
-`allowed_actions` supporta già: `view, download, request_changes, reject, accept, sign`. Attualmente attivi solo `view, download`.
-
-### Access log tenant-scoped
-Collection `public_access_log`, append-only, campi: `token_id, quote_id, revision, event, result, reason, ip_hash, user_agent, created_at, tenant_id`.
-Eventi implementati: `link_opened, quote_viewed, pdf_opened, pdf_downloaded, token_expired, token_revoked, token_invalid, rate_limited`.
-**Nessun raw token nei log** — solo `token_id` (UUID del record).
-
-### Portale frontend (`/p/:token`)
-- Isolato da app layout (nessun sidebar/menu interno)
-- Mobile-responsive
-- Alert espliciti: `Revisione superata` / `Preventivo scaduto`
-- Download PDF + Apri PDF full-page
-- Info commerciale + telefono/email
-- Errori generici (`404 Link non disponibile`, `410 Documento non disponibile`, `429 Accessi eccessivi`) senza rivelare esistenza risorse
-
-### Permessi nuovi
-`quotes.public_link.create/view/revoke/regenerate/configure`, `quotes.public_access_logs.view`.
-
-### Test coverage
-- iteration_8: 17/18 backend PASS, frontend 100%. Bug HIGH rilevato (500 su valid_until datetime).
-- iteration_9: fix HIGH validato (200 con is_expired computato), fix clipboard graceful validato, secondo minor `is_expired` naive datetime rilevato.
-- Post-fix manuale: `is_expired: True` corretto per date passate anche naive.
-
-### Backlog M3.3.4-6 (prossime milestone)
-- **M3.3.4** Firma FES: canvas signature + hash chain (`quote_pdf_id + snapshot_hash + revision + firmatario_name + accepted_terms_version + timestamp + IP + user_agent + token_id`), PDF firmato archiviato in storage
-- **M3.3.5** Azioni portale cliente: `POST /public/quotes/{token}/accept-sign|request-changes|reject` con motivazione configurabile (7 opzioni preset)
-- **M3.3.6** Conversione contratto idempotente con snapshot + numerazione autonoma CTR-2026-
-- **P1** Badge risparmio · KPI dashboard preventivi
-- **M3.3.3.1** (nice-to-have) OTP email predisposto in `requires_otp` — provider mock, endpoint stub `POST /public/quotes/{token}/otp/request|verify`
-
-## Iteration 12 (2026-02) — M6.PAR Engine Parametrico Preventivi/BOM/Nesting
-
-### Scope (implementato interamente in un unica esecuzione — d)
-Motore parametrico completo per: sistemi profilo → profili → BOM parametrica versionata → matrici prezzi L×H → 3 modalità pricing (A tabella / B BOM / C ibrida) → nesting 1D FFD+BFD+auto_best → categorie colore con logica scarto → SVG server-side sanitizzato → snapshot canonici input/output.
-
-### Data model (nuove collezioni tenant-scoped)
-`profile_systems`, `profiles`, `color_categories`, `colors`, `glass_types`, `hardware_kits`, `accessories`, `item_pricelists` (sell/cost versionati), `price_matrices`, `bom_templates` (versionate), `pricing_mode_configs` (scope tenant|profile_system|product|quote_line), `cutting_lists`, `scrap_stock`, `bar_optimization_runs`, `parametric_snapshots`.
-
-### Modalità pricing (priorità: line → product → profile_system → tenant)
-- **A_table**: prezzo da matrix.lookup(w,h) con `nearest_up|nearest|linear`, `oversize_surcharge_pct`, `allow_extrapolation`
-- **B_bom**: prezzo = costo_materiali + costi_lavorazioni + costi_indiretti + margine (formula configurabile, `b_markup_pct`, `b_indirect_pct`)
-- **C_hybrid**: prezzo dalla matrice · costo dalla BOM · margine reale automatico
-
-### Parser formule (nessun eval)
-`services/formula.py` esteso con variabili: L, H, width_mm, height_mm, nr_ante/traversi/montanti/fissi/vetri, kerf, bar_length, frame_width/depth, sash_width/depth, central_node, rebate, glass_clearance, glass_deduction, weld_allowance, glazing_bead_clearance, threshold_height, mullion_offset, transom_offset, coupling_gap, installation_gap, profile_length_adjustment, glass_width/height/area/weight, profile_weight, total_weight, component_index. Whitelist rigorosa AST, limiti MAX_LEN=500 / MAX_DEPTH=20 / MAX_NODES=200, div-by-zero → 0.
-
-### Nesting 1D
-- FFD (First Fit Decreasing) e BFD (Best Fit Decreasing)
-- `auto_best`: sceglie meno barre, tie-break minor waste
-- kerf per taglio, head/tail offcut, `min_reusable_scrap_mm` → scarto vs sfrido riutilizzabile
-- Raggruppamento per `(profile_id, color_category_id, color_id, lot, bar_length)`
-- `respect_order_isolation=true` → non aggrega tra ordini (Cat.2/Cat.3)
-- Fatal error 400 se TUTTI i tagli di un gruppo superano la barra utile
-- Endpoint compare FFD vs BFD con `winner`
-
-### Categorie colore (`services/color_scrap.py`)
-- **Cat.1 global_reuse**: costo proporzionale, residuo → magazzino generico compatibile
-- **Cat.2 order_reuse**: costo proporzionale, residuo → utilizzabile solo nello stesso ordine
-- **Cat.3 order_full_cost**: cliente paga barra intera, residuo → magazzino con costo netto 0 (ammortizzato)
-- Policy riuso: `same_color_same_profile_only | same_color_any_compatible_profile | generic_stock | non_reusable | manual_approval`
-- Sovrapprezzo commerciale `surcharge_pct` + `surcharge_fixed` applicato nel breakdown come voce separata
-
-### SVG server-side (`services/svg_drawing.py`)
-- Generazione programmatica da parametri numerici (nessuna stringa utente)
-- Whitelist tag: svg, g, defs, marker, rect, line, path, polygon, polyline, text, title, desc
-- `sanitize_svg()`: rimuove script/iframe/foreignObject, event handlers on*, href esterni, `javascript:` scheme
-- Quote automatiche, frecce apertura, montanti/traversi dinamici
-
-### Permessi nuovi
-`pricing.mode.view`, `pricing.mode.override`, `pricing.mode.manage_defaults`, `pricing.mode.view_cost_basis`, `parametric.bom.view/manage`, `parametric.matrix.view/manage`, `parametric.color.manage`, `parametric.nesting.run`, `parametric.svg.generate`.
-
-### Cost/margin hiding
-Se utente non ha `quotes.view_costs` OR `financials.view` (né superadmin):
-- `unit_cost`, `total_cost`, `margin_abs`, `margin_pct` → 0
-- `bom_resolved[*].line_cost`, `bom_resolved[*].unit_cost` → 0
-- `price_breakdown` filtrato (rimosse voci `bom_cost`, `labor`, `indirect`)
-- `cutting_preview.total_cost` e `bars[*].cost_bar` → 0
-
-### Endpoints (tutti sotto `/api/parametric/`)
-`profile-systems`, `profiles`, `color-categories`, `colors`, `glass-types`, `hardware-kits`, `accessories`, `item-pricelists`, `price-matrices`, `bom-templates` (+`/duplicate-as-new-version`), `pricing-modes`, `formula/validate|test`, `preview`, `nesting/run|compare`, `cutting-lists` (+`/from-nesting`), `scrap-stock`, `svg`, `bom/resolve`, `demo/status`.
-
-### Snapshot canonico
-Ogni preview genera un `ParametricSnapshot` con `input_hash` (sha256 di input canonicalizzato) e `output_hash`. `engine_version=1.0.0`, `formula_schema_version=1`. Rigenerazione idempotente a parità di input+versioni.
-
-### Frontend
-- **`/parametric`** — Configuratore Live: parametri (product, W, H, qty, ante, colore) → preview real-time (debounce 350ms) con SVG dinamico, prezzo/costo/margine (permission-gated), breakdown, distinta base risolta, preview lista taglio con efficienza.
-- **`/parametric/admin`** — Tab per: sistemi profilo, profili, categorie colore, colori, vetri, ferramenta, accessori, listini articoli, matrici prezzi, BOM parametriche, modalità pricing.
-
-### Seed demo (`is_demo=true`)
-1× Sistema PVC 70mm 5 camere, 7 profili (telaio, anta, montante, traverso, fermavetro, 2 rinforzi), 3 categorie colore (CAT1/CAT2/CAT3), 3 colori (bianco 9016, noce/bianco, RAL 7016 strutturato), 3 vetri (doppio, triplo, stratificato acustico), 5 ferramenta (fissa, 1anta, tilt-turn, 2ante, scorrevole), 3 accessori (guarnizione, davanzale, vite), 2 listini (sell/cost), 2 matrici prezzi (1anta 5×6, 2ante 5×6), 4 BOM parametriche (finestra 1a/2a, fisso, portafinestra 1a), 4 pricing_mode_configs (tenant C_hybrid + product per 2ante/fisso/portafinestra).
-
-### Test coverage
-- iteration_12.json: **25/25 backend PASS** + 1 XFAIL corretto post-report
-- Copertura: seed integrity, parser AST (validi + malevoli + div/0), preview A/B/C con fallback, oversize matrice, CAT3 sovrapprezzo, mode_override senza permesso, tenant isolation (9 collezioni), nesting FFD healthy + oversize hard-fail 400, SVG sanitization no `<script>` no `on*`, snapshot input/output_hash presenti.
-- Post-report fix: `_id` popped dai payload (mongo_utils.from_mongo), nesting oversize → 400 se tutti impossibili, cost hiding esteso a bom_resolved/breakdown/cutting_preview/bars.
-
-### Verifica economica live
-1200×1400 window_1_leaf CAT1 · mode `C_hybrid tenant` → unit €690.40, cost €142.60, **margin 79.35%**.
-Con CAT3 (+15%) → unit €793.96, breakdown mostra voce `color_surcharge`.
-Fuori matrice 2500×2500 → warning esplicito + rincaro 15%.
-
-### Backlog post-M6.PAR
-- **P0** Integrazione con QuoteEditor: sostituire product picker esistente con `parametric_config` per riga
-- **P0** Persistenza `cutting_lists` da ordine di produzione + snapshot BOM produttiva (non commerciale)
-- **P1** UI editor BOM con formula validator inline
-- **P1** UI editor matrice prezzi (grid inline)
-- **P1** Bar Optimization audit UI (confronto FFD/BFD, storico)
-- **P2** Auto-gestione `scrap_stock` con FIFO/LIFO su nuovi ordini
-- **P2** Preview visuale multi-vano (SVG composito)
-- **P2** Import/export BOM/matrici via Excel
-
-## Iteration 13 (2026-02) — M6.WF Workflow End-to-End integrato
-
-### Scope (implementato in un unica esecuzione, come richiesto)
-Integrazione completa del flusso: **Preventivo → Accettazione → Contratto → Firma → Rilievo → Abaco → Firma Abaco → Ordine Esecutivo → Produzione → Tracking Cliente**. Il preventivatore parametrico M6.PAR è ora la base tecnica del preventivo; l'abaco è il documento tecnico definitivo che sostituisce le misure preventive e sblocca la produzione.
-
-### Nuovi modelli (models_workflow.py)
-- **TechnicalSchedule** (abaco): versionato, tenant-scoped, stati draft → in_technical_review → approved_internally → sent_to_customer → viewed → change_requested → awaiting_signature → **signed** → released_to_production (+ superseded, cancelled). Contiene items[] con misure DEFINITIVE (final_width_mm, final_height_mm), configurazione tecnica completa, disegno SVG, blocking_errors per vano.
-- **TechnicalScheduleItem**: 1 riga = 1 vano (ref, room, product_key, misure definitive, ante, apertura, profilo, colore interno/esterno, vetro, ferramenta, soglia, cassonetto, oscurante, zanzariera, accessori, foto, note, parametric_snapshot).
-- **ExecutiveOrder**: ordine esecutivo con snapshot immutabili del contratto + abaco firmato + BOM produttiva versionata. Stati created → materials_check → in_production → quality_control → packaging → ready_for_delivery → delivered → installed.
-- **ProductionReleaseCheckResult**: struttura di controllo con `eligible`, `blocking_reasons[]`, `warnings[]`, `source_versions{contract, survey, ts, eo}`, `checked_at/by`.
-- **TimelineEvent**: evento unificato cross-domain con `is_customer_visible`, `customer_label`, `customer_stage`, `dedup_hash` unique per evitare duplicati.
-- **CustomerStatusMapping**: mapping configurabile per tenant tra stati interni e stati mostrati al cliente (default: 25 mappings in DEFAULT_CUSTOMER_STATUS_MAP).
-- **Variance**: variante economica derivata dal rilievo con lines[] classificate (no_impact | technical_only | economic | requires_customer_approval | contract_variant_required).
-
-### Nuovi servizi (services/workflow_engine.py)
-- `production_release_check(tenant_id, contract_id, checked_by)` → verifica: contratto firmato + acconto (warning se in payment_terms) + survey completata + abaco firmato + zero errori bloccanti sui vani + zero varianti pendenti + ordine esecutivo → restituisce oggetto strutturato non booleano.
-- `ensure_survey_from_contract(tenant_id, contract, actor_id)` → idempotente: crea Survey to_schedule con quote_width_mm/quote_height_mm dalle openings del contract snapshot. Chiamato automaticamente da `POST /api/contracts/{id}/sign`.
-- `ensure_technical_schedule_from_survey(tenant_id, survey_id, actor_id)` → idempotente: crea Abaco draft con items[] popolati da survey.openings, prefisso numerazione `ABACO`.
-- `create_executive_order_from_signed_ts(tenant_id, ts_id, actor_id)` → idempotente: crea ExecutiveOrder da abaco firmato, aggiorna abaco → `released_to_production`. Chiamato automaticamente al termine della firma pubblica dell'abaco.
-- `log_timeline_event(...)` → registra evento nella timeline unificata con dedup_hash (evita duplicati logici).
-- `resolve_customer_status(tenant_id, key)` → mapping stato interno → stato cliente (con fallback ai default).
-
-### Fix formula parser (P0 requisito §3)
-- `services/formula.py::eval_formula(strict: bool | None = None)` — nuovo parametro esplicito.
-- `strict=True`: DIV_ZERO / INFINITE / NaN → `FormulaError` con `code`, `formula`, `severity`, `meta`, `to_dict()`.
-- `strict=False` (o default legacy): retro-compatibile, div/0 → Decimal(0).
-- `parametric_engine.resolve_bom()` usa sempre `strict=True` sulle formule BOM.
-- Errori bloccanti raccolti in `blocking_errors[]` con: `code`, `message`, `formula`, `component_id`, `role`, `field`, `severity="blocking"`, `suggested_action`. Il componente con errore viene saltato (non contribuisce al totale).
-- Verifica CUT_TOO_LONG: se `length_mm > bar_usable`, aggiunge errore bloccante specifico.
-- Propagazione: `pricing_modes.compute_parametric_preview()` inserisce `bom_blocking_errors[]` nella response e prefissa `errors[]` con `[CODE]`.
-- **Verifica live**: `POST /api/parametric/preview {product_key: "window_multi_ante_test", nr_ante: 0}` → `errors: ["[DIV_ZERO] frame_top · Divisione per zero"]` + `bom_blocking_errors[0] = {code: DIV_ZERO, formula: "L / nr_ante", suggested_action: "Verifica il valore di nr_ante o del divisore"}`. Con `nr_ante=2` → prezzo calcolato correttamente.
-
-### Nuovi endpoints (routers/workflow.py)
-Sotto `/api/workflow/`:
-- `GET|POST|PATCH technical-schedules` + `POST from-survey/{survey_id}` + `POST {ts_id}/status` + `POST {ts_id}/send` + `POST {ts_id}/new-version`
-- `GET executive-orders` + `GET executive-orders/{id}`
-- `POST production/release-check` + `POST production/release-override` (doppia approvazione)
-- `GET timeline?contract_id|customer_id|quote_id|domain=...`
-- `GET|POST customer-status-mappings`
-- `GET|POST variances`
-
-Portale pubblico `/api/public/schedules/{token}`:
-- `GET` → dati abaco sanitizzati (no tenant, no costi, no blocking_errors)
-- `POST /sign` → FES con 6 consent obbligatori, canvas signature, evidence hash, IP hash, user-agent, invalidazione token dopo firma, auto-creazione ExecutiveOrder
-
-Portale cliente autenticato `/api/customer-portal/orders/{contract_id}/tracking`:
-- Restituisce timeline sanitizzata con label cliente e stage.
-
-### Frontend
-- **`/technical-schedules`** — Lista abachi + dettaglio vani + azione "Invia al cliente" con copia link.
-- **`/p/schedule/:token`** — Portale pubblico di firma abaco: vani, misure definitive, 6 checkbox obbligatorie, canvas firma, POST /sign.
-- Sidebar aggiornata con "Abaci tecnici" sotto "Rilievi tecnici".
-
-### Hook workflow (auto-orchestrazione)
-- `POST /api/contracts/{cid}/sign` → dopo firma: **auto-crea Survey** to_schedule (idempotente) + **auto-log timeline event** `contract.signed` con customer_label "Contratto firmato".
-- `POST /api/public/schedules/{token}/sign` → dopo firma: **auto-crea ExecutiveOrder** (idempotente) + **aggiorna abaco a released_to_production** + **log timeline** con customer_label "Abaco tecnico approvato".
-
-### Permessi nuovi
-`contracts.generate/send/view_signed`, `surveys.manage/validate/measure/assign/generate_schedule/send_to_customer/override_locked/view_variances`, `technical_schedules.create/edit/approve/send/sign/release`, `production.release/override_release`, `customer_portal.manage_tracking/manage_visibility`.
-
-### Nuove collezioni indicizzate
-`technical_schedules` (ix by contract+is_current, survey+is_current), `executive_orders` (ix by ts), `timeline_events` (ix by contract+created, customer_visible, **dedup_hash unique**), `technical_schedule_tokens` (unique on token_hash), `technical_schedule_signatures`, `production_release_overrides`, `customer_status_mappings`, `variances`.
-
-### Test M6.WF — `iteration_13.json` — 11/11 PASS
-Copertura: DIV_ZERO strict + legacy compat, quote→contract convert, sign hook auto-crea survey + timeline, abaco idempotente from survey, sanitization pubblica (no blocking_errors), release-check blocking_reasons corretti, tenant isolation, dedup timeline unique, override doppia approvazione refused se stesso user. Post-report fix: PricingModeConfig.b_price_formula → Optional per accettare create senza formula custom, aggiunto BOM demo `BOM-DIVTEST` (window_multi_ante_test) con `length_formula="L / nr_ante"` per verifica end-to-end DIV_ZERO nella preview.
-
-### Verifica economica end-to-end live
-1. Quote creato → status `to_approve → approved → sent → accepted` (state machine funzionante)
-2. `POST /quotes/{id}/convert-to-contract` → contratto CONTR-001 draft
-3. `POST /contracts/{cid}/sign` → contract_status=signed **+ Survey auto-creata + timeline event contract.signed customer_label "Contratto firmato"** ✅
-4. `POST /workflow/technical-schedules/from-survey/{sid}` → Abaco ABACO-001 draft v1 con item copiati dalla Survey
-5. `POST /workflow/production/release-check` → `eligible: false`, reasons: "Rilievo non completato/validato", "Abaco tecnico non firmato" ✅
-
-### Backlog post-M6.WF
-- **P0** UI editor abaco (modifica misure definitive per vano + validator)
-- **P0** UI portale cliente autenticato con timeline (`/my/orders`)
-- **P1** Auto-check acconto pagato via /payments prima del release-check
-- **P1** PDF template abaco con clausola "misure preventive vs definitive"
-- **P1** UI variante economica cliente-firmabile
-- **P2** Auto-generation dell'ordine esecutivo con productive_bom_snapshot piena (attualmente snapshot minimale)
-- **P2** Integrazione con production_orders → tracking cliente eventi mappati (`production:cutting` → "Produzione in corso")
-
-## Iteration 14+15 (2026-02) — M6.OPS + M7.TREASURY
-
-### M6.OPS Test: 24/25 backend PASS (iteration_14.json)
-Handoff CRUD+idempotency+ack+overdue, user-groups, assignment-rules, dashboards (company/team/my con benchmark 30%), commission engine tiers verificato per tutte le fasce (Fascia 1 <10% pending, F2 10-15% 5%, F3 >15% 10%, F3+MD→5%), lead webhook receive+dedup+auto-handoff+consents+timeline, template/consents/inbox.
-
-### M7.TREASURY — Tesoreria intelligente
-
-#### Modelli (`models_treasury.py`)
-`TaxDeductionRate` (aliquote versionate con fonte normativa) · `BankAccount` (reali/virtuali) · `VirtualFund` (IVA/imprevisti/investimenti/urgenze/imposte/stipendi/fornitori/free_liquidity) · `PaymentReceived` (con withholding calc + expected_bank_credit + recon states) · `BankStatementImport` + `BankMovement` (dedup_hash unique) · `VATEntry` + `VATClosing` (versioning) · `F24Payment` (con consistency_flags + professional_verification_required) · `SuggestedTransfer` (proposte, NO esec auto) · `AllocationPolicy` + `AllocationRun` (versionati) · `AICFOInsight` (data_sources, missing_data, confidence, requires_approval) · `TreasuryAlert` · `TreasuryScenario`.
-
-#### Formule (spiegabili + configurabili)
-- Ritenuta: `base = gross / (1 + vat_rate); withholding = base * rate; expected_credit = gross - withholding` (verificato: 10.000€ IVA 22% ritenuta 11% → base 8.196,72€ ritenuta 901,64€ credito 9.098,36€)
-- IVA periodo: `net_vat = sales_vat_exigible - purchases_vat_detrattable` (esempio: 2.200€ sales - 660€ purchases = **1.540€ debito**)
-- Base allocabile: `bank_credit - vat_reserve - imposte_ritenute - pagamenti_imminenti - fondi_vincolati` → poi 15%/15%/10% imprevisti/investimenti/urgenze + residuo a free_liquidity
-- Tutte le percentuali/formule sono `AllocationPolicy` versionata (versioning append-only)
-
-#### Endpoint (`/api/treasury/*`)
-- `POST withholding/calculate` — calcolatore ritenute con formula esplicita
-- `GET|POST bank-accounts` — conti reali/virtuali con IBAN mascherato + iban_hash
-- `GET|POST|PATCH funds` — fondi virtuali configurabili
-- `POST payments-received` — registra pagamento (con withholding auto-calcolato) + trigger AllocationRun automatica
-- `GET|POST allocation-policy` — policy versionata
-- `GET allocation-runs` — cronologia allocazioni
-- `GET|POST vat/entries` — registri IVA
-- `POST vat/close-period` — chiusura periodo IVA idempotente (rifiuta 409 se già chiuso)
-- `GET|POST f24` — F24 con consistency flags
-- `GET|POST transfers/suggest` + `approve` + `reject` + `mark-executed` — MAI esec auto
-- `POST statements/import` — import CSV con dedup_hash unique
-- `POST reconcile/auto` — match automatico movimenti↔pagamenti con tolleranza
-- `GET dashboard` — disponibilità/IVA/fondi/alerts/contatori/**disclaimer commercialista**
-- `POST ai-cfo/run` — genera insight con data_sources+confidence+missing_data+risk_level
-- `GET|POST scenarios` — simulazioni base/prudent/stress/growth con formula esplicita
-- `GET|POST tax-deduction-rates` — aliquote versionate (bonus ristrutturazione, ecobonus, ecc.)
-
-#### Regole di sicurezza
-- Nessuna esecuzione automatica di bonifici/F24
-- Ogni output AI ha `data_sources[]`, `missing_data[]`, `confidence`, `formula`, `risk_level`
-- Dashboard TUTTE le response contengono `disclaimer` "NON sostitutivo del commercialista"
-- Permessi granulari: treasury.view/manage/configure/approve_transfers/import_statements/reconcile · vat.view/manage/close_period · withholding.view/reconcile · tax_payments.view/manage · funds.view/configure · ai_cfo.view/run/configure · financial_statements.view/import
-- IBAN sempre mascherato (ultime 4 cifre) + `iban_hash` sha256 per lookup
-
-#### Test live end-to-end (verificati con curl)
-- Withholding 10.000€ IVA 22% 11% → **9.098,36€ credit** ✅
-- Pagamento con ritenuta → AllocationRun trigger → fondi contingency/investments aggiornati automaticamente ✅
-- VAT closing 2026-02 → 1.540€ debito calcolato ✅
-- AI CFO run con soli dati reali (no invenzioni) → insight generato con data_sources ✅
-- Dashboard con disclaimer "NON sostitutivo del commercialista" ✅
-
-#### Limiti / MOCKED
-- **PDF F24**: solo campo receipt_id, upload/parsing PDF non implementato
-- **Open Banking**: predisposto ma non integrato (import solo CSV/Excel via payload rows)
-- **Bilancio**: modelli predisposti (`financial_statements.*` permessi) ma modulo full non ancora costruito
-- **AI CFO**: usa solo dati reali del DB — NON usa LLM esterno in questa iter, tutti gli insight sono rule-based (no allucinazioni)
-- **Nessuna esecuzione bonifici**: solo suggerimenti + mark-executed manuale
-
-#### Next Actions (P0)
-1. UI Treasury dashboard + tab IVA/Fondi/Ritenute/F24/Scenari
-2. Endpoint upload ricevuta F24 con Object Storage privato + URL temporanei
-3. Integrazione LLM Emergent per AI CFO enhanced (Claude/GPT con prompt "cita sempre fonte")
-4. Import CBI/CAMT053 parser
-5. Bilancio module (import CE/SP + riclassificazione + DSCR/EBITDA/PFN)
+- Iteration 15: 38/38 backend tests PASS (100%)
+  - Multi-company isolation, intercompany auto-mirroring, SaaS module dependencies gating, budget/breakeven math, product catalog SVG rendering, site conditions logic, public landing lead intake + dedup + CRM integration, email validation.
+- Bug fix during testing: `mongo_utils._serialize` now handles `datetime.date` (was BSON-encoding-incompatible).
+
+## Deployment
+- deployment_agent PASS. FastAPI+React+Mongo config compliant.
+- Backend `0.0.0.0:8001`, tutti gli endpoint sotto `/api/`, frontend usa `REACT_APP_BACKEND_URL` from env.
+
+## Known limits & manual tasks
+- Legal Entities Enerhia/Auxer create con `le_status=to_complete` — dati fiscali NON inseriti (nessuna P.IVA fittizia). Platform Owner deve completarli da UI prima di operazioni fiscali.
+- Landing email recipients: nessun destinatario valido attualmente configurato. `checonpaorechioccilagmail.com` respinto come previsto (non è un email valido). L'utente deve inserire un indirizzo email valido da UI Platform Owner → Configurazione landing → Destinatari lead.
+- Stripe NON integrato (fuori scope, milestone dedicata).
+- WhatsApp/Meta Lead Ads: interfaccia astratta pronta, provider reale non attivato.
+
+## Next backlog (P1/P2)
+- P1: Real Open Banking integration (attualmente import manuale)
+- P1: Riclassificazione bilancio (schema civilistico + stato patrimoniale + conto economico)
+- P2: Portale cliente finale (M9 completo)
+- P2: Firma elettronica FEA/FES/FEQ (provider da scegliere)
