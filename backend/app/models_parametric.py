@@ -605,7 +605,7 @@ class PricingModeConfig(BaseDoc):
     sell_pricelist_id: Optional[str] = None
     cost_pricelist_id: Optional[str] = None
     # Formula prezzo B (configurabile; NO formula rigida hardcoded)
-    b_price_formula: str = "costo_materiali + costo_lavorazioni + costi_indiretti + margine"
+    b_price_formula: Optional[str] = None
     b_markup_pct: float = 30.0
     b_indirect_pct: float = 8.0
     # Metadati

@@ -298,3 +298,85 @@ Fuori matrice 2500×2500 → warning esplicito + rincaro 15%.
 - **P2** Auto-gestione `scrap_stock` con FIFO/LIFO su nuovi ordini
 - **P2** Preview visuale multi-vano (SVG composito)
 - **P2** Import/export BOM/matrici via Excel
+
+## Iteration 13 (2026-02) — M6.WF Workflow End-to-End integrato
+
+### Scope (implementato in un unica esecuzione, come richiesto)
+Integrazione completa del flusso: **Preventivo → Accettazione → Contratto → Firma → Rilievo → Abaco → Firma Abaco → Ordine Esecutivo → Produzione → Tracking Cliente**. Il preventivatore parametrico M6.PAR è ora la base tecnica del preventivo; l'abaco è il documento tecnico definitivo che sostituisce le misure preventive e sblocca la produzione.
+
+### Nuovi modelli (models_workflow.py)
+- **TechnicalSchedule** (abaco): versionato, tenant-scoped, stati draft → in_technical_review → approved_internally → sent_to_customer → viewed → change_requested → awaiting_signature → **signed** → released_to_production (+ superseded, cancelled). Contiene items[] con misure DEFINITIVE (final_width_mm, final_height_mm), configurazione tecnica completa, disegno SVG, blocking_errors per vano.
+- **TechnicalScheduleItem**: 1 riga = 1 vano (ref, room, product_key, misure definitive, ante, apertura, profilo, colore interno/esterno, vetro, ferramenta, soglia, cassonetto, oscurante, zanzariera, accessori, foto, note, parametric_snapshot).
+- **ExecutiveOrder**: ordine esecutivo con snapshot immutabili del contratto + abaco firmato + BOM produttiva versionata. Stati created → materials_check → in_production → quality_control → packaging → ready_for_delivery → delivered → installed.
+- **ProductionReleaseCheckResult**: struttura di controllo con `eligible`, `blocking_reasons[]`, `warnings[]`, `source_versions{contract, survey, ts, eo}`, `checked_at/by`.
+- **TimelineEvent**: evento unificato cross-domain con `is_customer_visible`, `customer_label`, `customer_stage`, `dedup_hash` unique per evitare duplicati.
+- **CustomerStatusMapping**: mapping configurabile per tenant tra stati interni e stati mostrati al cliente (default: 25 mappings in DEFAULT_CUSTOMER_STATUS_MAP).
+- **Variance**: variante economica derivata dal rilievo con lines[] classificate (no_impact | technical_only | economic | requires_customer_approval | contract_variant_required).
+
+### Nuovi servizi (services/workflow_engine.py)
+- `production_release_check(tenant_id, contract_id, checked_by)` → verifica: contratto firmato + acconto (warning se in payment_terms) + survey completata + abaco firmato + zero errori bloccanti sui vani + zero varianti pendenti + ordine esecutivo → restituisce oggetto strutturato non booleano.
+- `ensure_survey_from_contract(tenant_id, contract, actor_id)` → idempotente: crea Survey to_schedule con quote_width_mm/quote_height_mm dalle openings del contract snapshot. Chiamato automaticamente da `POST /api/contracts/{id}/sign`.
+- `ensure_technical_schedule_from_survey(tenant_id, survey_id, actor_id)` → idempotente: crea Abaco draft con items[] popolati da survey.openings, prefisso numerazione `ABACO`.
+- `create_executive_order_from_signed_ts(tenant_id, ts_id, actor_id)` → idempotente: crea ExecutiveOrder da abaco firmato, aggiorna abaco → `released_to_production`. Chiamato automaticamente al termine della firma pubblica dell'abaco.
+- `log_timeline_event(...)` → registra evento nella timeline unificata con dedup_hash (evita duplicati logici).
+- `resolve_customer_status(tenant_id, key)` → mapping stato interno → stato cliente (con fallback ai default).
+
+### Fix formula parser (P0 requisito §3)
+- `services/formula.py::eval_formula(strict: bool | None = None)` — nuovo parametro esplicito.
+- `strict=True`: DIV_ZERO / INFINITE / NaN → `FormulaError` con `code`, `formula`, `severity`, `meta`, `to_dict()`.
+- `strict=False` (o default legacy): retro-compatibile, div/0 → Decimal(0).
+- `parametric_engine.resolve_bom()` usa sempre `strict=True` sulle formule BOM.
+- Errori bloccanti raccolti in `blocking_errors[]` con: `code`, `message`, `formula`, `component_id`, `role`, `field`, `severity="blocking"`, `suggested_action`. Il componente con errore viene saltato (non contribuisce al totale).
+- Verifica CUT_TOO_LONG: se `length_mm > bar_usable`, aggiunge errore bloccante specifico.
+- Propagazione: `pricing_modes.compute_parametric_preview()` inserisce `bom_blocking_errors[]` nella response e prefissa `errors[]` con `[CODE]`.
+- **Verifica live**: `POST /api/parametric/preview {product_key: "window_multi_ante_test", nr_ante: 0}` → `errors: ["[DIV_ZERO] frame_top · Divisione per zero"]` + `bom_blocking_errors[0] = {code: DIV_ZERO, formula: "L / nr_ante", suggested_action: "Verifica il valore di nr_ante o del divisore"}`. Con `nr_ante=2` → prezzo calcolato correttamente.
+
+### Nuovi endpoints (routers/workflow.py)
+Sotto `/api/workflow/`:
+- `GET|POST|PATCH technical-schedules` + `POST from-survey/{survey_id}` + `POST {ts_id}/status` + `POST {ts_id}/send` + `POST {ts_id}/new-version`
+- `GET executive-orders` + `GET executive-orders/{id}`
+- `POST production/release-check` + `POST production/release-override` (doppia approvazione)
+- `GET timeline?contract_id|customer_id|quote_id|domain=...`
+- `GET|POST customer-status-mappings`
+- `GET|POST variances`
+
+Portale pubblico `/api/public/schedules/{token}`:
+- `GET` → dati abaco sanitizzati (no tenant, no costi, no blocking_errors)
+- `POST /sign` → FES con 6 consent obbligatori, canvas signature, evidence hash, IP hash, user-agent, invalidazione token dopo firma, auto-creazione ExecutiveOrder
+
+Portale cliente autenticato `/api/customer-portal/orders/{contract_id}/tracking`:
+- Restituisce timeline sanitizzata con label cliente e stage.
+
+### Frontend
+- **`/technical-schedules`** — Lista abachi + dettaglio vani + azione "Invia al cliente" con copia link.
+- **`/p/schedule/:token`** — Portale pubblico di firma abaco: vani, misure definitive, 6 checkbox obbligatorie, canvas firma, POST /sign.
+- Sidebar aggiornata con "Abaci tecnici" sotto "Rilievi tecnici".
+
+### Hook workflow (auto-orchestrazione)
+- `POST /api/contracts/{cid}/sign` → dopo firma: **auto-crea Survey** to_schedule (idempotente) + **auto-log timeline event** `contract.signed` con customer_label "Contratto firmato".
+- `POST /api/public/schedules/{token}/sign` → dopo firma: **auto-crea ExecutiveOrder** (idempotente) + **aggiorna abaco a released_to_production** + **log timeline** con customer_label "Abaco tecnico approvato".
+
+### Permessi nuovi
+`contracts.generate/send/view_signed`, `surveys.manage/validate/measure/assign/generate_schedule/send_to_customer/override_locked/view_variances`, `technical_schedules.create/edit/approve/send/sign/release`, `production.release/override_release`, `customer_portal.manage_tracking/manage_visibility`.
+
+### Nuove collezioni indicizzate
+`technical_schedules` (ix by contract+is_current, survey+is_current), `executive_orders` (ix by ts), `timeline_events` (ix by contract+created, customer_visible, **dedup_hash unique**), `technical_schedule_tokens` (unique on token_hash), `technical_schedule_signatures`, `production_release_overrides`, `customer_status_mappings`, `variances`.
+
+### Test M6.WF — `iteration_13.json` — 11/11 PASS
+Copertura: DIV_ZERO strict + legacy compat, quote→contract convert, sign hook auto-crea survey + timeline, abaco idempotente from survey, sanitization pubblica (no blocking_errors), release-check blocking_reasons corretti, tenant isolation, dedup timeline unique, override doppia approvazione refused se stesso user. Post-report fix: PricingModeConfig.b_price_formula → Optional per accettare create senza formula custom, aggiunto BOM demo `BOM-DIVTEST` (window_multi_ante_test) con `length_formula="L / nr_ante"` per verifica end-to-end DIV_ZERO nella preview.
+
+### Verifica economica end-to-end live
+1. Quote creato → status `to_approve → approved → sent → accepted` (state machine funzionante)
+2. `POST /quotes/{id}/convert-to-contract` → contratto CONTR-001 draft
+3. `POST /contracts/{cid}/sign` → contract_status=signed **+ Survey auto-creata + timeline event contract.signed customer_label "Contratto firmato"** ✅
+4. `POST /workflow/technical-schedules/from-survey/{sid}` → Abaco ABACO-001 draft v1 con item copiati dalla Survey
+5. `POST /workflow/production/release-check` → `eligible: false`, reasons: "Rilievo non completato/validato", "Abaco tecnico non firmato" ✅
+
+### Backlog post-M6.WF
+- **P0** UI editor abaco (modifica misure definitive per vano + validator)
+- **P0** UI portale cliente autenticato con timeline (`/my/orders`)
+- **P1** Auto-check acconto pagato via /payments prima del release-check
+- **P1** PDF template abaco con clausola "misure preventive vs definitive"
+- **P1** UI variante economica cliente-firmabile
+- **P2** Auto-generation dell'ordine esecutivo con productive_bom_snapshot piena (attualmente snapshot minimale)
+- **P2** Integrazione con production_orders → tracking cliente eventi mappati (`production:cutting` → "Produzione in corso")

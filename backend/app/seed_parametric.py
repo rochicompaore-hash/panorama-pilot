@@ -334,6 +334,21 @@ async def seed_parametric_demo(tenant_id: str) -> Dict[str, Any]:
     bom_fx_id = await _upsert("bom_templates", tenant_id, "BOM-FIXED", _bom_fisso())
     bom_pf_id = await _upsert("bom_templates", tenant_id, "BOM-DOOR-1A", _bom_pf_1_anta())
 
+    # BOM di test per verifica DIV_ZERO su nr_ante: contiene "L / nr_ante" esplicito
+    def _bom_test_div():
+        return BomTemplate(
+            code="BOM-DIVTEST", name="Test formula L/nr_ante",
+            product_key="window_multi_ante_test", profile_system_id=ps_id,
+            color_category_default_id=cat1_id, level="commercial", is_demo=True,
+            technical_notes="TEST ONLY: formula 'L / nr_ante' — verifica errore DIV_ZERO con nr_ante=0",
+            components=[
+                BomComponent(sequence=10, component_type="profile", ref_id=prof_frame_id,
+                              role="frame_top", quantity_formula="nr_ante",
+                              length_formula="L / nr_ante", unit_of_measure="linear_m", waste_pct=2),
+            ],
+        )
+    await _upsert("bom_templates", tenant_id, "BOM-DIVTEST", _bom_test_div())
+
     # ---------- Price Matrix (Finestra 1 anta) ----------
     widths = [800, 1000, 1200, 1400, 1600]
     heights = [1000, 1200, 1400, 1600, 1800, 2000]
