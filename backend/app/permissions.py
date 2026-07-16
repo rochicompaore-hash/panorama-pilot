@@ -106,6 +106,8 @@ PERMISSION_CATALOG = [
     ("contracts.create", "Contratti", "create", "Crea contratti"),
     ("contracts.sign", "Contratti", "approve", "Firma contratti"),
     ("contracts.cancel", "Contratti", "delete", "Annulla contratti"),
+    # Records governance / concurrency
+    ("records.force_override", "Record", "approve", "Sovrascrittura forzata con motivazione (bypass concorrenza)"),
 ]
 
 # Predefined roles with permissions

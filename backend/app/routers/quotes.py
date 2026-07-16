@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 from datetime import datetime, timezone
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Header
+from pydantic import BaseModel
 from app.db import get_db
 from app.deps import require_permission, require_any_permission, get_client_ip, get_permission_keys_for_user
 from app.models import new_id
@@ -17,6 +18,10 @@ from app.mongo_utils import to_mongo, from_mongo
 from app.services.audit import record_audit
 from app.services.timeline import record_activity
 from app.services.pricing import compute_line, compute_quote_totals
+from app.services.concurrency import (
+    update_with_version, get_if_match_version, user_has_permission,
+    ConflictError, CONSOLIDATED_QUOTE_STATUSES,
+)
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 
@@ -176,22 +181,34 @@ def _assert_editable(doc: dict):
 
 
 @router.patch("/{qid}")
-async def update_quote(qid: str, body: QuoteUpdate, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
-    db = get_db()
-    doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
-    if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
-    _assert_editable(doc)
+async def update_quote(
+    qid: str, body: QuoteUpdate, request: Request,
+    expected_version: Optional[int] = Depends(get_if_match_version),
+    force: bool = False,
+    force_reason: Optional[str] = Header(default=None, alias="X-Force-Reason"),
+    user: dict = Depends(require_permission("quotes.edit")),
+):
     payload = body.model_dump(exclude_unset=True)
     if "site_address" in payload and payload["site_address"] is not None:
         payload["site_address"] = payload["site_address"] if isinstance(payload["site_address"], dict) else payload["site_address"].model_dump()
-    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-    payload["updated_by"] = user["id"]
-    await db.quotes.update_one({"_id": qid}, {"$set": payload})
+
+    # Force override permission check
+    if force:
+        perms = await _get_perms(user)
+        if not user_has_permission(user, perms, "records.force_override"):
+            raise HTTPException(status_code=403, detail="Permesso 'records.force_override' mancante")
+
+    updated = await update_with_version(
+        collection="quotes", entity_id=qid, tenant_id=user["tenant_id"],
+        entity_type="quote", expected_version=expected_version,
+        set_fields=payload, user=user, request=request,
+        force_override=force, override_reason=force_reason,
+    )
     await record_audit(action="quotes.update", tenant_id=user["tenant_id"], user_id=user["id"],
                        user_email=user["email"], ip=get_client_ip(request),
                        entity_type="quote", entity_id=qid, after=payload)
     perms = await _get_perms(user)
-    return _strip_costs_if_needed(from_mongo(await db.quotes.find_one({"_id": qid})), perms)
+    return _strip_costs_if_needed(updated, perms)
 
 
 @router.delete("/{qid}")
@@ -219,13 +236,17 @@ async def add_opening(qid: str, body: QuoteOpeningCreate, request: Request, user
     if not op.code:
         op.code = f"V{len(openings) + 1:02d}"
     openings.append(op.model_dump())
-    await db.quotes.update_one({"_id": qid}, {"$set": {"openings": openings, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}})
+    await db.quotes.update_one({"_id": qid}, {"$set": {"openings": openings, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
     await record_audit(action="quotes.opening_add", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=qid, after={"opening": op.code})
     return op.model_dump()
 
 
 @router.patch("/{qid}/openings/{oid}")
-async def update_opening(qid: str, oid: str, body: QuoteOpeningUpdate, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+async def update_opening(
+    qid: str, oid: str, body: QuoteOpeningUpdate, request: Request,
+    expected_version: Optional[int] = Depends(get_if_match_version),
+    user: dict = Depends(require_permission("quotes.edit")),
+):
     db = get_db()
     doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
     if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
@@ -240,7 +261,17 @@ async def update_opening(qid: str, oid: str, body: QuoteOpeningUpdate, request: 
             updated = True
             break
     if not updated: raise HTTPException(status_code=404, detail="Vano non trovato")
-    await db.quotes.update_one({"_id": qid}, {"$set": {"openings": openings, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}})
+    now = datetime.now(timezone.utc).isoformat()
+    # Version-checked update on parent quote
+    filter_q = {"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None}
+    if expected_version is not None:
+        filter_q["version"] = expected_version
+    result = await db.quotes.update_one(filter_q, {"$set": {"openings": openings, "updated_at": now, "updated_by": user["id"]}, "$inc": {"version": 1}})
+    if result.modified_count == 0:
+        latest = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"]})
+        if latest and expected_version is not None and latest.get("version") != expected_version:
+            raise ConflictError(from_mongo(latest), "quote", expected_version)
+        raise HTTPException(status_code=409, detail="Aggiornamento vano fallito")
     return {"ok": True}
 
 
@@ -253,7 +284,7 @@ async def delete_opening(qid: str, oid: str, user: dict = Depends(require_permis
     openings = [o for o in (doc.get("openings") or []) if o["id"] != oid]
     lines = [l for l in (doc.get("lines") or []) if l.get("opening_id") != oid]
     q = _recompute({"lines": lines, "openings": openings})
-    await db.quotes.update_one({"_id": qid}, {"$set": {"openings": q["openings"], "lines": q["lines"], "subtotal": q["subtotal"], "vat_amount": q["vat_amount"], "total": q["total"], "internal_cost": q["internal_cost"], "margin_abs": q["margin_abs"], "margin_pct": q["margin_pct"], "taxable_amount": q["taxable_amount"], "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}})
+    await db.quotes.update_one({"_id": qid}, {"$set": {"openings": q["openings"], "lines": q["lines"], "subtotal": q["subtotal"], "vat_amount": q["vat_amount"], "total": q["total"], "internal_cost": q["internal_cost"], "margin_abs": q["margin_abs"], "margin_pct": q["margin_pct"], "taxable_amount": q["taxable_amount"], "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
     return {"ok": True}
 
 
@@ -276,13 +307,17 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
     ql.order_index = len(lines)
     lines.append(compute_line(ql.model_dump()))
     totals = compute_quote_totals(lines)
-    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **totals, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}})
+    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **totals, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
     await record_audit(action="quotes.line_add", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=qid, after={"category": ql.category, "price": ql.base_price})
     return lines[-1]
 
 
 @router.patch("/{qid}/lines/{lid}")
-async def update_line(qid: str, lid: str, body: QuoteLineUpdate, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+async def update_line(
+    qid: str, lid: str, body: QuoteLineUpdate, request: Request,
+    expected_version: Optional[int] = Depends(get_if_match_version),
+    user: dict = Depends(require_permission("quotes.edit")),
+):
     db = get_db()
     doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
     if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
@@ -296,19 +331,15 @@ async def update_line(qid: str, lid: str, body: QuoteLineUpdate, request: Reques
     payload = body.model_dump(exclude_unset=True)
     if "discount_pct" in payload:
         new_pct = float(payload["discount_pct"] or 0)
-        # Check thresholds
         thresholds = await _get_thresholds(user["tenant_id"])
-        # find user's max
         user_role_ids = user.get("role_ids") or []
         max_allowed = 0.0
         for th in thresholds:
             if th.get("role_id") in user_role_ids:
                 max_allowed = max(max_allowed, float(th.get("max_discount_pct", 0)))
-        # superadmin unlimited
         if user.get("is_superadmin") or "*" in perms:
             max_allowed = 100.0
         if new_pct > max_allowed and "quotes.override_discount" not in perms and not user.get("is_superadmin"):
-            # Auto-flip to to_approve
             payload["_needs_approval"] = True
         if new_pct > 0 and "quotes.apply_discount" not in perms and not user.get("is_superadmin"):
             raise HTTPException(status_code=403, detail="Permesso 'quotes.apply_discount' mancante")
@@ -322,7 +353,16 @@ async def update_line(qid: str, lid: str, body: QuoteLineUpdate, request: Reques
     if needs_approval and doc.get("quote_status") in ("draft", "to_complete"):
         update["quote_status"] = "to_approve"
         update["approval"] = {"required": True, "status": "pending", "requested_by": user["id"], "requested_at": datetime.now(timezone.utc).isoformat(), "reason": f"Sconto {payload.get('discount_pct')}% oltre soglia"}
-    await db.quotes.update_one({"_id": qid}, {"$set": update})
+
+    filter_q = {"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None}
+    if expected_version is not None:
+        filter_q["version"] = expected_version
+    result = await db.quotes.update_one(filter_q, {"$set": update, "$inc": {"version": 1}})
+    if result.modified_count == 0:
+        latest = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"]})
+        if latest and expected_version is not None and latest.get("version") != expected_version:
+            raise ConflictError(from_mongo(latest), "quote", expected_version)
+        raise HTTPException(status_code=409, detail="Aggiornamento riga fallito")
     return lines[idx]
 
 
@@ -334,7 +374,7 @@ async def delete_line(qid: str, lid: str, user: dict = Depends(require_permissio
     _assert_editable(doc)
     lines = [l for l in (doc.get("lines") or []) if l["id"] != lid]
     totals = compute_quote_totals(lines)
-    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **totals, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}})
+    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **totals, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
     return {"ok": True}
 
 
@@ -356,8 +396,21 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
     if new == "sent":
         update["sent_at"] = now
         update["sent_by"] = user["id"]
-        # Freeze price snapshot on send
-        update["price_snapshot"] = {"lines": doc.get("lines", []), "totals": {k: doc.get(k) for k in ("subtotal", "vat_amount", "total", "internal_cost", "margin_abs")}, "frozen_at": now}
+        # Freeze price snapshot on send — includes pricelist + rules snapshot for reproducibility
+        pl = await db.pricelists.find_one({"tenant_id": user["tenant_id"], "is_default": True, "deleted_at": None})
+        rules_snap: list = []
+        pl_snap: dict = {}
+        if pl:
+            pl_snap = {"id": pl["_id"], "name": pl.get("name"), "currency": pl.get("currency", "EUR"), "version": pl.get("version", 1)}
+            rules_snap = await db.price_rules.find({"tenant_id": user["tenant_id"], "pricelist_id": pl["_id"], "deleted_at": None, "active": True}).sort("priority", 1).to_list(1000)
+        update["price_snapshot"] = {
+            "lines": doc.get("lines", []),
+            "totals": {k: doc.get(k) for k in ("subtotal", "vat_amount", "total", "internal_cost", "margin_abs")},
+            "pricelist": pl_snap,
+            "rules": [from_mongo(r) for r in rules_snap],
+            "frozen_at": now,
+            "frozen_by": user["id"],
+        }
     elif new == "viewed":
         update["viewed_at"] = now
     elif new == "accepted":

@@ -45,6 +45,7 @@ const NAV = [
     group: "commercial",
     items: [
       { to: "/quotes", i18n: "nav.quotes", icon: FileText, perm: "quotes.view" },
+      { to: "/pricelists", i18n: "nav.pricelists", icon: Hash, perm: "pricelists.view" },
     ],
   },
   {

@@ -2,15 +2,16 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Header
 from app.db import get_db
-from app.deps import require_permission, get_client_ip
+from app.deps import require_permission, get_client_ip, get_permission_keys_for_user
 from app.models_crm import Lead, LeadCreate, LeadUpdate, LeadConvertRequest, Customer, LeadAddress
 from app.models import new_id
 from app.mongo_utils import to_mongo, from_mongo
 from app.services.audit import record_audit
 from app.services.timeline import record_activity, compute_lead_intelligence
 from app.routers.pipelines import seed_default_pipeline
+from app.services.concurrency import update_with_version, get_if_match_version, user_has_permission, ConflictError
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
@@ -159,6 +160,9 @@ async def create_lead(
 @router.patch("/{lid}")
 async def update_lead(
     lid: str, body: LeadUpdate, request: Request,
+    expected_version: Optional[int] = Depends(get_if_match_version),
+    force: bool = False,
+    force_reason: Optional[str] = Header(default=None, alias="X-Force-Reason"),
     user: dict = Depends(require_permission("crm.leads.edit")),
 ):
     db = get_db()
@@ -170,10 +174,7 @@ async def update_lead(
         payload["address"] = payload["address"] if isinstance(payload["address"], dict) else payload["address"].model_dump()
     old_stage = doc.get("stage_id")
     new_stage = payload.get("stage_id")
-    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-    payload["updated_by"] = user["id"]
 
-    # Handle stage change → record activity + update won/lost
     stages_map = await _get_stages_map(user["tenant_id"], doc.get("pipeline_id"))
     if new_stage and new_stage != old_stage and new_stage in stages_map:
         s = stages_map[new_stage]
@@ -184,7 +185,17 @@ async def update_lead(
         if "probability" not in payload:
             payload["probability"] = s.get("probability_default", 20)
 
-    await db.leads.update_one({"_id": lid}, {"$set": payload})
+    if force:
+        perms = set(await get_permission_keys_for_user(user))
+        if not user_has_permission(user, perms, "records.force_override"):
+            raise HTTPException(status_code=403, detail="Permesso 'records.force_override' mancante")
+
+    await update_with_version(
+        collection="leads", entity_id=lid, tenant_id=user["tenant_id"],
+        entity_type="lead", expected_version=expected_version,
+        set_fields=payload, user=user, request=request,
+        force_override=force, override_reason=force_reason, allow_consolidated=True,
+    )
 
     if new_stage and new_stage != old_stage:
         old_name = (stages_map.get(old_stage) or {}).get("name", "—")

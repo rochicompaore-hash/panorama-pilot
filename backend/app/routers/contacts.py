@@ -2,13 +2,14 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Header
 from app.db import get_db
-from app.deps import require_permission, get_client_ip
+from app.deps import require_permission, get_client_ip, get_permission_keys_for_user
 from app.models_crm import Contact, ContactCreate, ContactUpdate
 from app.models import new_id
 from app.mongo_utils import to_mongo, from_mongo
 from app.services.audit import record_audit
+from app.services.concurrency import update_with_version, get_if_match_version, user_has_permission
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
@@ -61,17 +62,26 @@ async def create_contact(
 @router.patch("/{cid}")
 async def update_contact(
     cid: str, body: ContactUpdate, request: Request,
+    expected_version: Optional[int] = Depends(get_if_match_version),
+    force: bool = False,
+    force_reason: Optional[str] = Header(default=None, alias="X-Force-Reason"),
     user: dict = Depends(require_permission("crm.contacts.manage")),
 ):
-    db = get_db()
-    doc = await db.contacts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Contatto non trovato")
     payload = body.model_dump(exclude_unset=True)
-    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-    payload["updated_by"] = user["id"]
-    await db.contacts.update_one({"_id": cid}, {"$set": payload})
-    return from_mongo(await db.contacts.find_one({"_id": cid}))
+    if force:
+        perms = set(await get_permission_keys_for_user(user))
+        if not user_has_permission(user, perms, "records.force_override"):
+            raise HTTPException(status_code=403, detail="Permesso 'records.force_override' mancante")
+    updated = await update_with_version(
+        collection="contacts", entity_id=cid, tenant_id=user["tenant_id"],
+        entity_type="contact", expected_version=expected_version,
+        set_fields=payload, user=user, request=request,
+        force_override=force, override_reason=force_reason, allow_consolidated=True,
+    )
+    await record_audit(action="crm.contacts.update", tenant_id=user["tenant_id"], user_id=user["id"],
+                       user_email=user["email"], ip=get_client_ip(request),
+                       entity_type="contact", entity_id=cid, after=payload)
+    return updated
 
 
 @router.delete("/{cid}")

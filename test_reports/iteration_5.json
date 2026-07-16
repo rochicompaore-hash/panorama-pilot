@@ -1,0 +1,55 @@
+{
+  "summary": "Fase A (Optimistic Concurrency Control) + M3.2 (Configuratori guidati + Live Pricing + Motore formule sicuro) — full backend + frontend E2E verification. 22/22 pytest tests in m3_2_concurrency_pricing_test.py PASSED. All concurrency, force-override, formula-security, pricelists-seed and live-pricing preview scenarios pass end-to-end. Frontend Playwright E2E flow PASSED for pricelists page (11 seed rules visible incl. COLOR_FILM_DIFF_PCT/ROLLER_MOTOR_RADIO/ROLLER_ATTACHED_DISCOUNT with DEFAULT badge), rule editor (Valida→success, Salva→toast, Elimina→toast), and configurator dialog (open from QuoteEditor → select 'Finestra PVC serie standard' → default preview 806,40 € matches base 480×1.68 = 806,40 → step 4 Colorazione → click cfg-opt-color_kind-film_diff → live price updates to 2.267,62 € (=1133,81×2 qty=2) with breakdown showing base 806,40 + COLOR_FILM_DIFF_PCT +22% (+177,41) + COLOR_FILM_DIFF_FIXED +150 → cfg-confirm adds line to quote table with description mentioning 'Finestra PVC'). All observed values match backend spec exactly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "QuoteEditorPage / dev-only ResizeObserver overlay",
+        "issue": "The react-scripts webpack-dev-server client-overlay still surfaces the benign 'ResizeObserver loop completed with undelivered notifications' error over the page after the configurator dialog closes (visible when preview URL is loaded in Chromium during automation). Same finding as iteration_4 — non-blocking for real users, non-shipped in production build. Only affects Playwright/Selenium overlays. Optional: swallow this specific error in index.js (window.addEventListener('error', e => if (e.message.startsWith('ResizeObserver')) e.stopImmediatePropagation()); ). Non-blocking.",
+        "selector": "iframe#webpack-dev-server-client-overlay",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/m3_2_concurrency_pricing_test.py",
+    "/app/test_reports/pytest/m3_2_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: swallow ResizeObserver dev-overlay error in index.js to declutter automation (same as iteration_4 note).",
+    "OPTIONAL: expose 'version' in response of POST /api/quotes/{id}/openings and lines directly so the FE could avoid a follow-up GET when it wants the fresh quote version (currently FE re-fetches the quote — works, just an extra roundtrip)."
+  ],
+  "critical_code_review_comments": [
+    "services/concurrency.py: correctly atomic — filter includes {_id, tenant_id, deleted_at:null, version:expected_version} + $inc version. ConflictError payload contains error='version_conflict', expected_version, current_version, server_data (tenant-scoped, no leak), updated_by, updated_at. Verified via automated tenant-id check on 409 payload for quotes/customers/leads.",
+    "services/concurrency.py force_override path: correctly requires records.force_override permission (super admin bypass via user_has_permission wildcard) AND non-empty X-Force-Reason header, blocks entities in CONSOLIDATED_QUOTE_STATUSES/CONTRACT_STATUSES with Italian error 'Documento consolidato non sovrascrivibile — creare una nuova revisione', and records audit_log entry with action='<entity>.force_override', kind='force_override', reason=<x-force-reason>. All three assertions verified in test.",
+    "services/formula.py: strict AST whitelist works — __import__() rejected as 'Chiamata di funzione non autorizzata' / 'Variabile non autorizzata: __import__'; attribute access ast.Attribute rejected; safe expressions base_price*1.145 accepted; division by zero returns Decimal(0) silently (documented behavior). MAX_LEN=500, MAX_DEPTH=20, MAX_NODES=200 caps present. create_rule endpoint validates formula before insert — dangerous formula returns 400 'Formula non valida'.",
+    "services/pricing_v2.py compute_preview: deterministic rule ordering by (priority ASC, created_at, id). billable_sqm = max(sqm, min_billable_sqm) — verified: 1000×1500 (sqm=1.5) → billable=1.75 for ROLLER_PVC. Rule effects: pct = running*value/100 added; fixed = running+value; set = value. Breakdown emits BASE step + one entry per matched rule with base_of_calc / percentage / amount / result — matches UI display exactly. WIN_PVC_STANDARD film_diff at 1200×1400 qty=2 → 480×1.68=806.40 → +22%→983.81 → +150→1133.81 → ×2 = 2267.62 verified byte-for-byte in both backend + frontend.",
+    "routers/pricing.py: /configurator/preview correctly resolves default pricelist when body.pricelist_id is None (is_default=true) with fallback to lowest-priority. Product lookup by (tenant_id, key, deleted_at=null). Cost visibility gated by is_superadmin OR '*' OR quotes.view_costs / quotes.view_margins — masks internal_cost/margin fields cleanly.",
+    "routers/quotes.py update_quote: correctly wires expected_version from If-Match header (via Depends(get_if_match_version)), force via query param 'force', and X-Force-Reason header. Uses records.force_override permission check via user_has_permission(user, perms, 'records.force_override'). Superadmin bypass works via wildcard '*' membership.",
+    "routers/quotes.py update_line: hand-rolled concurrency filter using {_id, tenant_id, deleted_at:null, version:expected_version} + $inc — behaves identically to update_with_version but does NOT support force override on lines (lines are always version-checked; if the caller wants to bypass, they must force the parent quote). Documented gap but acceptable — lines are always mutated inside the parent doc so parent-level force covers it anyway.",
+    "routers/customers.py & leads.py: both use update_with_version with entity_type='customer'/'lead' — same conflict payload shape. Tenant leak verified: server_data.tenant_id always matches logged-in tenant.",
+    "seed_pricing.py: 11 INFISSI_RULES seeded (5 color + 4 roller/motor + 2 discount) plus WIN_PVC_STANDARD/ROLLER_PVC/… products with schema wizard steps. Default pricelist IE_DEFAULT_2026 idempotent on re-seed.",
+    "PricelistsPage.jsx: rules table renders all 11 seed rules with data-testid=rule-{code}; 'Nuova regola' modal correctly validates formula via /price-rules/validate before Salva; delete via trash icon works (toast 'Regola eliminata' confirmed).",
+    "ConfiguratorDialog.jsx: 450 ms debounce (verified: after clicking film_diff option live price updates within ~800 ms). AbortController + requestSeq prevents stale response races. Wizard steps rendered from product.config_schema.steps; each option gets data-testid=cfg-opt-{step.key}-{opt.value}. Breakdown card shows per-rule contributions with running progressive result — matches backend exactly.",
+    "QuoteEditorPage.jsx cfg-open button correctly opens the configurator; onConfirm posts a new /quotes/{id}/lines with the composed description including product name — verified: new line rendered in quote lines table after dialog close."
+  ],
+  "updated_files": [
+    "/app/backend/tests/m3_2_concurrency_pricing_test.py (new — 22 pytest tests covering Fase A OCC + M3.2 pricing/formula)"
+  ],
+  "success_rate": {
+    "backend": "100% (22/22)",
+    "frontend": "100% (all E2E: pricelists rules list, DEFAULT badge, rule editor create+validate+save+delete, quote open, configurator dialog, product select, live pricing base 806,40 €, wizard step Colorazione, film_diff option, live re-price 2.267,62 €, breakdown with both COLOR_FILM_DIFF_PCT + COLOR_FILM_DIFF_FIXED, add-to-quote confirm, new line visible in table)"
+  },
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (super admin, has records.force_override and pricelists.manage via wildcard '*').",
+  "seed_data_creation": "No manual DB seeding. Tests reuse existing default pricelist IE_DEFAULT_2026, existing leads/customers, and create TEST_-prefixed quotes/lines/rules/customers. Test rule TEST_R{ts} created and deleted via UI to verify roundtrip.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Fase A + M3.2 test suite at /app/backend/tests/m3_2_concurrency_pricing_test.py — 22 tests, ~3 s runtime with pytest-xdist. Uses module-scoped fixtures s/admin_h/tenant_id/seed_lead/concurrency_quote. Note on line-level concurrency: PATCH /api/quotes/{qid}/lines/{lid} uses expected_version at the QUOTE level (not per-line) because lines are embedded arrays; the parent quote version increments on any line change. Force override is NOT supported on individual lines — force at quote level. Preview endpoint /api/configurator/preview requires quotes.view permission. WIN_PVC_STANDARD @ 1200×1400 qty=2 film_diff → 2267.62 € exact. ROLLER_PVC @ 1200×1500 attached+ral → sqm=1.8 (>min 1.75), unit_final=130.64 €. ROLLER_PVC @ 1000×1500 → billable_sqm=1.75 (min applied), unit=168.00 €. All backend values match frontend Intl.NumberFormat display.",
+  "rca of the issue": "No blocking issues found. All Fase A concurrency scenarios (correct If-Match → 200 with version+1; stale If-Match → 409 with server_data payload including tenant_id/version/updated_by; force without reason → 400; force with reason → 200 + audit entry; force on consolidated 'sent' quote → 400 'Documento consolidato non sovrascrivibile') are implemented correctly with proper tenant isolation. Formula engine correctly rejects __import__(), attribute access, and unknown variables; safe arithmetic like 'base_price * 1.145' is accepted. Live pricing preview matches backend spec down to the cent for both WIN_PVC_STANDARD (film_diff → +22% then +€150 with priority 100 then 101) and ROLLER_PVC (RAL +8% at priority 110, attached discount -30% at priority 200). Only pre-existing non-blocking observation is the dev-mode ResizeObserver overlay noise (already documented in iteration_4)."
+}

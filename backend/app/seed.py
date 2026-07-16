@@ -208,5 +208,8 @@ async def run_seed():
     # Seed default pipeline (M2)
     from app.routers.pipelines import seed_default_pipeline
     await seed_default_pipeline(company_id)
+    # Seed pricing defaults (M3.2)
+    from app.seed_pricing import run_pricing_seed
+    await run_pricing_seed(company_id)
     await write_test_credentials()
     logger.info("Seed completed. Company=%s", company_id)

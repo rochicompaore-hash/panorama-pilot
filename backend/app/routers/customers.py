@@ -2,13 +2,14 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Header
 from app.db import get_db
-from app.deps import require_permission, get_client_ip
+from app.deps import require_permission, get_client_ip, get_permission_keys_for_user
 from app.models_crm import Customer, CustomerCreate, CustomerUpdate, LeadAddress
 from app.models import new_id
 from app.mongo_utils import to_mongo, from_mongo
 from app.services.audit import record_audit
+from app.services.concurrency import update_with_version, get_if_match_version, user_has_permission
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -75,23 +76,29 @@ async def create_customer(
 @router.patch("/{cid}")
 async def update_customer(
     cid: str, body: CustomerUpdate, request: Request,
+    expected_version: Optional[int] = Depends(get_if_match_version),
+    force: bool = False,
+    force_reason: Optional[str] = Header(default=None, alias="X-Force-Reason"),
     user: dict = Depends(require_permission("crm.customers.edit")),
 ):
-    db = get_db()
-    doc = await db.customers.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Cliente non trovato")
     payload = body.model_dump(exclude_unset=True)
     for key in ("address", "billing_address"):
         if key in payload and payload[key] is not None:
             payload[key] = payload[key] if isinstance(payload[key], dict) else payload[key].model_dump()
-    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-    payload["updated_by"] = user["id"]
-    await db.customers.update_one({"_id": cid}, {"$set": payload})
+    if force:
+        perms = set(await get_permission_keys_for_user(user))
+        if not user_has_permission(user, perms, "records.force_override"):
+            raise HTTPException(status_code=403, detail="Permesso 'records.force_override' mancante")
+    updated = await update_with_version(
+        collection="customers", entity_id=cid, tenant_id=user["tenant_id"],
+        entity_type="customer", expected_version=expected_version,
+        set_fields=payload, user=user, request=request,
+        force_override=force, override_reason=force_reason, allow_consolidated=True,
+    )
     await record_audit(action="crm.customers.update", tenant_id=user["tenant_id"], user_id=user["id"],
                        user_email=user["email"], ip=get_client_ip(request),
                        entity_type="customer", entity_id=cid, after=payload)
-    return from_mongo(await db.customers.find_one({"_id": cid}))
+    return updated
 
 
 @router.delete("/{cid}")

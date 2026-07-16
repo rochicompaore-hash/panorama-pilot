@@ -29,6 +29,7 @@ import GoalsPage from "@/pages/GoalsPage";
 import WhatsAppLogsPage from "@/pages/WhatsAppLogsPage";
 import QuotesPage from "@/pages/QuotesPage";
 import QuoteEditorPage from "@/pages/QuoteEditorPage";
+import PricelistsPage from "@/pages/PricelistsPage";
 import OnboardingWizard from "@/pages/OnboardingWizard";
 import AppLayout from "@/layouts/AppLayout";
 
@@ -77,6 +78,7 @@ function App() {
           <Route path="whatsapp-logs" element={<WhatsAppLogsPage />} />
           <Route path="quotes" element={<QuotesPage />} />
           <Route path="quotes/:id" element={<QuoteEditorPage />} />
+          <Route path="pricelists" element={<PricelistsPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="roles" element={<RolesPage />} />
           <Route path="company" element={<CompanyPage />} />
