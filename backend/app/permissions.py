@@ -129,6 +129,53 @@ PERMISSION_CATALOG = [
     ("quotes.reopen", "Preventivi", "approve", "Riapri preventivo rifiutato"),
     # OTP debug (M3.3.4) — dev/test only
     ("debug.otp.read", "Debug", "view", "Legge OTP mock in ambiente dev/test"),
+    # M4 — Rilievo tecnico
+    ("surveys.view", "Rilievo", "view", "Visualizza rilievi tecnici"),
+    ("surveys.create", "Rilievo", "create", "Crea rilievi tecnici"),
+    ("surveys.edit", "Rilievo", "edit", "Modifica rilievi tecnici"),
+    ("surveys.delete", "Rilievo", "delete", "Elimina rilievi tecnici"),
+    # M5 — Sales orders / Purchasing
+    ("sales_orders.view", "Ordini cliente", "view", "Visualizza ordini cliente"),
+    ("sales_orders.create", "Ordini cliente", "create", "Crea ordini cliente"),
+    ("sales_orders.edit", "Ordini cliente", "edit", "Modifica ordini cliente"),
+    ("sales_orders.delete", "Ordini cliente", "delete", "Elimina ordini cliente"),
+    ("suppliers.view", "Fornitori", "view", "Visualizza fornitori"),
+    ("suppliers.create", "Fornitori", "create", "Crea fornitori"),
+    ("suppliers.edit", "Fornitori", "edit", "Modifica fornitori"),
+    ("suppliers.delete", "Fornitori", "delete", "Elimina fornitori"),
+    ("purchase_orders.view", "Ordini fornitore", "view", "Visualizza ordini fornitore"),
+    ("purchase_orders.create", "Ordini fornitore", "create", "Crea ordini fornitore"),
+    ("purchase_orders.edit", "Ordini fornitore", "edit", "Modifica ordini fornitore"),
+    # M6 — Magazzino
+    ("items.view", "Magazzino", "view", "Visualizza articoli e giacenze"),
+    ("items.create", "Magazzino", "create", "Crea articoli"),
+    ("items.edit", "Magazzino", "edit", "Modifica articoli, movimenti, inventari"),
+    ("items.delete", "Magazzino", "delete", "Elimina articoli"),
+    # M7-M8 — Produzione
+    ("production.view", "Produzione", "view", "Visualizza produzione"),
+    ("production.edit", "Produzione", "edit", "Gestisce produzione, BOM, tagli"),
+    # M9 — QC
+    ("qc.view", "Qualità", "view", "Visualizza controlli qualità"),
+    ("qc.edit", "Qualità", "edit", "Registra controlli qualità e non conformità"),
+    # M10-M12 — Logistica/Posa
+    ("logistics.view", "Logistica", "view", "Visualizza logistica e spedizioni"),
+    ("logistics.edit", "Logistica", "edit", "Gestisce logistica"),
+    ("installation.view", "Posa", "view", "Visualizza pianificazione posa"),
+    ("installation.edit", "Posa", "edit", "Pianifica e registra posa"),
+    # M13 — Assistenza
+    ("service.view", "Assistenza", "view", "Visualizza ticket assistenza"),
+    ("service.create", "Assistenza", "create", "Apre ticket assistenza"),
+    ("service.edit", "Assistenza", "edit", "Gestisce ticket assistenza"),
+    # M14 — Amministrazione
+    ("admin.payments.view", "Amministrazione", "view", "Visualizza piani pagamenti"),
+    ("admin.payments.edit", "Amministrazione", "edit", "Gestisce pagamenti e piani"),
+    ("admin.invoices.view", "Amministrazione", "view", "Visualizza fatture"),
+    ("admin.invoices.edit", "Amministrazione", "edit", "Gestisce fatture"),
+    # M16 — BI
+    ("bi.direction.view", "BI Direzione", "view", "Visualizza dashboard direzione"),
+    # M17 — AI CFO
+    ("ai_cfo.view", "AI CFO", "view", "Visualizza suggerimenti AI CFO"),
+    ("ai_cfo.generate", "AI CFO", "edit", "Rigenera suggerimenti AI CFO"),
 ]
 
 # Predefined roles with permissions

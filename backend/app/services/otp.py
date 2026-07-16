@@ -98,7 +98,12 @@ async def verify_otp(request_id: str, code: str) -> Tuple[bool, str, Optional[di
     doc = await db.quote_otp_requests.find_one({"_id": request_id})
     if not doc:
         return False, "not_found", None
-    if doc.get("status") != "pending":
+    status_now = doc.get("status")
+    if status_now == "failed":
+        return False, "too_many_attempts", doc
+    if status_now == "expired":
+        return False, "expired", doc
+    if status_now != "pending":
         return False, "not_found", doc
     # Expiry
     exp = doc.get("expires_at")

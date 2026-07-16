@@ -12,18 +12,26 @@ ERP verticale per aziende di serramenti. Copertura end-to-end: Lead → Preventi
 - **M1 Fondazioni** ✅ (auth, ruoli, permessi, audit, allegati S3, notifiche, ricerca, numerazioni).
 - **M2 CRM** ✅ (leads/customers/contacts, pipeline, timeline, dashboard, WhatsApp/Email log).
 - **M3.1 Preventivatore** ✅ (Quote/Opening/Line, price engine base, approval flow, revisioni, conversione contratto).
-- **M3.2 Configuratori + Live Pricing** ✅ (this iteration)
-  - Optimistic Concurrency Control (version + If-Match, 409 modal, force override + reason)
-  - Motore formule sicuro (AST whitelist, no eval)
-  - Motore condizioni dichiarativo (eq/neq/in/nin/exists/truthy/falsy/gte/lte)
-  - Listini + regole (11 regole Infissi seed)
-  - Configuratore guidato wizard + modalità avanzata (accordion)
-  - Live pricing debounced 450ms, out-of-order guard, cancel previous request
-  - Breakdown trasparente per riga + costi/margini gated by permission
-  - Snapshot listino su invio preventivo (per riproducibilità)
-  - Prodotti seed: Finestra PVC, Alluminio, Tapparella, Zanzariera, Persiana, Cassonetto
-- **M3.3 PDF + Firma + Contratti** 🟡 (parziale — contratti CRUD OK, PDF/firma da fare)
-- M4..M10 pianificate
+- **M3.2 Configuratori + Live Pricing** ✅
+- **M3.3.1** Autosave ✅ · **M3.3.2** PDF WeasyPrint ✅ · **M3.3.3** Object Storage + link pubblico ✅
+- **M3.3.4** Firma Elettronica Semplice ✅ (Redis rate limiter, OTP mock, canvas, evidence hash, PDF firmato con timbro, azioni portale)
+- **M3.3.5** KPI preventivi ✅ (`/api/bi/quotes/kpi` — 15+ metriche)
+- **M3.3.6** Contratti idempotenti da firma ✅
+- **M4** Rilievo tecnico ✅ backend + UI base
+- **M5** Ordini cliente + Fornitori + PO + Ricevimenti ✅ backend + UI base
+- **M6** Magazzino ✅ backend + UI base (items, movimenti append-only, giacenze, inventari)
+- **M7** Produzione ✅ backend (BOM versionate, cutting-list FFD, fasi)
+- **M8** Pianificazione produzione 🟡 base (fasi + KPI; scheduling avanzato TBD)
+- **M9** QC ✅ backend (checklist finale 14 controlli + non-conformità)
+- **M10** Prodotto finito + Spedizioni ✅ backend base
+- **M11** Pianificazione posa ✅ backend + UI base
+- **M12** Verbale posa ✅ backend base
+- **M13** Assistenza ✅ backend + UI base
+- **M14** Amministrazione ✅ backend base (payment plans, payments, invoices)
+- **M15** Costi/Margini 🟡 struttura base
+- **M16** BI ✅ base (direction KPI + quote KPI)
+- **M17** AI CFO ✅ rule-based (no LLM); ogni suggerimento con fonti + confidence
+- **M18-M25**: parziali/backlog — vedi HANDOVER.md
 
 ## Regole economiche seed (11)
 - Colori: avorio massa +8%, film ext/int +14.5%, film both +16%, film int-only +16%, film diff +22% e +€150 fisso

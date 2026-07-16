@@ -34,6 +34,11 @@ import TemplatesPage from "@/pages/TemplatesPage";
 import ClausesPage from "@/pages/ClausesPage";
 import PublicQuotePage from "@/pages/PublicQuotePage";
 import OnboardingWizard from "@/pages/OnboardingWizard";
+import {
+  SurveysPage, SalesOrdersPage, SuppliersPage, PurchaseOrdersPage,
+  ItemsPage, ProductionOrdersPage, QCPage, ServiceTicketsPage,
+  InstallationPlansPage, PaymentPlansPage, AICFOPage,
+} from "@/pages/ErpModulePages";
 import AppLayout from "@/layouts/AppLayout";
 
 function Protected({ children }) {
@@ -95,6 +100,18 @@ function App() {
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="email-logs" element={<EmailLogsPage />} />
           <Route path="search" element={<SearchPage />} />
+          {/* M4..M17 — Operational ERP modules */}
+          <Route path="surveys" element={<SurveysPage />} />
+          <Route path="sales-orders" element={<SalesOrdersPage />} />
+          <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
+          <Route path="items" element={<ItemsPage />} />
+          <Route path="production-orders" element={<ProductionOrdersPage />} />
+          <Route path="qc" element={<QCPage />} />
+          <Route path="service-tickets" element={<ServiceTicketsPage />} />
+          <Route path="installation-plans" element={<InstallationPlansPage />} />
+          <Route path="payment-plans" element={<PaymentPlansPage />} />
+          <Route path="ai-cfo" element={<AICFOPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

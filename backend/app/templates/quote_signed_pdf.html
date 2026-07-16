@@ -6,7 +6,7 @@
   <style>
     @page {
       size: A4;
-      margin: 20mm 15mm 24mm 15mm;
+      margin: 15mm 12mm 20mm 12mm;
       @top-left { content: element(header); }
       @bottom-left {
         content: "Documento firmato elettronicamente — Evidence ID: {{ evidence.short_id }}";
@@ -17,7 +17,7 @@
         font-size: 8pt; color: #666; font-family: 'DejaVu Sans','Liberation Sans',sans-serif;
       }
     }
-    html, body { margin: 0; padding: 0; font-family: 'DejaVu Sans','Liberation Sans','Helvetica',sans-serif; color: #1a1a1a; font-size: 10pt; line-height: 1.35; }
+    html, body { margin: 0; padding: 0; font-family: 'DejaVu Sans','Liberation Sans','Helvetica',sans-serif; color: #1a1a1a; font-size: 9pt; line-height: 1.25; }
     :root {
       --brand: {{ snap.company.primary_color or '#0F1720' }};
       --accent: {{ snap.company.secondary_color or '#D42027' }};
@@ -27,41 +27,41 @@
     }
     /* Signature page — always starts on new page */
     .sig-page { page-break-before: always; }
-    .sig-header { border-bottom: 3pt solid var(--brand); padding-bottom: 4mm; margin-bottom: 8mm; }
-    .sig-header h1 { margin: 0; font-size: 20pt; color: var(--brand); letter-spacing: 0.3pt; }
-    .sig-header .subtitle { font-size: 10pt; color: var(--muted); margin-top: 1mm; }
+    .sig-header { border-bottom: 2pt solid var(--brand); padding-bottom: 2mm; margin-bottom: 4mm; }
+    .sig-header h1 { margin: 0; font-size: 16pt; color: var(--brand); letter-spacing: 0.2pt; }
+    .sig-header .subtitle { font-size: 9pt; color: var(--muted); margin-top: 0.5mm; }
     .sig-badge {
-      display: inline-block; padding: 2mm 4mm; background: var(--brand); color: #fff;
-      font-size: 8pt; font-weight: bold; letter-spacing: 1pt; text-transform: uppercase; margin-bottom: 3mm;
+      display: inline-block; padding: 1mm 3mm; background: var(--brand); color: #fff;
+      font-size: 7pt; font-weight: bold; letter-spacing: 0.8pt; text-transform: uppercase; margin-bottom: 2mm;
     }
-    .sig-grid { display: table; width: 100%; margin-bottom: 8mm; border-collapse: collapse; }
+    .sig-grid { display: table; width: 100%; margin-bottom: 3mm; border-collapse: collapse; }
     .sig-grid .row { display: table-row; }
-    .sig-grid .k { display: table-cell; width: 42%; font-size: 8.5pt; color: var(--muted);
-      padding: 2.5mm 3mm; border-bottom: 0.4pt solid var(--border); text-transform: uppercase; letter-spacing: 0.5pt; }
-    .sig-grid .v { display: table-cell; padding: 2.5mm 3mm; border-bottom: 0.4pt solid var(--border); font-weight: 500; }
+    .sig-grid .k { display: table-cell; width: 38%; font-size: 7.5pt; color: var(--muted);
+      padding: 1.2mm 2mm; border-bottom: 0.3pt solid var(--border); text-transform: uppercase; letter-spacing: 0.4pt; }
+    .sig-grid .v { display: table-cell; padding: 1.2mm 2mm; border-bottom: 0.3pt solid var(--border); font-weight: 500; font-size: 8.5pt; }
     .sig-image-box {
-      border: 0.5pt dashed var(--brand); padding: 6mm; text-align: center; margin: 6mm 0;
+      border: 0.5pt dashed var(--brand); padding: 3mm; text-align: center; margin: 3mm 0;
       background: var(--soft);
     }
-    .sig-image-box img { max-height: 40mm; max-width: 120mm; background: #fff; padding: 2mm; }
-    .sig-image-caption { font-size: 8pt; color: var(--muted); margin-top: 2mm; }
-    .consents { margin: 6mm 0; }
-    .consents li { margin: 2mm 0; font-size: 9.5pt; }
+    .sig-image-box img { max-height: 26mm; max-width: 100mm; background: #fff; padding: 1mm; }
+    .sig-image-caption { font-size: 7pt; color: var(--muted); margin-top: 1mm; }
+    .consents { margin: 3mm 0; padding-left: 4mm; }
+    .consents li { margin: 0.8mm 0; font-size: 8.5pt; }
     .consents .ok { color: #16803D; font-weight: bold; }
     .consents .no { color: #b91c1c; font-weight: bold; }
     .evidence-box {
-      background: #fafafa; border: 0.5pt solid var(--border); padding: 5mm; margin-top: 6mm;
-      font-family: 'DejaVu Sans Mono','Liberation Mono',ui-monospace,Consolas,monospace; font-size: 8pt;
+      background: #fafafa; border: 0.4pt solid var(--border); padding: 2.5mm 3mm; margin-top: 3mm;
+      font-family: 'DejaVu Sans Mono','Liberation Mono',ui-monospace,Consolas,monospace; font-size: 7pt;
     }
-    .evidence-box .k { color: var(--muted); text-transform: uppercase; letter-spacing: 0.5pt; font-size: 7.5pt; }
-    .evidence-box .hash { word-break: break-all; letter-spacing: 0.2pt; }
+    .evidence-box .k { color: var(--muted); text-transform: uppercase; letter-spacing: 0.4pt; font-size: 6.5pt; }
+    .evidence-box .hash { word-break: break-all; letter-spacing: 0.15pt; }
     .fes-disclaimer {
-      margin-top: 8mm; font-size: 8pt; color: var(--muted); background: #fff8e6;
-      border-left: 3pt solid #d4a017; padding: 3mm 4mm;
+      margin-top: 3mm; font-size: 7pt; color: var(--muted); background: #fff8e6;
+      border-left: 2pt solid #d4a017; padding: 2mm 3mm; line-height: 1.35;
     }
     .short-id-badge {
-      display: inline-block; background: var(--accent); color: #fff; padding: 2mm 5mm;
-      font-family: 'DejaVu Sans Mono',ui-monospace,monospace; font-weight: bold; font-size: 13pt; letter-spacing: 2pt;
+      display: inline-block; background: var(--accent); color: #fff; padding: 1.2mm 4mm;
+      font-family: 'DejaVu Sans Mono',ui-monospace,monospace; font-weight: bold; font-size: 11pt; letter-spacing: 1.6pt;
     }
   </style>
 </head>
@@ -71,19 +71,19 @@
 <!-- SIGNATURE PAGE                                                -->
 <!-- ============================================================ -->
 <div class="sig-page">
-  <div class="sig-header">
-    <div class="sig-badge">Documento firmato — {{ signature.signature_type_label }}</div>
-    <h1>Accettazione e firma elettronica</h1>
-    <div class="subtitle">
-      Preventivo <b>{{ snap.quote.number }}</b> · Revisione <b>{{ snap.quote.revision_label or snap.quote.revision }}</b>
-      · Emittente: <b>{{ snap.company.commercial_name or snap.company.name }}</b>
+  <div class="sig-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:8mm">
+    <div>
+      <div class="sig-badge">Documento firmato — {{ signature.signature_type_label }}</div>
+      <h1>Accettazione e firma elettronica</h1>
+      <div class="subtitle">
+        Preventivo <b>{{ snap.quote.number }}</b> · Rev. <b>{{ snap.quote.revision_label or snap.quote.revision }}</b>
+        · {{ snap.company.commercial_name or snap.company.name }}
+      </div>
     </div>
-  </div>
-
-  <!-- Evidence ID prominent -->
-  <div style="margin-bottom: 6mm">
-    <div style="font-size:8pt;color:var(--muted);text-transform:uppercase;letter-spacing:1pt;margin-bottom:1mm">Evidence ID</div>
-    <span class="short-id-badge">{{ evidence.short_id }}</span>
+    <div style="text-align:right;flex-shrink:0">
+      <div style="font-size:7pt;color:var(--muted);text-transform:uppercase;letter-spacing:0.8pt;margin-bottom:0.5mm">Evidence ID</div>
+      <span class="short-id-badge">{{ evidence.short_id }}</span>
+    </div>
   </div>
 
   <div class="sig-grid">

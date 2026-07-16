@@ -42,6 +42,30 @@ from app.routers.pricing import router as pricing_router
 from app.routers.pdf_router import router as pdf_router
 from app.routers.public import admin_router as public_admin_router, public_router as public_router_open
 from app.routers.debug import router as debug_router
+# M4..M17 — Operational ERP routers
+from app.routers.surveys import router as surveys_router
+from app.routers.sales_orders import router as sales_orders_router
+from app.routers.purchasing import (
+    suppliers_router, splist_router, po_router as purchase_orders_router,
+    gr_router as goods_receipts_router,
+)
+from app.routers.inventory import (
+    items_router, loc_router as stock_locations_router,
+    mv_router as stock_router, inv_router as inventory_counts_router,
+)
+from app.routers.production import (
+    bom_router, prod_router as production_orders_router,
+    cut_router as cutting_lists_router, ph_router as production_phases_router,
+)
+from app.routers.qc import qc_router, nc_router
+from app.routers.logistics import (
+    fg_router, sh_router as shipments_router, crew_router as install_crews_router,
+    plan_router as install_plans_router, rep_router as install_reports_router,
+)
+from app.routers.service_tickets import router as service_tickets_router
+from app.routers.admin_finance import pp_router, p_router, inv_router as invoices_router
+from app.routers.bi import router as bi_router
+from app.routers.ai_cfo import router as ai_cfo_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -101,6 +125,34 @@ api.include_router(pdf_router)
 api.include_router(public_admin_router)
 api.include_router(public_router_open)
 api.include_router(debug_router)
+# M4..M17 register
+api.include_router(surveys_router)
+api.include_router(sales_orders_router)
+api.include_router(suppliers_router)
+api.include_router(splist_router)
+api.include_router(purchase_orders_router)
+api.include_router(goods_receipts_router)
+api.include_router(items_router)
+api.include_router(stock_locations_router)
+api.include_router(stock_router)
+api.include_router(inventory_counts_router)
+api.include_router(bom_router)
+api.include_router(production_orders_router)
+api.include_router(cutting_lists_router)
+api.include_router(production_phases_router)
+api.include_router(qc_router)
+api.include_router(nc_router)
+api.include_router(fg_router)
+api.include_router(shipments_router)
+api.include_router(install_crews_router)
+api.include_router(install_plans_router)
+api.include_router(install_reports_router)
+api.include_router(service_tickets_router)
+api.include_router(pp_router)
+api.include_router(p_router)
+api.include_router(invoices_router)
+api.include_router(bi_router)
+api.include_router(ai_cfo_router)
 
 app.include_router(api)
 

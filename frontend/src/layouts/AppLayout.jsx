@@ -51,6 +51,29 @@ const NAV = [
     ],
   },
   {
+    group: "operations",
+    label: "Operativo",
+    items: [
+      { to: "/surveys", label: "Rilievi tecnici", icon: FileText, perm: "surveys.view" },
+      { to: "/sales-orders", label: "Ordini cliente", icon: FileText, perm: "sales_orders.view" },
+      { to: "/suppliers", label: "Fornitori", icon: Buildings, perm: "suppliers.view" },
+      { to: "/purchase-orders", label: "Ordini fornitore", icon: FileText, perm: "purchase_orders.view" },
+      { to: "/items", label: "Magazzino", icon: Hash, perm: "items.view" },
+      { to: "/production-orders", label: "Produzione", icon: FileText, perm: "production.view" },
+      { to: "/qc", label: "Qualità", icon: ShieldCheck, perm: "qc.view" },
+      { to: "/installation-plans", label: "Pianificazione posa", icon: CalendarBlank, perm: "installation.view" },
+      { to: "/service-tickets", label: "Assistenza", icon: ListChecks, perm: "service.view" },
+    ],
+  },
+  {
+    group: "finance",
+    label: "Amministrazione",
+    items: [
+      { to: "/payment-plans", label: "Piani pagamenti", icon: Hash, perm: "admin.payments.view" },
+      { to: "/ai-cfo", label: "AI CFO & BI", icon: Target, perm: "ai_cfo.view" },
+    ],
+  },
+  {
     group: "governance",
     items: [
       { to: "/users", i18n: "nav.users", icon: Users, perm: "users.view" },
@@ -117,7 +140,7 @@ export default function AppLayout() {
 
   const NavGroup = ({ group }) => (
     <div className="mt-6 first:mt-2">
-      <div className="overline px-3 mb-2 text-muted-foreground">{t(`nav.${group.group}`)}</div>
+      <div className="overline px-3 mb-2 text-muted-foreground">{group.label || t(`nav.${group.group}`)}</div>
       <div className="flex flex-col">
         {group.items.map((it) => {
           if (it.perm && !has(it.perm)) return null;
@@ -137,7 +160,7 @@ export default function AppLayout() {
               }
             >
               <Icon size={18} weight="duotone" aria-hidden />
-              <span>{t(it.i18n)}</span>
+              <span>{it.label || t(it.i18n)}</span>
             </NavLink>
           );
         })}

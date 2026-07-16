@@ -586,9 +586,27 @@ async def convert_to_contract(qid: str, request: Request, user: dict = Depends(r
     db = get_db()
     doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
     if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
-    if doc.get("contract_id"): raise HTTPException(status_code=400, detail="Preventivo già convertito")
-    if doc.get("quote_status") not in ("accepted", "approved"):
-        raise HTTPException(status_code=400, detail="Il preventivo deve essere 'accepted' o 'approved'")
+    # M3.3.6 — Idempotency: if already converted, return existing contract
+    if doc.get("contract_id"):
+        existing = await db.contracts.find_one({"_id": doc["contract_id"], "tenant_id": user["tenant_id"]})
+        if existing:
+            return from_mongo(existing)
+        # else fall through — dangling reference, allow new
+    # Contract can be created from: quote signed by customer (M3.3.4) OR internally accepted/approved.
+    allowed_source_status = {"signed", "accepted", "approved"}
+    if doc.get("quote_status") not in allowed_source_status:
+        raise HTTPException(status_code=400,
+            detail=f"Il preventivo deve avere quote_status in {sorted(allowed_source_status)} (attuale: {doc.get('quote_status')})")
+    if not doc.get("is_current", True):
+        raise HTTPException(status_code=400, detail="Revisione superata: non convertibile")
+    # If signed, require a signature evidence record
+    signature_ref = None
+    if doc.get("quote_status") == "signed":
+        sig = await db.quote_signatures.find_one({"quote_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
+        if not sig:
+            raise HTTPException(status_code=400, detail="Firma non trovata per il preventivo firmato")
+        signature_ref = {"signature_id": sig["_id"], "evidence_id": sig.get("evidence_id_short"),
+                         "signed_pdf_id": sig.get("signed_pdf_id"), "evidence_hash": sig.get("evidence_hash")}
 
     # Contract number from sequence
     seq = await db.sequences.find_one({"tenant_id": user["tenant_id"], "key": "contract"})
@@ -609,7 +627,7 @@ async def convert_to_contract(qid: str, request: Request, user: dict = Depends(r
         number=number, number_int=n,
         quote_id=qid, quote_revision=doc.get("revision", 0),
         customer_id=doc.get("customer_id"),
-        quote_snapshot={"lines": doc.get("lines", []), "openings": doc.get("openings", []), "totals": {k: doc.get(k) for k in ("subtotal", "vat_amount", "total")}, "site_address": doc.get("site_address"), "customer_id": doc.get("customer_id"), "quote_number": doc.get("number"), "payment_terms": doc.get("payment_terms")},
+        quote_snapshot={"lines": doc.get("lines", []), "openings": doc.get("openings", []), "totals": {k: doc.get(k) for k in ("subtotal", "vat_amount", "total")}, "site_address": doc.get("site_address"), "customer_id": doc.get("customer_id"), "quote_number": doc.get("number"), "payment_terms": doc.get("payment_terms"), "signature_ref": signature_ref},
         created_by=user["id"], updated_by=user["id"],
     )
     await db.contracts.insert_one(to_mongo(c.model_dump(by_alias=True)))
