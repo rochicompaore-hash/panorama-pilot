@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 21 — Fase 2 produzione: test end-to-end PDF endpoints (preview/generate/list/download versionati + immutabili), OTP reale (request/rate-limit/verify), signature providers registry ('electronic_simple' only), Importer object_storage, e regressioni geometry/BOM/state-machine. Frontend: GeometryBuilderPage con editor SVG interattivo + toolbar completa e ContractViewerPage con iframe PDF + tabella versioni + responsive tablet. 18/19 backend pass (1 skip su test permessi 403 per limiti di bootstrap utente), 10/10 frontend checks pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fase2_pdf_otp_storage.py",
+    "/app/test_reports/pytest/iteration_21_fase2.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: rimuovere warning pytest 'Class-scoped fixture defined as instance method' spostando la @pytest.fixture di signing_token fuori dalla classe o marcandola con @classmethod. Non blocca.",
+    "OPTIONAL: aggiungere endpoint di test in dev per creare rapidamente un utente con permessi arbitrari (senza flusso invitation) per completare il test 403 su contracts.download."
+  ],
+  "critical_code_review_comments": [
+    "PDF generation: render_contract_pdf() usa WeasyPrint (blocking sync in event loop) — considerare wrap in run_in_executor per contratti pesanti. Attualmente OK perché il render è veloce (24KB in <1s).",
+    "contracts.py:686 usa len(existing)+1 come version. Non atomico: due chiamate concorrenti potrebbero generare la stessa version — considerare $inc con findAndModify o timestamp-based version.",
+    "signature_provider.py:132 _is_configured() hardcoded 'internal_canvas' only — corretto per fase 2 ma richiederà aggiornamento quando Namirial/InfoCert saranno registrati (verificare presenza credenziali in env).",
+    "otp_request rate limit: usa count_documents solo su token_id+created_at — corretto ma potrebbe non gestire race conditions se 3+ richieste arrivano simultaneamente. In produzione considerare Redis SETNX o token bucket via services.rate_limiter.",
+    "PDF download: get_storage().get() esegue I/O sync — accettabile per Local (filesystem) ma S3 dovrebbe usare boto3 async o run_in_executor.",
+    "Il campo debug_code viene esposto solo se OTP_DEBUG_ENABLED=true — corretto. Assicurarsi che in prod .env questo flag sia esplicitamente 'false' o assente."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fase2_pdf_otp_storage.py"
+  ],
+  "success_rate": {"backend": "100% (18/18 pass, 1 skip per limiti env)", "frontend": "100% (10/10 checks pass)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin). Contratto test: 899c4115-d4be-41a3-8d57-b1cdfb488754 (signed)",
+  "seed_data_creation": "Generati 20 PDF versions (v1-v20) per il contratto CON-2026-00024 durante test generate. TEST_ CSV upload jobs creati via importer per verifica storage_key. Contratto in draft transizionato a ready_for_signature per test OTP.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Tutti gli endpoint di Fase 2 (PDF, OTP, storage import, signature providers) funzionano correttamente. Il contratto CON-2026-00024 ha ora ~20 PDF versions archiviate — potrebbe essere pulito se necessario. Il test file /app/backend/tests/test_fase2_pdf_otp_storage.py è riutilizzabile per regressione. NOTA: il test test_no_permission_user_403 è skipped perché la creazione utente richiede flusso di invitation email; per abilitarlo servirebbe un endpoint dev per creare utente con password diretta oppure completare il flusso accept-invitation nel test.",
+  "rca of the issue": "N/A — nessun issue trovato. Tutti i requisiti di Fase 2 sono soddisfatti: PDF versionato immutabile con hash SHA-256, storage privato, watermark BOZZA/FIRMATO, OTP reale con hash+expiry+rate-limit, provider registry con solo 'electronic_simple' configurato (no false claim FEA/FEQ), importer con storage_key + fallback Mongo blob, editor geometrico SVG click-to-select senza JSON blob principale, iframe PDF nel contract viewer, tablet responsive OK."
+}

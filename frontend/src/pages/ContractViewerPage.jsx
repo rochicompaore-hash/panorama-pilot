@@ -36,20 +36,63 @@ export default function ContractViewerPage() {
   const [drawing, setDrawing] = useState(false);
   const canvasRef = useRef();
 
+  const [pdfVersions, setPdfVersions] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
   useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    if (showPreview && !previewBlobUrl) {
+      (async () => {
+        try {
+          const resp = await api.get(`/contracts/${id}/pdf/preview`, { responseType: "blob" });
+          setPreviewBlobUrl(URL.createObjectURL(resp.data));
+        } catch (e) {
+          toast.error("Errore caricamento anteprima PDF");
+        }
+      })();
+    }
+    return () => { /* keep URL for reuse */ };
+  }, [showPreview]);
 
   const load = async () => {
     try {
-      const [c, t] = await Promise.all([
+      const [c, t, pl] = await Promise.all([
         api.get(`/contracts/${id}`),
         api.get(`/contracts/${id}/timeline`),
+        api.get(`/contracts/${id}/pdf/list`).catch(() => ({ data: { versions: [] } })),
       ]);
       setContract(c.data);
       setTimeline(t.data);
+      setPdfVersions(pl.data.versions || []);
     } catch (e) {
       toast.error("Errore caricamento contratto");
     }
   };
+
+  const generatePdf = async () => {
+    try {
+      const { data } = await api.post(`/contracts/${id}/pdf/generate`);
+      toast.success(`PDF v${data.version} archiviato — hash ${data.hash?.slice(0, 12)}…`);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Errore generazione PDF");
+    }
+  };
+
+  const downloadPdf = async (version) => {
+    try {
+      const resp = await api.get(`/contracts/${id}/pdf/download/${version}`, { responseType: "blob" });
+      const url = URL.createObjectURL(resp.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = `contract-${contract?.number}-v${version}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error("Errore download");
+    }
+  };
+
+  const previewUrl = null; // superseded by blob URL via api client (auth)
 
   const transition = async (to_state, reason) => {
     try {
@@ -121,7 +164,7 @@ export default function ContractViewerPage() {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {contract.contract_status === "draft" && (
             <Button size="sm" onClick={() => transition("ready_for_review")} data-testid="btn-ready-review">
               Pronto per revisione
@@ -132,6 +175,12 @@ export default function ContractViewerPage() {
               Pronto per firma
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => setShowPreview(v => !v)} data-testid="btn-preview-pdf">
+            {showPreview ? "Nascondi PDF" : "Anteprima PDF"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={generatePdf} data-testid="btn-generate-pdf">
+            Archivia PDF
+          </Button>
           {["draft", "ready_for_review", "ready_for_signature", "sent", "viewed", "rejected", "expired"].includes(contract.contract_status) && (
             <Button size="sm" variant="destructive" onClick={() => transition("cancelled", "Annullato dall'utente")}>
               Annulla
@@ -139,6 +188,53 @@ export default function ContractViewerPage() {
           )}
         </div>
       </div>
+
+      {/* PDF Preview inline */}
+      {showPreview && (
+        <Card>
+          <CardHeader><CardTitle>Anteprima PDF</CardTitle></CardHeader>
+          <CardContent>
+            <iframe
+              src={previewBlobUrl || "about:blank"}
+              width="100%" height="700"
+              style={{ border: "1px solid #ddd", borderRadius: "4px" }}
+              data-testid="pdf-preview-iframe"
+              title="Anteprima contratto PDF"
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PDF Versions */}
+      {pdfVersions.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Documenti PDF archiviati ({pdfVersions.length})</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>V.</TableHead><TableHead>Tipo</TableHead>
+                <TableHead>Data</TableHead><TableHead>Hash</TableHead>
+                <TableHead>Size</TableHead><TableHead></TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {pdfVersions.map(v => (
+                  <TableRow key={v.version} data-testid={`pdf-version-${v.version}`}>
+                    <TableCell>v{v.version}</TableCell>
+                    <TableCell><Badge>{v.kind}</Badge></TableCell>
+                    <TableCell className="text-xs">{v.generated_at ? new Date(v.generated_at).toLocaleString("it-IT") : "-"}</TableCell>
+                    <TableCell className="font-mono text-xs">{v.hash?.slice(0, 16)}…</TableCell>
+                    <TableCell className="text-xs">{Math.round((v.size_bytes || 0) / 1024)} KB</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="outline" onClick={() => downloadPdf(v.version)}
+                               data-testid={`btn-download-v${v.version}`}>Scarica</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Intestazione azienda + cliente */}
       <Card>

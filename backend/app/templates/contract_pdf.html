@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<title>Contratto {{ contract.number }}</title>
+<style>
+  @page { size: A4; margin: 25mm 18mm; @bottom-right { content: "Pag. " counter(page) " / " counter(pages); font-size: 9px; color: #555; } }
+  body { font-family: 'Helvetica', Arial, sans-serif; font-size: 10px; color: #222; line-height: 1.4; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.5px; }
+  h2 { font-size: 14px; margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid #333; }
+  h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin: 12px 0 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 9.5px; }
+  th, td { padding: 5px 6px; text-align: left; border-bottom: 1px solid #ddd; vertical-align: top; }
+  th { background: #f5f5f5; font-weight: 600; font-size: 9px; text-transform: uppercase; }
+  .header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px; }
+  .header-left { flex: 1; }
+  .header-right { text-align: right; font-size: 10px; }
+  .badge { display: inline-block; padding: 2px 8px; background: #e8f0ff; color: #003a75; border-radius: 3px; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+  .box { padding: 10px; background: #fafafa; border: 1px solid #ddd; border-radius: 4px; margin: 8px 0; }
+  .parties { display: flex; gap: 20px; margin: 10px 0; }
+  .party { flex: 1; padding: 10px; background: #fafafa; border-radius: 4px; }
+  .party-label { font-size: 8px; text-transform: uppercase; color: #666; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .money { text-align: right; font-family: 'Courier New', monospace; }
+  .total-row { font-weight: bold; font-size: 12px; }
+  .subtotal-block { margin-left: auto; width: 45%; margin-top: 15px; padding: 8px; background: #fafafa; border-radius: 4px; }
+  .subtotal-block .row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .subtotal-block .row.total { border-top: 1.5px solid #333; padding-top: 6px; margin-top: 4px; font-size: 12px; font-weight: bold; }
+  .clause { margin: 10px 0; padding: 8px 10px; background: #fafafa; border-left: 3px solid #003a75; }
+  .clause-title { font-weight: 600; margin-bottom: 3px; }
+  .clause-body { color: #444; font-size: 9.5px; }
+  .signature-block { margin-top: 25px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; page-break-inside: avoid; }
+  .signature-img { max-height: 60px; max-width: 200px; background: #fff; border: 1px solid #ccc; padding: 4px; }
+  .sig-meta { font-size: 8.5px; color: #555; margin-top: 8px; font-family: 'Courier New', monospace; }
+  .footer-hash { font-family: 'Courier New', monospace; font-size: 7.5px; color: #999; margin-top: 6px; word-break: break-all; }
+  .watermark-signed { position: fixed; top: 100mm; left: 50mm; transform: rotate(-30deg); font-size: 90px; color: rgba(0,150,50,0.10); font-weight: bold; z-index: -1; }
+  .watermark-draft { position: fixed; top: 100mm; left: 50mm; transform: rotate(-30deg); font-size: 90px; color: rgba(200,50,50,0.10); font-weight: bold; z-index: -1; }
+  .product-svg { max-height: 120px; max-width: 100%; }
+  .product-row { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+{% if watermark == 'signed' %}<div class="watermark-signed">FIRMATO</div>{% endif %}
+{% if watermark == 'draft' %}<div class="watermark-draft">BOZZA</div>{% endif %}
+
+<div class="header">
+  <div class="header-left">
+    {% if company.logo_url %}<img src="{{ company.logo_url }}" style="max-height:50px" alt="logo"/>{% else %}<h1>{{ company.name or 'Azienda' }}</h1>{% endif %}
+    <div>{{ company.legal_name or company.name }}</div>
+    <div>{{ company.address }}</div>
+    <div>P.IVA {{ company.vat_number or company.vat or '-' }}</div>
+    <div>{{ company.email }} · {{ company.phone }}</div>
+  </div>
+  <div class="header-right">
+    <h1 style="margin:0">CONTRATTO</h1>
+    <div><b>N. {{ contract.number }}</b></div>
+    <div>Versione {{ contract.version or 1 }}</div>
+    <div>Data: {{ generated_at }}</div>
+    {% if contract.quote_number %}<div>Rif. Preventivo: {{ contract.quote_number }}</div>{% endif %}
+    <div class="badge" style="margin-top:6px">Stato: {{ contract.contract_status }}</div>
+  </div>
+</div>
+
+<div class="parties">
+  <div class="party">
+    <div class="party-label">Committente / Cliente</div>
+    <div style="font-weight:600">{{ customer.name or customer.full_name or customer.display_name or '-' }}</div>
+    <div>{{ customer.email }}</div>
+    <div>{{ customer.phone }}</div>
+    <div>{% if customer.address is mapping %}{{ customer.address.street or '' }}, {{ customer.address.city or '' }} {{ customer.address.zip_code or '' }}{% else %}{{ customer.address or '' }}{% endif %}</div>
+    {% if customer.vat_number or customer.fiscal_code %}
+    <div>{% if customer.vat_number %}P.IVA {{ customer.vat_number }}{% endif %} {% if customer.fiscal_code %}CF {{ customer.fiscal_code }}{% endif %}</div>
+    {% endif %}
+  </div>
+  <div class="party">
+    <div class="party-label">Indirizzo del cantiere</div>
+    {% set sa = quote.site_address or customer.address or {} %}
+    {% if sa is mapping %}
+      <div>{{ sa.street or '' }}</div>
+      <div>{{ sa.zip_code or '' }} {{ sa.city or '' }} {{ sa.province or '' }}</div>
+      <div>{{ sa.country or 'Italia' }}</div>
+    {% else %}
+      <div>{{ sa }}</div>
+    {% endif %}
+  </div>
+</div>
+
+{% if environments %}
+<h2>Ambienti</h2>
+<div style="display:flex; gap:8px; flex-wrap:wrap">
+  {% for e in environments %}<span class="badge">{{ e.name }}{% if e.floor %} · Piano {{ e.floor }}{% endif %}</span>{% endfor %}
+</div>
+{% endif %}
+
+<h2>Prodotti / Serramenti</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Vano/Prodotto</th>
+      <th>Descrizione</th>
+      <th>Dimensioni</th>
+      <th>Qty</th>
+      <th class="money">Prezzo unit.</th>
+      <th class="money">Totale</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for p in products %}
+    <tr class="product-row">
+      <td>{{ p.opening_number or (loop.index) }}</td>
+      <td>
+        {{ p.description or p.name or p.category or '-' }}
+        {% if p.geometry_svg %}<br/><div class="product-svg">{{ p.geometry_svg|safe }}</div>{% endif %}
+      </td>
+      <td>{{ p.width_mm or p.dimensions.width_mm or '?' }} × {{ p.height_mm or p.dimensions.height_mm or '?' }} mm</td>
+      <td>{{ p.quantity or 1 }}</td>
+      <td class="money">{{ '%.2f' % (p.unit_price or 0) }} €</td>
+      <td class="money">{{ '%.2f' % (p.total_price or p.line_total or (p.unit_price or 0) * (p.quantity or 1)) }} €</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<div class="subtotal-block">
+  <div class="row"><span>Subtotale</span><span class="money">{{ '%.2f' % (totals.subtotal or 0) }} €</span></div>
+  {% if totals.discount %}<div class="row"><span>Sconto</span><span class="money">-{{ '%.2f' % totals.discount }} €</span></div>{% endif %}
+  <div class="row"><span>IVA</span><span class="money">{{ '%.2f' % (totals.tax or 0) }} €</span></div>
+  <div class="row total"><span>TOTALE</span><span class="money">{{ '%.2f' % (totals.total or 0) }} €</span></div>
+</div>
+
+{% if payment_terms %}
+<h2>Condizioni di pagamento</h2>
+<div class="box">
+  {% if payment_terms.description %}{{ payment_terms.description }}<br/>{% endif %}
+  {% if payment_terms.installments %}
+    {% for i in payment_terms.installments %}
+      <div>Rata {{ loop.index }}: <b>{{ '%.2f' % (i.amount or 0) }} €</b> — {{ i.trigger or i.due_date or '-' }}</div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endif %}
+
+{% if clauses %}
+<h2>Condizioni e clausole contrattuali</h2>
+{% for c in clauses %}
+<div class="clause">
+  <div class="clause-title">{{ c.title or ('Clausola ' + (loop.index|string)) }}</div>
+  <div class="clause-body">{{ (c.body or c.text or c.content or '')|safe }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="signature-block">
+  <h3 style="margin:0 0 6px">Sottoscrizione</h3>
+  {% if contract.signature_hash %}
+    <div><b>{{ contract.signed_by_name or '-' }}</b> ({{ contract.signed_by_email or '-' }})</div>
+    <div>Data: {{ contract.signed_at }}</div>
+    <div>Tipo firma: <span class="badge">{{ contract.signature_type or 'electronic_simple' }}</span>
+      &nbsp;— Firma elettronica semplice (canvas grafico + audit trail)</div>
+    {% if contract.signature_data_url %}<img class="signature-img" src="{{ contract.signature_data_url }}" alt="Firma"/>{% endif %}
+    <div class="sig-meta">
+      IP firmatario: {{ contract.signed_ip or '-' }}<br/>
+      User-Agent: {{ (contract.signed_ua or '-')[:80] }}<br/>
+      Hash firma (SHA-256): {{ contract.signature_hash }}
+    </div>
+  {% else %}
+    <div style="margin-top:20px">
+      <div>Il committente</div>
+      <div style="border-bottom:1px solid #333; width: 250px; margin-top: 40px">&nbsp;</div>
+      <div style="font-size:8.5px; color:#666">Nome, Cognome e firma leggibile</div>
+    </div>
+    <div style="margin-top:20px">
+      <div>Per {{ company.name or 'l\'azienda' }}</div>
+      <div style="border-bottom:1px solid #333; width: 250px; margin-top: 40px">&nbsp;</div>
+      <div style="font-size:8.5px; color:#666">Nome, Cognome e firma leggibile</div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="footer-hash">
+  Hash contratto (snapshot): {{ contract.snapshot_hash }}<br/>
+  Documento generato: {{ generated_at }} · Motore Infissi Express Cloud
+</div>
+
+</body>
+</html>

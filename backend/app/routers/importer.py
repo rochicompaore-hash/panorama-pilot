@@ -29,6 +29,21 @@ from app.services.importer_service import (
     validate_rows, rows_to_pricelist_entries, build_idempotency_key,
     MAX_FILE_MB, MAX_ROWS, PREVIEW_LIMIT,
 )
+from app.services.storage import get_storage, build_key
+
+
+async def _read_import_blob(db, job: dict) -> bytes:
+    """Legge il file dell'import job da storage (preferito) o Mongo (legacy)."""
+    key = (job or {}).get("storage_key")
+    if key:
+        try:
+            return get_storage().get(key)
+        except Exception:
+            pass
+    blob = await db.import_job_blobs.find_one({"_id": job["_id"], "tenant_id": job["tenant_id"]})
+    if not blob:
+        raise HTTPException(500, "Blob dati non trovato (né su storage, né su Mongo legacy)")
+    return bytes.fromhex(blob["data_b64"])
 
 router = APIRouter(prefix="/importer", tags=["importer"])
 
@@ -102,19 +117,28 @@ async def upload_file(
     )
     # persist raw file bytes as base64 in memory temp store (avoid heavy object storage in v1)
     # NB: in produzione va salvato in object storage.
+    # persist file in object storage (preferred); fallback Mongo blob
+    storage_key = None
+    try:
+        storage_key = build_key(user["tenant_id"], "imports", file_hash[:12], file.filename)
+        get_storage().put(storage_key, data, "application/octet-stream")
+    except Exception:
+        storage_key = None
     doc = to_mongo(job.model_dump(by_alias=True))
-    # attach raw bytes hex-encoded per rollback (LIMITATO: solo se < 25MB)
     doc["_raw_b64_len"] = len(data)
+    doc["storage_key"] = storage_key
     await db.import_jobs.insert_one(doc)
     await record_audit(action="importer.upload", tenant_id=user["tenant_id"],
                         user_id=user["id"], user_email=user["email"], ip=get_client_ip(request),
                         entity_type="import_job", entity_id=job.id,
                         after={"filename": file.filename, "entity_type": entity_type,
-                                "file_hash": file_hash, "rows": job.total_rows})
-    # store bytes in a separate collection for rollback (avoid stuffing main doc)
-    await db.import_job_blobs.insert_one({
-        "_id": job.id, "tenant_id": user["tenant_id"], "data_b64": data.hex(),
-    })
+                                "file_hash": file_hash, "rows": job.total_rows,
+                                "storage": "object_storage" if storage_key else "mongo_blob"})
+    # Legacy fallback: keep bytes in Mongo blob only if storage failed
+    if not storage_key:
+        await db.import_job_blobs.insert_one({
+            "_id": job.id, "tenant_id": user["tenant_id"], "data_b64": data.hex(),
+        })
     return from_mongo(doc)
 
 
@@ -139,11 +163,8 @@ async def set_mapping(jid: str, body: MappingBody, request: Request,
     if job.get("im_status") in ("published", "rolled_back", "cancelled"):
         raise HTTPException(400, f"Job in stato {job['im_status']}: non modificabile")
 
-    # Load raw
-    blob = await db.import_job_blobs.find_one({"_id": jid, "tenant_id": user["tenant_id"]})
-    if not blob:
-        raise HTTPException(500, "Blob dati non trovato")
-    data = bytes.fromhex(blob["data_b64"])
+    # Load raw file (storage preferred, mongo blob legacy)
+    data = await _read_import_blob(db, job)
     sheet = body.selected_sheet or job.get("selected_sheet")
     df = load_sheet(data, job["filename"], sheet)
     rows, mapping_errors = apply_mapping(df, [m.model_dump() for m in body.mappings])
@@ -238,10 +259,7 @@ async def publish_job(jid: str, request: Request,
     })
 
     # Ricomponi righe da mapping + valida di nuovo
-    blob = await db.import_job_blobs.find_one({"_id": jid, "tenant_id": user["tenant_id"]})
-    if not blob:
-        raise HTTPException(500, "Blob dati non trovato")
-    data = bytes.fromhex(blob["data_b64"])
+    data = await _read_import_blob(db, job)
     df = load_sheet(data, job["filename"], job.get("selected_sheet"))
     rows, _ = apply_mapping(df, job.get("mappings") or [])
     new_entries = rows_to_pricelist_entries(

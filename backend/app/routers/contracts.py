@@ -18,6 +18,13 @@ from app.mongo_utils import from_mongo, to_mongo
 from app.models import new_id
 from app.services.audit import record_audit
 from app.services.timeline import record_activity
+from app.services.contract_pdf import render_contract_pdf, store_contract_pdf, get_signed_url
+from app.services.signature_provider import list_providers as list_sign_providers
+from app.services.otp import create_otp as otp_create, verify_otp as otp_verify, mask_email
+from app.services.email import send_email as email_send
+from app.config import settings
+import secrets
+from fastapi.responses import Response, StreamingResponse
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
 
@@ -343,17 +350,51 @@ async def public_view_contract(token: str, request: Request):
 
 @router.post("/public/{token}/request-otp")
 async def public_request_otp(token: str, request: Request):
+    """Genera OTP reale (random hashato + scadenza + max tentativi) e invia
+    tramite provider email configurato. Se provider non configurato in prod:
+    ritorna `configuration_required=true`."""
     db = get_db()
     tk = await db.contract_signing_tokens.find_one({"_id": token, "consumed": False})
     if not tk:
         raise HTTPException(404, "Token non valido")
+    contract = await db.contracts.find_one({"_id": tk["contract_id"]})
+    if not contract:
+        raise HTTPException(404, "Contratto non trovato")
+    # Rate limit: max N OTP in finestra 5 min
+    from datetime import timedelta as _td
+    since = datetime.now(timezone.utc) - _td(minutes=5)
+    recent = await db.quote_otp_requests.count_documents({
+        "token_id": token, "created_at": {"$gt": since}
+    })
+    if recent >= 3:
+        raise HTTPException(429, "Troppe richieste OTP — riprova tra qualche minuto")
+
+    req, raw_code = await otp_create(
+        token_id=token, quote_id=contract.get("quote_id") or contract["_id"],
+        email=tk["to_email"], user_agent=request.headers.get("user-agent"),
+    )
+    req_doc = req.model_dump(by_alias=True)
+    req_doc["tenant_id"] = tk["tenant_id"]
+    req_doc["created_at"] = datetime.now(timezone.utc)
+    await db.quote_otp_requests.insert_one(req_doc)
+    # Prova invio email (se provider configurato)
+    email_status = "mocked_dev"
     try:
-        # OTP semplice mocked in dev — real integration via services.otp per FEA
-        code = "123456"
-    except Exception:
-        # Fallback dev: OTP fisso mocked
-        code = "123456"
-    return {"ok": True, "delivery": "email" if code != "123456" else "mocked_dev"}
+        subj = f"Codice OTP firma contratto {contract.get('number')}"
+        html = f"<p>Il tuo codice OTP è: <b style='font-size:24px'>{raw_code}</b></p><p>Scade in {settings.OTP_TTL_SECONDS//60} minuti.</p>"
+        text = f"OTP: {raw_code} (scade in {settings.OTP_TTL_SECONDS//60} min)"
+        eid = await email_send(to=tk["to_email"], subject=subj, template="contract_otp",
+                                 html=html, text=text)
+        email_status = f"sent:{eid}"
+    except Exception as e:
+        email_status = f"delivery_failed:{type(e).__name__}"
+    debug_code = req.debug_code_plain  # solo in dev con OTP_DEBUG_ENABLED
+    return {
+        "ok": True, "request_id": req.id, "otp_id": req.id,
+        "expires_in_seconds": settings.OTP_TTL_SECONDS,
+        "delivery_status": email_status, "recipient_masked": mask_email(tk["to_email"]),
+        **({"debug_code": debug_code} if debug_code else {}),
+    }
 
 
 class PublicSignRequest(BaseModel):
@@ -361,6 +402,7 @@ class PublicSignRequest(BaseModel):
     signature_data_url: str
     accept_terms: bool = True
     otp_code: Optional[str] = None
+    otp_request_id: Optional[str] = None
 
 
 @router.post("/public/{token}/sign")
@@ -378,10 +420,21 @@ async def public_sign(token: str, body: PublicSignRequest, request: Request):
     if not body.accept_terms:
         raise HTTPException(400, "Accettazione condizioni obbligatoria")
     if body.otp_code:
-        # Dev OTP check (mocked); production usa services.otp con request_id
-        ok = body.otp_code == "123456"
-        if not ok:
-            raise HTTPException(400, "OTP non valido")
+        # OTP reale via services.otp — request_id obbligatorio in prod, fallback dev accetta 123456 solo con OTP_DEBUG_ENABLED
+        req_id = body.otp_request_id
+        otp_ok = False
+        if req_id:
+            ok, reason, _ = await otp_verify(request_id=req_id, code=body.otp_code)
+            otp_ok = ok
+            if not ok:
+                raise HTTPException(400, f"OTP non valido: {reason}")
+        else:
+            # Fallback dev only
+            from app.config import is_dev_or_test
+            if is_dev_or_test() and body.otp_code == "123456":
+                otp_ok = True
+            if not otp_ok:
+                raise HTTPException(400, "OTP request_id mancante (necessario in produzione)")
     doc = await db.contracts.find_one({
         "_id": tk["contract_id"], "tenant_id": tk["tenant_id"], "deleted_at": None,
     })
@@ -593,3 +646,103 @@ async def contract_timeline(cid: str, user: dict = Depends(require_permission("c
         "signature_hash": doc.get("signature_hash"),
         "signed_at": doc.get("signed_at").isoformat() if doc.get("signed_at") else None,
     }
+
+
+# =====================================================================
+# PDF endpoints — anteprima, download, versionato + storage privato
+# =====================================================================
+@router.get("/{cid}/pdf/preview")
+async def contract_pdf_preview(cid: str, user: dict = Depends(require_permission("contracts.view"))):
+    """Anteprima PDF (bozza in draft; finale se firmato). Stream inline."""
+    db = get_db()
+    doc = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(404, "Contratto non trovato")
+    signed = doc.get("contract_status") == "signed"
+    watermark = "signed" if signed else "draft"
+    try:
+        pdf_bytes = render_contract_pdf(doc, watermark=watermark)
+    except Exception as e:
+        raise HTTPException(500, f"Errore render PDF: {type(e).__name__}: {str(e)[:200]}")
+    return Response(
+        content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=contract-{doc.get('number')}-preview.pdf"},
+    )
+
+
+@router.post("/{cid}/pdf/generate")
+async def contract_pdf_generate(cid: str, request: Request,
+                                  user: dict = Depends(require_permission("contracts.download"))):
+    """Genera e archivia una versione PDF nel storage privato.
+    Ogni chiamata crea una nuova versione (NON sovrascrive)."""
+    db = get_db()
+    doc = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(404, "Contratto non trovato")
+    signed = doc.get("contract_status") == "signed"
+    kind = "signed" if signed else "preview"
+    watermark = "signed" if signed else "draft"
+    pdf_bytes = render_contract_pdf(doc, watermark=watermark)
+    existing = doc.get("pdf_versions") or []
+    version = len(existing) + 1
+    meta = store_contract_pdf(user["tenant_id"], cid, kind, version, pdf_bytes)
+    await db.contracts.update_one({"_id": cid}, {"$push": {"pdf_versions": meta}})
+    await record_audit(action=f"contracts.pdf.{kind}", tenant_id=user["tenant_id"],
+                        user_id=user["id"], user_email=user["email"], ip=get_client_ip(request),
+                        entity_type="contract", entity_id=cid,
+                        after={"kind": kind, "version": version, "hash": meta["hash"],
+                                "size_bytes": meta["size_bytes"]})
+    return {"ok": True, **meta}
+
+
+@router.get("/{cid}/pdf/download/{version}")
+async def contract_pdf_download(cid: str, version: int,
+                                  user: dict = Depends(require_permission("contracts.download"))):
+    db = get_db()
+    doc = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(404, "Contratto non trovato")
+    versions = doc.get("pdf_versions") or []
+    match = next((v for v in versions if int(v.get("version") or 0) == int(version)), None)
+    if not match:
+        raise HTTPException(404, f"Versione PDF {version} non trovata")
+    from app.services.storage import get_storage
+    try:
+        data = get_storage().get(match["storage_key"])
+    except Exception as e:
+        raise HTTPException(500, f"Storage error: {e}")
+    return Response(
+        content=data, media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={match.get('filename')}"},
+    )
+
+
+@router.get("/{cid}/pdf/list")
+async def contract_pdf_list(cid: str, user: dict = Depends(require_permission("contracts.view"))):
+    db = get_db()
+    doc = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(404, "Contratto non trovato")
+    versions = doc.get("pdf_versions") or []
+    # Signed URLs se disponibili
+    out = []
+    for v in versions:
+        item = {**v}
+        try:
+            url = get_signed_url(v["storage_key"], 900)
+            if url:
+                item["signed_url"] = url
+        except Exception:
+            pass
+        out.append(item)
+    return {"contract_id": cid, "versions": out}
+
+
+# =====================================================================
+# Signature providers info (per UI configurazione)
+# =====================================================================
+@router.get("/config/signature-providers")
+async def signature_providers(user: dict = Depends(require_permission("contracts.view"))):
+    """Elenco provider firma registrati (per pannello configurazione).
+    Ritorna: nome, level (electronic_simple/advanced/qualified), configured, description."""
+    return {"items": list_sign_providers()}
