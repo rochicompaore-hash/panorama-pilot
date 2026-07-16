@@ -206,7 +206,13 @@ export default function QuoteEditorPage() {
   });
   const copyPortalUrl = (raw) => {
     const url = `${window.location.origin}/p/${raw}`;
-    navigator.clipboard.writeText(url).then(() => toast.success("Link copiato negli appunti"));
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url)
+        .then(() => toast.success("Link copiato negli appunti"))
+        .catch(() => toast.error("Copia manuale: la clipboard non è disponibile in questo contesto"));
+    } else {
+      toast.error("Copia manuale: la clipboard non è disponibile in questo contesto");
+    }
   };
 
   if (!q) return <div className="text-sm text-muted-foreground">Caricamento…</div>;

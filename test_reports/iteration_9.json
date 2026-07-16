@@ -1,0 +1,42 @@
+{
+  "summary": "Retest M3.3.3 fix HIGH: verificato che la fix in routers/public.py (helper _iso per issue_date e valid_until) elimina il 500 quando il preventivo ha valid_until valorizzato. Test end-to-end: (1) login super admin → POST /quotes con site_address → POST /quotes/{qid}/lines (2) PATCH valid_until='2026-12-31T23:59:59Z' con If-Match → POST /pdf/generate → POST /public-links{validity_days:30} → GET /api/public/quotes/{raw} SENZA auth → 200 con quote_number='PREV-2026-01xxx-R00', total=610.0 (>0), valid_until='2026-12-31T23:59:59' (ISO string valida), is_expired=false, Content-Type application/json. (3) Verificato DTO NON contiene _id, tenant_id, quote_id, internal_cost, margin_abs, cost_price, margin_pct, notes_interne, cost_matrix, openings né a top-level né come substring. Frontend Playwright: login → apri quote → PDF menu → 'Link pubblico' → 'Rigenera token' (link esisteva già) → click Copia in contesto headless insecure → NESSUN overlay 'Uncaught runtime error', 0 pageerror events, toast graceful mostrato: 'Copia manuale: la clipboard non è disponibile in questo contesto'. Fix frontend valido. NUOVO BUG scoperto durante il retest: is_expired resta False anche con valid_until nel passato (2020-01-01) — la fix ha eliminato il 500 ma is_expired non funziona correttamente.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/public/quotes/{token}", "issue": "is_expired non viene calcolato correttamente quando valid_until è nel passato. Il DTO ritorna is_expired=false anche con valid_until='2020-01-01T00:00:00' (data nel passato). RCA: nella branch else di public_get_quote (righe 300-306 di routers/public.py), il codice fa `vu = snap_q['valid_until'] if isinstance(...str) else snap_q['valid_until']` e poi `vu < datetime.now(timezone.utc)`. Il snapshot conserva valid_until come datetime NAIVE (senza tz — infatti nel response troviamo '2020-01-01T00:00:00' senza Z né offset), quindi il confronto naive<aware solleva TypeError che viene silenziato dal `except Exception: pass`, lasciando is_expired al default False. FIX SUGGERITA: normalizzare vu con `vu = vu.replace(tzinfo=timezone.utc) if vu.tzinfo is None else vu` prima del confronto, oppure usare `datetime.fromisoformat(_iso(snap_q['valid_until']).replace('Z','+00:00'))` e assumere UTC se naive. Riproduzione: PATCH valid_until='2020-01-01T00:00:00Z', POST /pdf/generate, POST /public-links, GET /api/public/quotes/{raw} → 200 ma is_expired=false invece di true.", "priority": "MEDIUM"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_public_link_bugfix_retest.py",
+    "/app/test_reports/pytest/iteration_9_bugfix_retest.xml"
+  ],
+  "action_items": [
+    "MINOR: In routers/public.py::public_get_quote, dopo `vu = ... if isinstance(...str) else snap_q['valid_until']`, aggiungere `if vu.tzinfo is None: vu = vu.replace(tzinfo=timezone.utc)` prima del confronto `vu < datetime.now(timezone.utc)`, altrimenti il TypeError naive<aware viene silenziato e is_expired resta sempre False su valid_until nel passato.",
+    "OPTIONAL: valutare se anche la normalizzazione della naiveness va applicata nello snapshot builder (services/pdf_renderer.build_snapshot) per uniformità futura."
+  ],
+  "critical_code_review_comments": [
+    "routers/public.py::public_get_quote — la fix _iso helper (righe 310-313, 339-340) risolve correttamente il 500 su valid_until datetime. Verificato: risposta HTTP 200 con valid_until come stringa ISO. Il DTO Optional[str] è ora rispettato.",
+    "Regressione test PASS: il DTO PublicQuoteResponse continua a NON esporre _id, tenant_id, quote_id, internal_cost, margin_abs, cost_price, notes_interne, openings — verificato scansionando la risposta JSON raw.",
+    "QuoteEditorPage.jsx::copyPortalUrl (righe 207-216) — la fix con try/catch e fallback else è correttamente implementata: navigator.clipboard.writeText().then(...).catch(() => toast.error('Copia manuale: la clipboard non è disponibile in questo contesto')) più fallback esplicito quando clipboard API non è disponibile. Nessun overlay React 'Uncaught runtime error' in contesto headless insecure. Toast italiano graceful confermato via Playwright.",
+    "SECONDARIO: is_expired lookup nel try/except silenziato — best practice sarebbe loggare l'exception invece di 'except Exception: pass' per non nascondere futuri bug logici sui datetime naive/aware."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_public_link_bugfix_retest.py (NEW — 3 test focalizzati sul fix bug HIGH: future valid_until, past valid_until, no internal fields leak)"
+  ],
+  "success_rate": {
+    "backend": "66.7% (2/3 test PASS: future date + no-leak PASS; past date FAIL per is_expired=false invece di true — la fix del 500 è OK, ma è emerso bug secondario minore)",
+    "frontend": "100% (clipboard fix verificato: toast graceful mostrato, nessun overlay React runtime error, 0 pageerror)"
+  },
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (super admin wildcard *)",
+  "seed_data_creation": "Diverse quote TEST_M333_BUGFIX_* create durante il test (con line e PDF generati). Tutte draft, isolate al tenant super-admin.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug fix HIGH (500 → 200) confermato risolto. Rimane un bug MINOR: is_expired sempre False anche con valid_until nel passato — richiede normalizzazione naive→aware nel confronto datetime. Il file test_public_link_bugfix_retest.py può essere rieseguito rapidamente in ~4s (richiede REACT_APP_BACKEND_URL env). Il test past_valid_until verifica DUE cose (200 + is_expired=true): sposterà a PASS solo dopo la fix del confronto naive/aware.",
+  "rca of the issue": "FIX HIGH (500): risolto — helper _iso in public.py converte datetime → isoformat string prima di istanziare PublicQuoteResponse. BUG RESIDUO (MINOR — is_expired): il snapshot mongo conserva valid_until come datetime naive (senza tzinfo) perché la serializzazione mongo o il to_mongo/from_mongo scarica il Z timezone marker. In public_get_quote la logica corrente `datetime.fromisoformat(snap_q['valid_until'].replace('Z','+00:00')) if isinstance(...,str) else snap_q['valid_until']` prende il ramo else (perché snap_q ora ritorna già il datetime naive prima di essere convertito da _iso a stringa solo per il DTO). Il confronto `naive_datetime < aware_now_utc` solleva TypeError, catturato da `except Exception: pass`, lasciando is_expired=False. Mitigation: forzare tz UTC se vu è naive prima del confronto."
+}

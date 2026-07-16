@@ -307,6 +307,11 @@ async def public_get_quote(token: str, request: Request, response: Response):
     is_superseded = not (quote.get("is_current", True))
     watermark = pdf.get("watermark") or ("SUPERATO" if is_superseded else None)
 
+    def _iso(v):
+        if v is None: return None
+        if hasattr(v, "isoformat"): return v.isoformat()
+        return str(v)
+
     # Payment terms display
     pt = snapshot.get("payment_terms") or {}
     parts = []
@@ -331,8 +336,8 @@ async def public_get_quote(token: str, request: Request, response: Response):
         quote_number=snap_q.get("number") or quote.get("number"),
         quote_revision=snap_q.get("revision_label") or tok["quote_revision"],
         title=snap_q.get("title"),
-        issue_date=snap_q.get("issue_date"),
-        valid_until=snap_q.get("valid_until"),
+        issue_date=_iso(snap_q.get("issue_date")),
+        valid_until=_iso(snap_q.get("valid_until")),
         is_expired=is_expired,
         is_superseded=is_superseded,
         customer_name=(snap_q.get("customer") or {}).get("name"),
