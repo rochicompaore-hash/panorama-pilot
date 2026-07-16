@@ -44,11 +44,12 @@ async def create_bom(body: BOMCreate, request: Request,
 @bom_router.patch("/{bid}")
 async def patch_bom(bid: str, body: dict, request: Request,
                      user: dict = Depends(require_permission("production.edit"))):
-    # Every edit bumps BOM version explicitly
+    # Every edit bumps BOM version — handled by update_doc via $inc { version: 1 }.
+    # Do NOT set version in body (would conflict with $inc in the same MongoDB update).
     db = get_db()
     existing = await db.boms.find_one({"_id": bid, "tenant_id": user["tenant_id"], "deleted_at": None})
     if not existing: raise HTTPException(status_code=404, detail="BOM non trovato")
-    body["version"] = (existing.get("version") or 1) + 1
+    body.pop("version", None)  # never allow caller-supplied version
     return await update_doc(collection="boms", doc_id=bid, updates=body, user=user,
                              entity_type="bom", ip=get_client_ip(request))
 

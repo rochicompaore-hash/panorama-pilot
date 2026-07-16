@@ -97,10 +97,17 @@ async def seed_roles(tenant_id: str) -> dict:
     role_ids: dict[str, str] = {}
     for slug, cfg in PREDEFINED_ROLES.items():
         existing = await db.roles.find_one({"tenant_id": tenant_id, "name": cfg["name"]})
+        keys = all_perm_keys if cfg["permissions"] == "*" else list(cfg["permissions"])
+        # For "*" roles we store the wildcard as a marker so admin can bypass ALL future perms.
+        if cfg["permissions"] == "*":
+            keys = ["*"]
         if existing:
+            # Idempotent refresh: keep system roles in sync with the latest permission catalog.
+            if existing.get("is_system"):
+                await db.roles.update_one({"_id": existing["_id"]},
+                    {"$set": {"permission_keys": keys, "description": cfg["description"]}})
             role_ids[slug] = existing["_id"]
             continue
-        keys = all_perm_keys if cfg["permissions"] == "*" else list(cfg["permissions"])
         r = Role(
             id=new_id(),
             tenant_id=tenant_id,
@@ -230,5 +237,16 @@ async def run_seed():
     po = await run_platform_owner_seed()
     logger.info("Platform Owner seed: user_id=%s already_active=%s inv=%s",
                 po.get("user_id"), po.get("already_active"), po.get("invitation_token_id"))
+    # Tenant Admin (Infissi Express) — via invito
+    from app.tenant_admin_seed import ensure_tenant_admin_invite
+    ta = await ensure_tenant_admin_invite(company_id)
+    logger.info("Tenant Admin seed: user_id=%s already_active=%s inv=%s",
+                ta.get("user_id"), ta.get("already_active"), ta.get("invitation_id"))
+    # Indexes (stabilization)
+    from app.services.indexes import ensure_indexes as _ensure_indexes
+    try:
+        await _ensure_indexes()
+    except Exception as e:
+        logger.warning("Index creation issue (non-fatal): %s", e)
     await write_test_credentials()
     logger.info("Seed completed. Company=%s", company_id)

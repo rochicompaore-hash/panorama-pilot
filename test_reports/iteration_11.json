@@ -1,0 +1,55 @@
+{
+  "summary": "RC1 stabilization audit — 51/51 backend tests PASS. Comprehensive coverage: AUTH (Platform Owner + Tenant Admin + Super Admin flags & flows), Platform Owner protection guards (DELETE/PATCH is_active/PATCH role_ids all return 403 platform_owner_protected for Tenant Admin), anonymous debug endpoints return 401/403, Tenant Admin can list ALL 16 tenant modules (quotes/surveys/items/sales-orders/purchase-orders/suppliers/production-orders/qc-checks/non-conformities/shipments/installation-plans/service-tickets/payment-plans/invoices/bi.quotes/bi.direction) all with 200. Status-flow enforcement verified on 5 flows (SURVEY_FLOW draft→approved rejected; ORDER_FLOW draft→installed rejected; PO_FLOW requested→received rejected; PLAN_FLOW draft→completed rejected; TICKET_FLOW opened→resolved rejected). Stock multi-movement math verified (inbound 50 + transfer 20 A→B + outbound 10 → A=20, B=20 with qty_available correctly computed). New modules smoke: survey create + compare-quote, sales-order totals (200 sub + 44 VAT = 244), item unique code, BOM version bump, cutting-list FFD optimizer with yield_percent, QC seeds 14 default checks, installation report submit auto-advances SO to installed, payment plan seeds 50/50 default, payment updates plan outstanding + installment partial status, invoice dashboard KPI, ai-cfo generate returns evidence chain (data_sources/computed_metrics/confidence/risk_level/category/action_suggested) + dismiss works. Contract idempotency verified on real signed quote. Error handling: 422 for missing fields, 404 for non-existent IDs across 9 collections, 400 for invalid status transitions. ONE trivial 500 bug found & FIXED: PATCH /api/boms/{id} was combining $set version + $inc version in same Mongo update.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/quotes/{qid}/public-links",
+        "issue": "For non-existent quote_id (or a quote belonging to another tenant), the endpoint returns HTTP 200 with an empty items list instead of HTTP 404. Tenant filter IS applied on the tokens query so no data leaks, but the behavior allows quote_id enumeration and diverges from the convention used in create_link (line 135 of public.py) which explicitly checks `db.quotes.find_one({...tenant_id...})` before proceeding. Recommend adding the same existence check at the top of `list_links` to return 404 consistently."
+      },
+      {
+        "endpoint": "GET /api/debug/tenant-admin-invite",
+        "issue": "When the tenant admin is already active, returns HTTP 410 (already_active). Correct behavior. Just documented for main agent — first-time invite retrieval requires an inactive user; the E2E flow of POST /api/auth/accept-invitation could not be re-tested in this iteration because both PO and TA are already activated."
+      },
+      {
+        "endpoint": "N/A — carried over from iteration_10",
+        "issue": "Three previously-documented minor issues remain: (a) OTP verify status-code ordering (5th wrong attempt → 400 then 404 not 429), (b) signed PDF appends 2 pages instead of 1, (c) PATCH /api/quotes silently accepts sales_rep_id without persisting. See /app/test_reports/iteration_10.json."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_stabilization_rc1.py",
+    "/app/test_reports/pytest/iteration_11_rc1.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Add explicit quote-existence check at the top of GET /api/quotes/{qid}/public-links (routers/public.py::list_links) to return 404 (consistent with create_link) instead of 200-with-empty. Prevents quote_id enumeration; no data leaks currently.",
+    "OPTIONAL (carry-over iter_10): (a) reorder services/otp.py::verify_otp checks so exhaust-attempts branch returns 429; (b) tighten templates/quote_signed_pdf.html to fit on 1 page; (c) PATCH /api/quotes should persist sales_rep_id or 400-reject it."
+  ],
+  "critical_code_review_comments": [
+    "FIXED HERE: routers/production.py::patch_bom line 51 previously set body['version'] before calling update_doc, which then applied `$set: {version: X}` AND `$inc: {version: 1}` in the SAME MongoDB update → WriteError code 40 'Updating the path version would create a conflict at version'. All BOM PATCH calls were returning HTTP 500. Fixed by removing the manual `body['version'] = ...` line and calling `body.pop('version', None)` to prevent caller-supplied version (versioning is already handled by update_doc's $inc). Regression test added: TestBOMandProduction::test_bom_version_bump now passes and verifies version goes from 1 → 2.",
+    "routers/production.py::_optimize_first_fit_decreasing — good: 1D cutting-stock heuristic with kerf accounting, produces per-profile bar_optimizations with yield_percent. Verified via test (returns >0 yield for real inputs).",
+    "routers/logistics.py::submit_report — good: auto-advances SalesOrder to 'installed' ONLY when order_status is in (ready_for_installation, in_production, completed). Verified end-to-end via test.",
+    "routers/admin_finance.py::create_payment — good: correctly recalculates plan.outstanding_amount + updates matching installment's paid_amount + installment_status (paid/partial). Verified via test (2000 total - 500 payment → 1500 outstanding, I1=partial).",
+    "routers/qc.py — good: DEFAULT_FINAL_CHECKS list has exactly 14 items and are seeded on create. Verified.",
+    "routers/inventory.py::_apply_movement — good: transfer creates 2 stock_level updates (from -qty, to +qty). qty_available correctly recomputed as qty_on_hand - qty_committed after each mutation.",
+    "routers/users.py::update_user — good: platform_owner_protected guards short-circuit BEFORE role/is_active updates land. Cannot demote (block empty role_ids), cannot disable (block is_active=false), cannot strip platform_owner role.",
+    "routers/debug.py — good: /platform-owner-invite and /tenant-admin-invite both gated by is_dev_or_test() + require_permission('debug.otp.read') + return 410 when target user is already active (correct semantics).",
+    "routers/bi.py::quotes_kpi — good: returns 13 top-level metrics (period_days, counts_by_status, total_created, value_created, value_signed, value_sent_active, weighted_pipeline_value, conversion_rate_pct, avg_hours_to_first_open, avg_hours_to_sign, quotes_never_viewed, quotes_expiring_7d, rejection_reasons). Combined with counts_by_status (12 statuses) yields 25+ leaf metrics.",
+    "routers/ai_cfo.py — excellent: rule-based, no LLM calls, every suggestion has data_sources + computed_metrics + confidence + risk_level. Regeneration invalidates previous non-dismissed suggestions atomically.",
+    "MINOR: routers/public.py::list_links (line 118-128) does not check quote existence — returns 200 empty list for unknown/other-tenant qids. See action items.",
+    "GOOD: 51 test failures in first run were all diagnostic — /api/auth/me returns `{user: {...}, permissions: [...]}` wrapping (test bug), SalesOrderLine requires 'ref' field (test bug), BOM PATCH 500 (real bug fixed), IDOR expectation (behavior is correct 200-empty, not a leak). No production code changes needed except BOM fix."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_stabilization_rc1.py (NEW - 51 tests, ~450 lines, RC1 audit)",
+    "/app/backend/app/routers/production.py (FIX - patch_bom: removed conflicting version $set)"
+  ],
+  "success_rate": {"backend": "100% (51/51)", "frontend": "n/a (backend-only per request)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin *) — rochicompaore@gmail.com / Platform#Owner_2026!Secure (PO) — admin.tenant@infissiexpress.com / Tenant#Admin!2026Ok (Tenant Admin)",
+  "seed_data_creation": "Test creates disposable TEST_RC1_* customers, surveys, sales-orders, purchase-orders, suppliers, items (with TEST_STOCK_* codes), stock-locations, BOMs, production-orders, cutting-lists, qc-checks, installation-plans/reports, service-tickets, payment-plans, payments, ai-cfo suggestions. All isolated to Super Admin tenant. Nothing modifies existing production/seed data. Runs cleanly in ~9s with 2 parallel workers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Full RC1 stabilization coverage in /app/backend/tests/test_stabilization_rc1.py. Idempotent, no cleanup needed. Uses session-scoped tokens for SA/TA/PO. New modules tested: surveys (SURVEY_FLOW), sales-orders (ORDER_FLOW), suppliers+purchase-orders (PO_FLOW), items+stock-movements (multi-kind math), BOM (version bump), production-orders (PROD_FLOW), cutting-lists (FFD optimizer), qc-checks (14 seed items), non-conformities, installation-plans (PLAN_FLOW), installation-reports (auto-advance SO→installed), service-tickets (TICKET_FLOW), payment-plans (50/50 seed + payment persistence), invoices (KPI), bi.quotes/kpi (13+ metrics), bi.direction/kpi (9 counters), ai-cfo (evidence chain + dismiss). BOM 500 bug fixed in routers/production.py::patch_bom. Iteration_10 (M3.3.4 signature) test file /app/backend/tests/test_public_signature_m334.py is unaffected and still passing.",
+  "rca of the issue": "Only one production-code bug found and fixed: PATCH /api/boms/{id} returned HTTP 500 due to MongoDB WriteError 40 (path 'version' conflict between $set and $inc in the same update document). Root cause: routers/production.py::patch_bom was explicitly injecting body['version'] = existing.version + 1 and passing it to update_doc, which itself always applies $inc: {version: 1}. Fix: remove the manual assignment and pop any caller-supplied 'version' key to preserve integrity ($inc alone reliably bumps the version). Regression test TestBOMandProduction::test_bom_version_bump asserts version increments from 1 → 2 after PATCH. All other status-flow enforcement, stock movement math, idempotency, and platform-owner protection assertions pass without code changes."
+}

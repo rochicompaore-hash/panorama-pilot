@@ -97,6 +97,45 @@ async def read_platform_owner_invite(request: Request,
     }
 
 
+@router.get("/tenant-admin-invite")
+async def read_tenant_admin_invite(request: Request,
+                                     user: dict = Depends(require_permission("debug.otp.read"))):
+    """Return the pending invitation for the distinct Tenant Super Admin (dev/test only)."""
+    if not is_dev_or_test():
+        raise HTTPException(status_code=404, detail="Not found")
+    from app.tenant_admin_seed import TENANT_ADMIN_EMAIL
+    db = get_db()
+    ta_user = await db.users.find_one({"email": TENANT_ADMIN_EMAIL})
+    if not ta_user:
+        raise HTTPException(status_code=404, detail="Utenza Tenant Admin non trovata")
+    if ta_user.get("password_hash"):
+        raise HTTPException(status_code=410, detail={"error": "already_active",
+            "message": "L'utenza Tenant Admin è già attivata"})
+    inv = await db.invitations.find_one({
+        "email": TENANT_ADMIN_EMAIL, "consumed_at": None, "accepted_at": None,
+        "kind": "tenant_admin_activation",
+    }, sort=[("created_at", -1)])
+    if not inv:
+        raise HTTPException(status_code=404, detail="Nessun invito attivo")
+    raw = inv.get("debug_raw_token")
+    if not raw:
+        raise HTTPException(status_code=410, detail="Token non recuperabile — rigenera dal seed")
+    await record_audit(
+        action="debug.tenant_admin_invite.read",
+        tenant_id=ta_user.get("tenant_id"), user_id=user["id"], user_email=user["email"],
+        ip=get_client_ip(request),
+        entity_type="invitation", entity_id=str(inv["_id"]),
+        after={"email": TENANT_ADMIN_EMAIL},
+    )
+    return {
+        "email": TENANT_ADMIN_EMAIL,
+        "invitation_id": str(inv["_id"]),
+        "raw_token": raw,
+        "accept_url_path": f"/accept-invitation?token={raw}",
+        "expires_at": inv.get("expires_at"),
+    }
+
+
 @router.post("/platform-owner-invite/regenerate")
 async def regenerate_platform_owner_invite(request: Request,
                                              user: dict = Depends(require_permission("debug.otp.read"))):
