@@ -43,6 +43,13 @@ import ParametricConfiguratorPage from "@/pages/ParametricConfiguratorPage";
 import ParametricAdminPage from "@/pages/ParametricAdminPage";
 import TechnicalSchedulesPage from "@/pages/TechnicalSchedulesPage";
 import PublicSchedulePage from "@/pages/PublicSchedulePage";
+import LegalEntitiesPage from "@/pages/LegalEntitiesPage";
+import TreasuryCFOPage from "@/pages/TreasuryCFOPage";
+import SaaSPlatformPage from "@/pages/SaaSPlatformPage";
+import ProductCatalogPage from "@/pages/ProductCatalogPage";
+import SiteConditionsForm from "@/pages/SiteConditionsForm";
+import LandingPage from "@/pages/LandingPage";
+import PlatformSiteConfigPage from "@/pages/PlatformSiteConfigPage";
 import AppLayout from "@/layouts/AppLayout";
 
 function Protected({ children }) {
@@ -63,6 +70,7 @@ function App() {
   return (
     <div className="App">
       <Routes>
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/p/:token" element={<PublicQuotePage />} />
         <Route path="/p/schedule/:token" element={<PublicSchedulePage />} />
@@ -120,6 +128,12 @@ function App() {
           <Route path="parametric" element={<ParametricConfiguratorPage />} />
           <Route path="parametric/admin" element={<ParametricAdminPage />} />
           <Route path="technical-schedules" element={<TechnicalSchedulesPage />} />
+          <Route path="legal-entities" element={<LegalEntitiesPage />} />
+          <Route path="cfo" element={<TreasuryCFOPage />} />
+          <Route path="saas-platform" element={<SaaSPlatformPage />} />
+          <Route path="product-catalog" element={<ProductCatalogPage />} />
+          <Route path="site-conditions" element={<SiteConditionsForm />} />
+          <Route path="platform-site-config" element={<PlatformSiteConfigPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -70,10 +70,22 @@ const NAV = [
   },
   {
     group: "finance",
-    label: "Amministrazione",
+    label: "Amministrazione e CFO",
     items: [
       { to: "/payment-plans", label: "Piani pagamenti", icon: Hash, perm: "admin.payments.view" },
+      { to: "/cfo", label: "Dashboard CFO", icon: Target, perm: "treasury.view" },
       { to: "/ai-cfo", label: "AI CFO & BI", icon: Target, perm: "ai_cfo.view" },
+      { to: "/legal-entities", label: "Società (Multi-company)", icon: Buildings, perm: "company.view" },
+    ],
+  },
+  {
+    group: "platform",
+    label: "Platform Owner",
+    items: [
+      { to: "/saas-platform", label: "SaaS Modularization", icon: ShieldCheck, perm: null },
+      { to: "/platform-site-config", label: "Configurazione landing", icon: Buildings, perm: null },
+      { to: "/product-catalog", label: "Catalogo prodotti", icon: FileText, perm: "products.view" },
+      { to: "/site-conditions", label: "Test questionario cantiere", icon: FileText, perm: "quotes.view" },
     ],
   },
   {

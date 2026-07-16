@@ -1,0 +1,49 @@
+{
+  "summary": "M7.TREASURY backend regression — 38/38 tests passed after fixing a critical BSON serialization bug. Coverage: public landing config + lead submit (5 package-suggestion scenarios, dedup, privacy/email validation), Platform Owner site-config PATCH (invalid email rejected 400, valid → email_status=configured, mixed rejected), Legal Entities (Enerhia+Auxer, fiscal missing_fields + fiscal_operations_blocked, PATCH unblocks + le_status→active), Intercompany (400 when either LE blocked, create pair with correct source revenue/credit + target cost/debit + gross=taxable*1.22, receivable+payable linked via due_date, pair GET consistency, reconcile confirm→reconciled, reverse creates mirrored credit_note pair, same-entity 400, reconciliation-report), SaaS (13 modules, 3 plans starter/professional/enterprise, 11 dependencies incl. quotes_contracts→core_crm, assign starter to temp tenant then activate ai_cfo → 400 missing treasury+management_control), Management Control (preset-scenarios ≥3, budget/simulate save_as_scenario returns forecast_revenue/break_even/ebitda/contribution_margin/waterfall, yearly fixed cost 1200 → amount_monthly=100, personnel RAL 36000 30% charges → 3000 gross/3900 total, consolidation returns entities+gross_totals+eliminations.intercompany_revenue+consolidated), Product Catalog (18 types incl. window_3/french_door/sliding/shutter/roller_shutter/roller_box/entrance_door, drawing 3-module composition with sopraluce returns SVG no <script>, hash, site-conditions platform_required→with_platform+is_quotable=true+3 surcharges+platform warning, truck_access=false→not_quotable_without_survey+is_quotable=false), Installation rules seeded 10 codes (inst_window, inst_french_door, inst_sliding, inst_roller, inst_entrance, ...), Access rules 6 codes (floor_no_elev, elev_inad, platform_req, ztl_permit, occ_soil, muni_auth), Regression: /api/auth/me returns admin user, /api/quotes list ok, /api/parametric/preview router live. Runtime ~3s with xdist.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/intercompany (FIXED by testing agent)",
+        "issue": "500 Internal Server Error when payload includes 'due_date' (or any datetime.date field). RCA: app/mongo_utils.py::_serialize handled datetime but not date. Pydantic parses ISO date string into datetime.date and pymongo BSON encoder chokes with 'InvalidDocument: cannot encode object: datetime.date(...)'. Fixed by adding isinstance(v, date) branch that returns v.isoformat(). Same helper is used by ~all routers, so fix also benefits any endpoint that emits date-typed fields (FixedCost.start_date/end_date, Investment.start_date, LegalEntity fiscal snapshots, etc.). Post-fix intercompany create returns 200 and correctly persists source+target pair + receivable + payable."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_m7_treasury_consolidation.py",
+    "/app/test_reports/pytest/iteration_15_m7.xml"
+  ],
+  "action_items": [
+    "REVIEW/APPROVE fix in /app/backend/app/mongo_utils.py — added `isinstance(v, date)` branch to `_serialize` so date fields are stored as ISO strings (fixes 500 on intercompany with due_date; also implicitly hardens FixedCost/Investment/LegalEntity fiscal_snapshot writes).",
+    "OPTIONAL: consider a matching `from_mongo`/re-parse path — currently date fields are stored as ISO strings; consumers reading them back should handle both string and native date. Existing routers already tolerate strings.",
+    "OPTIONAL: `/api/platform/site-config` initial email_status is currently `configured` (previous PATCH already applied recipient ops@infissiexpress.com). Review §6 says initial should be `configuration_required` — the guard note in review explicitly allows either state, so this is acceptable. If a clean initial state is desired, expose a reset endpoint or clear `lead_notification_recipients` in seed rollback.",
+    "OPTIONAL: consider adding an application-level unique key on `landing_leads.dedup_key` to enforce dedup at DB level (currently only enforced via find_one before insert).",
+    "OPTIONAL: consider not silently swallowing the timeline `activities.insert_one` exception in `landing.public_submit_lead` — currently `except Exception: pass` masks any DB error."
+  ],
+  "critical_code_review_comments": [
+    "BUG (FIXED): app/mongo_utils.py::_serialize did not handle datetime.date, causing 500 in any endpoint that writes a date field via to_mongo. Added `isinstance(v, date) → v.isoformat()`. Scope-wide fix.",
+    "GOOD: routers/intercompany.py::create_intercompany is atomic-ish (source insert → target insert → receivable + payable). Uses side='source'/target with correct debit/credit and revenue_or_cost. Rejects blocked LE with clear message + missing_fields. Consider wrapping the two insert_one calls in a Mongo transaction (multi-doc write). Currently a crash between source and target insert leaves an orphan.",
+    "GOOD: routers/legal_entities.py::_refresh_missing correctly transitions le_status from `to_complete` → `active` on write. `fiscal_version` bump + `prev_fiscal_snapshot` snapshot when critical fields change — solid audit trail.",
+    "GOOD: routers/landing.py — EMAIL_RE regex is intentionally strict (^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$) — correctly rejects `checonpaorechioccilagmail.com` and edge cases. Pydantic EmailStr catches invalid email on the submission side (422). CRM lead auto-creation ties to default company + creates timeline activity.",
+    "GOOD: routers/saas_platform.py::set_module_state properly enforces `resolve_module_dependencies` before allowing active/trial/grace_period on a module — verified with ai_cfo requiring treasury+management_control.",
+    "GOOD: services/svg_advanced.py::render_composition — sanitized SVG output (no <script>), hash for integrity, watermark support, deterministic renderer_version='2.0.0'.",
+    "MINOR: routers/landing.py::public_submit_lead silently swallows timeline `activities.insert_one` exception (except: pass). Log at least.",
+    "MINOR: routers/landing.py::_dedup_key uses SHA256 truncated to 32 chars (128-bit). Fine for expected volume but no DB unique index enforces it — dedup is application-level via find_one. Consider unique index `dedup_key_1` on `landing_leads` with sparse=True.",
+    "MINOR: routers/management_control.py::_monthly_amount treats `one_off` as 0 monthly — reasonable but silently drops one-off costs from cash-flow. Consider a separate `one_off_events` array in dashboard.",
+    "MINOR: routers/product_catalog.py::generate_drawing uses `require_permission('parametric.svg.generate')` — verify this permission is granted by default to admin/superadmin (currently is_superadmin bypasses all perms).",
+    "MINOR: intercompany reconcile `reverse` action creates a mirrored credit_note pair but does NOT link the receivable/payable inversion — reversal is only recorded on the intercompany transactions, not on the linked scadenziario. If required by accounting, add receivable/payable reversal too."
+  ],
+  "updated_files": [
+    "/app/backend/app/mongo_utils.py (fixed: date serialization)",
+    "/app/backend/tests/test_m7_treasury_consolidation.py (new — 38 tests)"
+  ],
+  "success_rate": {"backend": "100% (38/38)", "frontend": "n/a (backend-only)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin, also acts as Platform Owner via is_superadmin bypass)",
+  "seed_data_creation": "Tests dynamically create: landing_leads TEST_* (dedup pattern), CRM leads (auto-linked), legal_entities TEST_LE_* (fresh incomplete), intercompany_transactions with doc_ref TEST-IC-*, receivables+payables (linked via pair_id), fixed_costs 'TEST_YearlyIns_*', personnel_costs 'TEST_Person_*', budget_scenarios 'TEST_SimGrowth', tenant_entitlements for fake TEST-TENANT-* (isolated). All identifiable by TEST_ prefix.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test suite in /app/backend/tests/test_m7_treasury_consolidation.py (38 tests, ~3s with xdist). Runs both public (no-auth) and authenticated endpoints. Note: seed legal entities Enerhia/Auxer are currently unblocked (previous PATCH). The dep-check test uses a fake TEST-TENANT-* to avoid polluting the main tenant which has enterprise plan (all modules included). If re-running, `test_intercompany_blocked_when_fiscal_incomplete` creates a fresh incomplete LE each run — safe. The bug fix in mongo_utils.py::_serialize is the single change; hot-reload picked it up. If the fix is reverted, all intercompany tests with due_date will regress to 500. Existing tests in /app/backend/tests/ (test_ops_m6, test_workflow_m6_wf, test_parametric_m6 etc) remain untouched.",
+  "rca of the issue": "BUG: intercompany create endpoint returned 500 with error `bson.errors.InvalidDocument: cannot encode object: datetime.date(2026, 12, 31)`. RCA: `IntercompanyCreate` model has `due_date: Optional[date]`. When client posts `\"due_date\": \"2026-12-31\"`, Pydantic parses into `datetime.date`. The helper `app/mongo_utils.py::_serialize` only converted `datetime.datetime` to ISO string, leaving `datetime.date` as-is. Motor/pymongo's BSON encoder does NOT natively support `date` (only `datetime`), so `insert_one` raised. FIX: extended `_serialize` with `if isinstance(v, date): return v.isoformat()` (order: datetime check first — since datetime IS-A date in Python, this ordering is required and correct). Also benefits FixedCost.start_date/end_date, Investment.start_date, LegalEntity fiscal snapshots. VERIFIED: post-fix intercompany create returns 200 + persists source, target, receivable, payable correctly; consolidation and reconciliation-report also work. No other change to business logic."
+}

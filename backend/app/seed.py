@@ -239,6 +239,17 @@ async def run_seed():
         logger.info("Parametric demo seed: %s", pdemo.get("ok"))
     except Exception as e:
         logger.warning("Parametric demo seed issue (non-fatal): %s", e)
+    # Seed M7 extensions — multi-company, SaaS, product catalog, management control
+    try:
+        from app.seed_extensions import (
+            seed_multi_company_and_saas, seed_product_catalog, seed_management_demo,
+        )
+        await seed_multi_company_and_saas(company_id)
+        await seed_product_catalog(company_id)
+        await seed_management_demo(company_id)
+        logger.info("M7 extensions seed OK (multi-company, SaaS, product catalog)")
+    except Exception as e:
+        logger.warning("M7 extensions seed issue (non-fatal): %s", e)
     # Platform Owner (globale, sopra Super Admin del tenant)
     from app.platform_owner import run_platform_owner_seed
     po = await run_platform_owner_seed()

@@ -245,6 +245,40 @@ PERMISSION_CATALOG = [
     ("ai_cfo.configure", "AI CFO", "edit", "Configura AI CFO"),
     ("financial_statements.view", "Bilancio", "view", "Visualizza bilancio"),
     ("financial_statements.import", "Bilancio", "edit", "Importa bilancio"),
+    # M7.CONTROL — Controllo di gestione
+    ("control.view", "Controllo di gestione", "view", "Visualizza controllo di gestione"),
+    ("control.manage", "Controllo di gestione", "edit", "Gestisce costi fissi/personale/scadenziario"),
+    ("budget.view", "Budget", "view", "Visualizza budget e scenari"),
+    ("budget.manage", "Budget", "edit", "Gestisce budget e forecast"),
+    ("budget.approve", "Budget", "approve", "Approva budget/forecast"),
+    ("breakeven.view", "Break-even", "view", "Visualizza break-even e simulazioni"),
+    # Multi-company
+    ("multi_company.view", "Multi-company", "view", "Visualizza legal entities"),
+    ("multi_company.manage", "Multi-company", "edit", "Gestisce legal entities e membership"),
+    ("intercompany.view", "Intercompany", "view", "Visualizza operazioni intercompany"),
+    ("intercompany.manage", "Intercompany", "edit", "Registra e riconcilia intercompany"),
+    ("intercompany.approve", "Intercompany", "approve", "Approva/storna intercompany"),
+    ("consolidation.view", "Consolidato", "view", "Visualizza consolidato multi-company"),
+    # SaaS platform
+    ("platform.plans.view", "SaaS Plans", "view", "Visualizza piani SaaS"),
+    ("platform.plans.manage", "SaaS Plans", "edit", "Gestisce piani SaaS (platform owner)"),
+    ("platform.entitlements.view", "SaaS Entitlement", "view", "Visualizza entitlement tenant"),
+    ("platform.entitlements.manage", "SaaS Entitlement", "edit", "Gestisce entitlement tenant"),
+    # Product catalog extended
+    ("product_types.view", "Tipologie prodotto", "view", "Visualizza tipologie prodotto"),
+    ("product_types.manage", "Tipologie prodotto", "edit", "Gestisce tipologie prodotto"),
+    ("drawings.generate", "Disegni tecnici", "view", "Genera disegni serramenti"),
+    ("drawings.configure", "Disegni tecnici", "edit", "Configura opzioni disegno"),
+    ("drawings.view_internal", "Disegni tecnici", "view", "Visualizza disegni interni"),
+    ("installation_pricing.view", "Listini montaggio", "view", "Visualizza listini montaggio"),
+    ("installation_pricing.manage", "Listini montaggio", "edit", "Gestisce listini montaggio/smontaggio"),
+    ("site_conditions.view", "Condizioni cantiere", "view", "Visualizza condizioni cantiere"),
+    ("site_conditions.edit", "Condizioni cantiere", "edit", "Modifica condizioni cantiere"),
+    ("site_conditions.override", "Condizioni cantiere", "approve", "Override condizioni cantiere"),
+    ("access_surcharges.view", "Supplementi accesso", "view", "Visualizza supplementi accesso"),
+    ("access_surcharges.manage", "Supplementi accesso", "edit", "Gestisce regole supplementi"),
+    ("platform_costs.manage", "Costi piattaforma", "edit", "Gestisce costi piattaforma"),
+    ("municipal_authorizations.manage", "Autorizzazioni comunali", "edit", "Gestisce costi autorizzazioni"),
 ]
 
 # Predefined roles with permissions

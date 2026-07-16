@@ -1,6 +1,6 @@
 """Mongo helpers: serialize/deserialize documents with UUID _id and ISO dates."""
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Dict, Optional
 
 
@@ -16,6 +16,8 @@ def to_mongo(doc: Dict[str, Any]) -> Dict[str, Any]:
 
 def _serialize(v: Any) -> Any:
     if isinstance(v, datetime):
+        return v.isoformat()
+    if isinstance(v, date):
         return v.isoformat()
     if isinstance(v, dict):
         return {k: _serialize(x) for k, x in v.items()}

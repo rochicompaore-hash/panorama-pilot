@@ -70,6 +70,12 @@ from app.routers.parametric import router as parametric_router
 from app.routers.workflow import router as workflow_router, public_router as workflow_public_router, customer_router as customer_portal_router
 from app.routers.ops_workflow import router as ops_workflow_router, public_leads_router as public_leads_router
 from app.routers.treasury import router as treasury_router
+from app.routers.legal_entities import router as legal_entities_router
+from app.routers.saas_platform import router as saas_platform_router
+from app.routers.management_control import router as management_control_router
+from app.routers.intercompany import router as intercompany_router
+from app.routers.product_catalog import router as product_catalog_router
+from app.routers.landing import public_site_router, platform_site_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -164,6 +170,13 @@ api.include_router(customer_portal_router)
 api.include_router(ops_workflow_router)
 api.include_router(public_leads_router)
 api.include_router(treasury_router)
+api.include_router(legal_entities_router)
+api.include_router(saas_platform_router)
+api.include_router(management_control_router)
+api.include_router(intercompany_router)
+api.include_router(product_catalog_router)
+api.include_router(public_site_router)
+api.include_router(platform_site_router)
 
 app.include_router(api)
 
