@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 18 — FULL PLATFORM REGRESSION AUDIT before production deploy. 49/49 backend tests PASS covering: Auth (login/me/tenant_id/wrong-pw), CRM (leads list/create/dedup, customers CRUD), Legal Entities (Enerhia+Auxer present, missing_fields↔blocked coherent, fiscal-complete PATCH), Intercompany (mirrored source-revenue/target-cost pair, block-when-LE-incomplete, reconcile confirm→reconciled, reverse→credit_note pair), SaaS (13 modules, ai_cfo dep-on-treasury enforcement verified via stripped scratch tenant), Management Control (dashboard, 3 preset scenarios, budget/simulate w/ forecast_revenue+break_even_revenue+ebitda+contribution_margin+waterfall, /consolidation returns entities+gross_totals+eliminations+consolidated), Product Catalog (18 types, SVG sanitized), Site Conditions (2nd floor no-elevator + platform-required → complexity=with_platform + is_quotable=true), Public Landing (config unauth: 6 packages + 13 module codes, lead dedup + email/privacy validation), Platform Owner Site Config (reject 'checonpaorechioccilagmail.com' as 400, accept valid email → email_status=configured), Preventivatore unified stack (env→opening→4 products primary_frame+shading+box+insect_screen with correct dim inheritance), Compatibility (roller_shutter blocks shutter with 400+'Tapparella e persiana'), Tree (nested), Migration idempotent no-op, PDF preview both current AND legacy-no-environments (quote_pdf.html jinja robust), Treasury dashboard OK for admin. No 500s across 14 parametrized core endpoints. NO CRITICAL/HIGH BUGS found. Platform is GREEN for deploy.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/quote-structure/{quote_id}/environments",
+        "issue": "Router at /app/backend/app/routers/quote_structure.py:44 accepts `payload: dict` and manually constructs `QuoteEnvironment(kind=payload.get('kind','other'), ...)`. If a client sends an invalid literal (e.g. 'living' instead of 'living_room'), pydantic ValidationError escapes the handler → 500 Internal Server Error instead of 422/400. Repro: POST body {name:'x', kind:'living'} → HTTP 500. FIX: swap payload:dict for a Pydantic Create-model (e.g. QuoteEnvironmentCreate) so FastAPI returns 422 automatically, OR wrap the model instantiation in try/except pydantic.ValidationError → HTTPException(422, ...). Same pattern likely exists in other routers that manually instantiate models from dict payloads — recommend audit."
+      },
+      {
+        "endpoint": "PATCH /api/platform/saas/entitlements/{tenant_id}",
+        "issue": "`TenantEntitlementUpdate` (models_saas.py:113) does NOT expose `plan_snapshot_module_codes` as an updatable field, so any client attempt to modify the module list via PATCH is silently ignored (pydantic exclude_unset drops it, no error). Not a security bug (module dep enforcement happens on activation via set-module-state), but confusing DX: caller may believe the plan was patched. Consider either adding `plan_snapshot_module_codes: Optional[List[str]]` explicitly, or rejecting unknown fields with model_config extra='forbid'."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_full_regression_iter18.py",
+    "/app/test_reports/pytest/iteration_18.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (minor): Wrap manual model instantiation in POST /environments (and any similar router) to return 422 instead of 500 on invalid Literal fields — /app/backend/app/routers/quote_structure.py:49.",
+    "OPTIONAL (DX): TenantEntitlementUpdate should expose plan_snapshot_module_codes or use extra='forbid' — /app/backend/app/models_saas.py:113."
+  ],
+  "critical_code_review_comments": [
+    "GOOD: landing.py::platform_update_config correctly validates each recipient email via _valid_email and rejects malformed inputs (checonpaorechioccilagmail.com → 400). email_status transitions to 'configured' only when at least one valid recipient exists.",
+    "GOOD: intercompany.py::create_intercompany enforces fiscal completeness on BOTH source and target LEs (fiscal_operations_blocked check) before mirroring, and the reverse action correctly generates a credit_note pair with reversal_of_id link.",
+    "GOOD: module_gating.py::require_module wraps 402 responses with a structured detail {code, module, state, message} — clean UX for the frontend to render upgrade CTAs.",
+    "GOOD: saas_platform.py::set_module_state verifies module deps at activation time (resolve_module_dependencies) — verified with a scratch tenant entitlement missing treasury: ai_cfo activation returns 400 with 'treasury' in the message. Dep graph confirmed in DB (ai_cfo→treasury, ai_cfo→management_control, multi_company→treasury, multi_company→management_control, all *→admin/quotes/crm chain).",
+    "GOOD: landing.py::_get_or_create_config seeds 6 default packages (starter/sales/operations/production/finance/enterprise) and 13 public_module_codes matching MODULE_CODES from models_saas.py.",
+    "GOOD: quote_pdf.html defensive against legacy quotes: envs default to [] via `snap.quote.environments or []`, and orphan lines fall through to 'Righe aggiuntive'. Verified: PDF preview on a quote with zero environments returns 200 (weasyprint completes 7 steps in the backend log).",
+    "GOOD: breakeven.py::compute_budget_outputs builds a waterfall [Ricavi, Costi variabili, Margine contrib., Costi fissi, EBITDA] and returns all required fields (forecast_revenue, break_even_revenue, ebitda, contribution_margin, contribution_margin_pct).",
+    "MINOR (defensive): manual model instantiation from raw dict in quote_structure.py can turn client validation errors into 500. FastAPI's Pydantic body validation is the right layer.",
+    "MINOR (DX): TenantEntitlementUpdate omits plan_snapshot_module_codes — cannot modify module list via PATCH without touching Mongo directly.",
+    "GOOD: composite_drawing.py output stays sanitized under multi-product openings (no <script/javascript:/onerror=/onclick= and only the xmlns literal URL)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_full_regression_iter18.py (new — 49 tests, 49/49 pass, ~7.5s w/ xdist)"
+  ],
+  "success_rate": {"backend": "100% (49/49)", "frontend": "n/a (backend-only per request)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (superadmin)",
+  "seed_data_creation": "Test creates: TEST_ITER18_* customers, TEST_ITER18_LEAD/PUB/PRV/LEGACY quotes+leads, TEST_LE_* legal entity (incomplete, for negative test), completed fiscal fields on the two default LEs if they were incomplete. All scratch data prefixed with TEST_ITER18_ or TEST_ prefix and tenant-scoped. Scratch tenant entitlement for ai_cfo dep test is inserted+deleted in the same test (cleanup guaranteed via finally).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter18 = full regression audit before deploy. All 49 tests green. Suite lives at /app/backend/tests/test_full_regression_iter18.py and takes ~7.5s with pytest-xdist (2 workers). Coverage is one representative test per module; combine with the deeper iter16/iter17 quote-structure suites for full coverage. Two MINOR issues logged (500 on invalid literal in POST /environments, and TenantEntitlementUpdate missing plan_snapshot_module_codes) — neither is a blocker. Cleanup: the TEST_ITER18_ scratch data (customers, quotes, leads, one temp LE) will accumulate over runs; consider a nightly cleanup by prefix if needed. IMPORTANT: fixture `two_complete_les` mutates the two default legal entities by filling their vat_number/tax_code/pec — this is IDEMPOTENT (skipped if already complete) but leaves fiscal_operations_blocked=False on Enerhia+Auxer. If your test expects Enerhia to still be blocked, reset it before running.",
+  "rca of the issue": "No RCA required — no bugs found. The two Minor items above have clear fixes documented in action_items."
+}
