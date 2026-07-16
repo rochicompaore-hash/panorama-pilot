@@ -76,6 +76,7 @@ from app.routers.management_control import router as management_control_router
 from app.routers.intercompany import router as intercompany_router
 from app.routers.product_catalog import router as product_catalog_router
 from app.routers.landing import public_site_router, platform_site_router
+from app.routers.quote_structure import router as quote_structure_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -177,6 +178,7 @@ api.include_router(intercompany_router)
 api.include_router(product_catalog_router)
 api.include_router(public_site_router)
 api.include_router(platform_site_router)
+api.include_router(quote_structure_router)
 
 app.include_router(api)
 

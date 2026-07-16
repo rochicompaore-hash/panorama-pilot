@@ -206,51 +206,111 @@
   </table>
 </div>
 
-<!-- Openings & lines -->
+<!-- Environments → Openings → Products -->
 {% if snap.template.show_prices_mode != 'total_only' %}
 <div class="section">
-  <h2>Dettaglio prodotti per vano</h2>
+  <h2>Dettaglio prodotti per ambiente e vano</h2>
   {% set ns = namespace(shown=[]) %}
-  {% for op in snap.quote.openings %}
-    <div class="opening">
-      <div class="head">
-        <div class="code">{{ op.code }}</div>
-        <div class="title">
-          <h3>{{ op.description or 'Vano ' + op.code }}</h3>
-          <div class="desc">
-            {% if op.floor %}Piano: {{ op.floor }} · {% endif %}
-            {% if op.room %}Locale: {{ op.room }} · {% endif %}
-            {% if op.width_mm and op.height_mm %}Misura indicativa: {{ op.width_mm }}×{{ op.height_mm }} mm{% endif %}
+  {% set envs = snap.quote.environments or [] %}
+  {# Group openings by environment_id. Openings without environment go under "Non specificato" #}
+  {% set unassigned_openings = snap.quote.openings | selectattr('environment_id', 'undefined') | list %}
+  {% set no_env_openings = snap.quote.openings | rejectattr('environment_id') | list %}
+
+  {% for env in envs %}
+    {% set env_openings = snap.quote.openings | selectattr('environment_id', 'equalto', env.id) | list %}
+    {% if env_openings %}
+      <div class="environment" style="margin-top:12px; padding-top:8px; border-top:2px solid #0F1720;">
+        <h3 style="margin:6px 0; color:#0F1720;">🏠 {{ env.name }}{% if env.floor %} <span class="muted small">— {{ env.floor }}</span>{% endif %}</h3>
+        {% for op in env_openings %}
+          <div class="opening" style="margin-left:8px;">
+            <div class="head">
+              <div class="code">{{ op.code }}</div>
+              <div class="title">
+                <h4>{{ op.display_name or op.code }}</h4>
+                <div class="desc">
+                  {% if op.width_mm and op.height_mm %}Nicchia: {{ op.width_mm }}×{{ op.height_mm }} mm{% endif %}
+                  {% if op.depth_mm %} · Profondità: {{ op.depth_mm }} mm{% endif %}
+                </div>
+              </div>
+            </div>
+            <table class="lines">
+              <thead>
+                <tr>
+                  <th>Ruolo</th>
+                  <th>Descrizione</th>
+                  <th class="qty">Q.tà</th>
+                  {% if snap.template.show_prices_mode == 'per_line' %}<th class="price">Prezzo un.</th><th class="sub">Subtotale</th>{% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% set ns2 = namespace(op_total=0.0) %}
+                {% for l in snap.quote.lines if l.opening_id == op.id %}
+                  {% set _ = ns.shown.append(l.id) %}
+                  {% set _ = ns2.update({'op_total': ns2.op_total + (l.subtotal_line or 0)}) %}
+                  <tr>
+                    <td class="small">
+                      {% if l.role == 'primary_frame' %}Serramento
+                      {% elif l.role == 'shading' %}Oscurante
+                      {% elif l.role == 'insect_screen' %}Zanzariera
+                      {% elif l.role == 'box' %}Cassonetto
+                      {% elif l.role == 'counter_frame' %}Controtelaio
+                      {% elif l.role == 'installation' %}Montaggio
+                      {% elif l.role == 'dismount' %}Smontaggio
+                      {% elif l.role == 'disposal' %}Smaltimento
+                      {% else %}{{ l.role or '—' }}{% endif %}
+                    </td>
+                    <td>
+                      <b>{{ l.description or 'Prodotto' }}</b>
+                      {% if l.width_mm and l.height_mm %}<div class="small muted">{{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}
+                    </td>
+                    <td class="qty">{{ l.quantity | num(0) }}</td>
+                    {% if snap.template.show_prices_mode == 'per_line' %}
+                      <td class="price">{{ l.unit_price_final | cur }}</td>
+                      <td class="sub">{{ l.subtotal_line | cur }}</td>
+                    {% endif %}
+                  </tr>
+                {% endfor %}
+                {% if snap.template.show_prices_mode == 'per_line' %}
+                  <tr style="font-weight:bold; background:#F3F4F6;">
+                    <td colspan="4" style="text-align:right;">Totale vano</td>
+                    <td class="sub">{{ ns2.op_total | cur }}</td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
           </div>
-        </div>
+        {% endfor %}
       </div>
-      <table class="lines">
-        <thead>
-          <tr>
-            <th>Descrizione</th>
-            <th class="qty">Q.tà</th>
-            {% if snap.template.show_prices_mode == 'per_line' %}<th class="price">Prezzo un.</th><th class="sub">Subtotale</th>{% endif %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for l in snap.quote.lines if l.opening_id == op.id %}
-            {% set _ = ns.shown.append(l.id) %}
-            <tr>
-              <td>
-                <b>{{ l.description or 'Prodotto' }}</b>
-                {% if l.width_mm and l.height_mm %}<div class="small muted">{{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}
-              </td>
-              <td class="qty">{{ l.quantity | num(0) }}</td>
-              {% if snap.template.show_prices_mode == 'per_line' %}
-                <td class="price">{{ l.unit_price_final | cur }}</td>
-                <td class="sub">{{ l.subtotal_line | cur }}</td>
-              {% endif %}
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    {% endif %}
   {% endfor %}
+
+  {# Openings orphan (no environment) — fallback #}
+  {% if no_env_openings %}
+    <div class="environment" style="margin-top:12px; padding-top:8px; border-top:1px dashed #94A3B8;">
+      <h3 style="margin:6px 0; color:#6B7280;">Vani non assegnati a un ambiente</h3>
+      {% for op in no_env_openings %}
+        <div class="opening" style="margin-left:8px;">
+          <div class="head">
+            <div class="code">{{ op.code }}</div>
+            <div class="title"><h4>{{ op.display_name or op.description or 'Vano ' + (op.code or '') }}</h4></div>
+          </div>
+          <table class="lines">
+            <thead><tr><th>Descrizione</th><th class="qty">Q.tà</th>{% if snap.template.show_prices_mode == 'per_line' %}<th class="price">Prezzo un.</th><th class="sub">Subtotale</th>{% endif %}</tr></thead>
+            <tbody>
+              {% for l in snap.quote.lines if l.opening_id == op.id %}
+                {% set _ = ns.shown.append(l.id) %}
+                <tr>
+                  <td><b>{{ l.description or 'Prodotto' }}</b>{% if l.width_mm and l.height_mm %}<div class="small muted">{{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}</td>
+                  <td class="qty">{{ l.quantity | num(0) }}</td>
+                  {% if snap.template.show_prices_mode == 'per_line' %}<td class="price">{{ l.unit_price_final | cur }}</td><td class="sub">{{ l.subtotal_line | cur }}</td>{% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
   {# Show lines without opening #}
   {% set orphans = snap.quote.lines | rejectattr('id', 'in', ns.shown) | list %}
   {% if orphans %}

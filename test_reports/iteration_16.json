@@ -1,0 +1,59 @@
+{
+  "summary": "Iteration 16 — Quote Structure refactor backend regression. 20/21 tests pass. Coverage: Environments create/list, Openings auto-numbering (V01/V02) + display_name + portafinestra proportions + duplicate opening (copies products), Products+DimensionInheritance (primary_frame 1200x1400 inherited, roller_shutter formula +60/+40 → 1260x1440, roller_box +40/220 fixed, insect_screen -10/-5, dimensions/resolve endpoint, opening-with-only-shading), Compatibility (roller_shutter blocks shutter with 400+blocker 'Tapparella e persiana...', /compatibility/check persiana+box returns allow=true+warning 'Una persiana non richiede...'), Composite drawing (SVG with 4 products: no <script/javascript:/onerror=/onclick=/external URLs, contains rollerpat + data-composite='1' + Cassonetto + Zanzariera markers), Tree view (environments→openings→products_by_role with subtotal), Migration legacy (creates 'Non specificato' env for orphan openings + assigns env_id + returns ok:true), Regression (auth/me, /api/quotes list+GET, landing public config). 1 real business-logic bug exposed: migrate-structure lock check reads wrong field.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/quote-structure/{quote_id}/migrate-structure",
+        "issue": "Lock check for sent/accepted/signed/converted quotes is BROKEN. Router reads `q.get('status')` at /app/backend/app/routers/quote_structure.py:387 but quotes actually persist workflow state in `quote_status` (values draft/sent/accepted/...); the `status` field always holds 'active'/'archived'. Consequence: an already-sent quote is NOT locked and its structure can be silently mutated, breaking the price_snapshot immutability guarantee documented in the endpoint's own docstring. Verified: transitioning a quote to `sent` via POST /api/quotes/{qid}/status then calling migrate-structure returns ok:true (should be ok:false, reason:quote_locked). FIX: change line 387 to `if q.get('quote_status') in ('sent', 'accepted', 'signed', 'converted'):` — the value set 'signed' may need review (quote status flow uses 'accepted'/'converted' but electronic signature currently lives on separate `signature.status`, so consider also checking `q.get('signature',{}).get('status')=='signed'`).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/quote-structure/{quote_id}/migrate-structure",
+        "issue": "Response field `environments_created` is computed as `len([e for e in envs if e.get('id') in rooms.values()])` — safe, but only when `orphan_openings` truthy. If a client calls migrate on a quote with zero orphans it returns 0 which is fine, but it also increments `version` and sets `structure_migrated_at` even when nothing changes → makes the endpoint non-idempotent w.r.t. version bump. Consider skipping the update when no changes."
+      },
+      {
+        "endpoint": "POST /api/quote-structure/openings/{opening_id}/products",
+        "issue": "HTTPException(400, {...}) is raised with a dict detail. FastAPI serializes fine, but the returned JSON has structure `{\"detail\": {\"code\":\"incompatible\",\"blockers\":[...],\"warnings\":[...]}}`. Clients that assume `detail` is a string will fail. Consider a dedicated Pydantic error model or documenting the shape."
+      },
+      {
+        "endpoint": "GET /api/quote-structure/{quote_id}/tree",
+        "issue": "`migration_required` is set to true only when there are BOTH orphan openings AND existing environments. On a fully-legacy quote (no envs at all) it returns migration_required=false, but tree.environments is empty and the openings are hidden entirely (only surfaced via orphan_openings). UI could miss the state. Suggest: migration_required = len(orphan_openings) > 0."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_quote_structure_iter16.py",
+    "/app/test_reports/pytest/iteration_16_qs.xml"
+  ],
+  "action_items": [
+    "FIX (HIGH): /app/backend/app/routers/quote_structure.py:387 — change `q.get('status')` → `q.get('quote_status')`. Also consider adding a check for `q.get('signature',{}).get('status')=='signed'` so signed quotes are also locked (the enum in status_flow currently uses 'accepted'/'converted', not 'signed').",
+    "REVIEW: consider making migrate-structure idempotent when no changes are pending (skip $inc version + structure_migrated_at when there are no orphan openings and no unassigned roles).",
+    "REVIEW: standardize the 400 error shape returned by /openings/{id}/products (currently raises HTTPException with a dict detail; document or wrap in a Pydantic error model)."
+  ],
+  "critical_code_review_comments": [
+    "BUG (HIGH): quote_structure.py::migrate_quote reads `q.get('status')` — wrong field name. `status` on the quote doc is 'active'/'archived' (soft-delete flag); the workflow state is `quote_status`. Result: the lock guard is dead code and sent/accepted quotes can be silently restructured, invalidating the price_snapshot. Test `test_migrate_locked_quote` exposes this: after transitioning to sent, migrate-structure returns ok:true.",
+    "GOOD: services/quote_structure.py::DEFAULT_RULES correctly encodes the tapparella/persiana/scuro mutual-exclusion triangle with hard=True + rich message. `_matches` checks both directions (principal↔related) so ordering of insertion doesn't matter.",
+    "GOOD: services/quote_structure.py::resolve_dimensions gracefully falls back from DB DimensionFormula → DEFAULT_FORMULAS → identity; short-circuits with source='manual' when opening dims are missing (avoids garbage-in-garbage-out).",
+    "GOOD: services/composite_drawing.py output is sanitized (no <script>, no javascript:, only literal xmlns URL). Layered order (nicchia→cassonetto→serramento→apertures→persiana/tapparella→zanzariera→quote+legend) matches architectural intent. Deterministic sha256 hash for cache-busting.",
+    "MINOR: routers/quote_structure.py::add_product_to_opening — does NOT verify tenant_id ownership of `opening_id` in the URL beyond the outer quote filter. The find_one uses `{tenant_id, openings.id: opening_id}` which IS scoped — OK on second look, but the same pattern in duplicate_opening/list_opening_products relies on it. Add explicit assertion or index note in the code.",
+    "MINOR: routers/quote_structure.py::duplicate_opening — resets `opening_number = len(same_env)+1` but does NOT re-check for collisions with existing custom-numbered openings. Edge case: manual opening_number=99 exists, duplicate picks len+1. Consider using max(existing_numbers)+1.",
+    "MINOR: composite_drawing.py — pattern name collisions possible if svg is embedded in a PDF with other patterns; consider prefixing (e.g., `cd-rollerpat`).",
+    "MINOR: dimension formula `220` for box is a literal fixed-height in mm — safe via eval_formula AST, but a magic number. Consider making it a DimensionFormula seed doc so tenants can override without code change.",
+    "GOOD: OpeningProductAddPayload defaults `dimension_source='inherited'` so callers omitting the field trigger formula resolution automatically — nice ergonomics.",
+    "MINOR: models_quote_structure.py::QuoteEnvironment.id uses `default_factory=new_id` and is NOT tenant-scoped; multi-quote environments cannot be shared (by design), but if in future you want a library of environments, refactor now."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_quote_structure_iter16.py (new — 21 tests, 20 pass)"
+  ],
+  "success_rate": {"backend": "95% (20/21 — 1 failure exposes a real backend bug)", "frontend": "n/a (backend-only)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (superadmin)",
+  "seed_data_creation": "Tests create scoped-under-tenant TEST_QS_* and TEST_LEGACY_* / TEST_LOCK_* quotes with attached environments/openings/products. Uses first existing customer (or creates TEST_QS_* if none). Sent quote created for lock test is left in `sent` state (harmless, discoverable by title prefix TEST_LOCK_).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Single failing test `test_migrate_locked_quote` documents the RCA inline and will pass once main agent fixes the field name in /app/backend/app/routers/quote_structure.py line 387 (`status` → `quote_status`). Other 20 tests validate all iteration-16 features listed in the review request. Test file at /app/backend/tests/test_quote_structure_iter16.py, runs ~6s with xdist. Composite drawing sanitization pattern reused across future SVG tests: reject <script/javascript:/onerror=/onclick= + any external URL other than xmlns literal. If new default compatibility rules are added, update TestCompatibility accordingly. Regression tests (auth/me, /api/quotes list+GET, landing public config) are lightweight sanity checks — keep them.",
+  "rca of the issue": "BUG: POST /api/quote-structure/{quote_id}/migrate-structure fails to lock sent/accepted/signed/converted quotes. RCA: in /app/backend/app/routers/quote_structure.py:387 the guard is `if q.get('status') in ('sent', 'accepted', 'signed', 'converted'):` — but the Quote document model persists workflow state in `quote_status` (verified via direct Mongo read: `_id=..., status='active', quote_status='draft'`; and via /api/quotes/{id}/status endpoint which writes `update['quote_status']=new`). The field `status` on the quote is used for soft-delete/active flag ('active'/'archived'), NEVER holds 'sent'. Result: the `not q.get('status') in (...)` branch is always false → migration proceeds even on sent quotes → violates the price_snapshot immutability guaranteed at send time. FIX: `if q.get('quote_status') in (...)`. Reproduction: create quote → POST /api/quotes/{qid}/status {new_status:'sent'} → GET /api/quotes/{qid} confirms quote_status=='sent' → POST /api/quote-structure/{qid}/migrate-structure returns ok:true (should return ok:false, reason:quote_locked). Automated in TestMigration.test_migrate_locked_quote. Once fixed, no other test changes are needed."
+}

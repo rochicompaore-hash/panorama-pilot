@@ -205,6 +205,7 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "site_address": quote.get("site_address"),
         "sales_rep": quote.get("sales_rep_snapshot") or {"name": quote.get("sales_rep_name")},
         "openings": quote.get("openings") or [],
+        "environments": quote.get("environments") or [],
         "lines": [
             {k: v for k, v in l.items() if k not in ("internal_cost", "margin_abs", "margin_pct", "cost_price")}
             for l in (quote.get("lines") or [])
