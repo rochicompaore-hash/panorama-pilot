@@ -188,6 +188,28 @@ PERMISSION_CATALOG = [
     ("parametric.color.manage", "Categorie Colore", "edit", "Gestisce categorie colore e policy residui"),
     ("parametric.nesting.run", "Nesting 1D", "edit", "Esegue algoritmi FFD/BFD"),
     ("parametric.svg.generate", "Disegno SVG", "view", "Genera disegni SVG parametrici"),
+    # M6.WORKFLOW — flusso end-to-end preventivo → abaco → produzione → cliente
+    ("contracts.generate", "Contratti", "edit", "Genera contratto da preventivo accettato"),
+    ("contracts.send", "Contratti", "edit", "Invia contratto al cliente"),
+    ("contracts.view_signed", "Contratti", "view", "Visualizza contratto firmato"),
+    ("surveys.manage", "Rilievo tecnico", "edit", "Gestisce campagna rilievi"),
+    ("surveys.validate", "Rilievo tecnico", "approve", "Valida rilievo tecnico completato"),
+    ("surveys.measure", "Rilievo tecnico", "edit", "Modifica misure tecniche definitive"),
+    ("surveys.assign", "Rilievo tecnico", "edit", "Assegna rilievo a tecnico"),
+    ("surveys.generate_schedule", "Rilievo tecnico", "edit", "Genera abaco tecnico dal rilievo"),
+    ("surveys.send_to_customer", "Rilievo tecnico", "edit", "Invia abaco al cliente"),
+    ("surveys.override_locked", "Rilievo tecnico", "approve", "Override rilievo bloccato"),
+    ("surveys.view_variances", "Rilievo tecnico", "view", "Visualizza differenze quote/rilievo"),
+    ("technical_schedules.create", "Abaco tecnico", "create", "Crea abaco tecnico"),
+    ("technical_schedules.edit", "Abaco tecnico", "edit", "Modifica abaco"),
+    ("technical_schedules.approve", "Abaco tecnico", "approve", "Approva abaco internamente"),
+    ("technical_schedules.send", "Abaco tecnico", "edit", "Invia abaco al cliente"),
+    ("technical_schedules.sign", "Abaco tecnico", "approve", "Firma abaco (interna, non FES)"),
+    ("technical_schedules.release", "Abaco tecnico", "approve", "Rilascia abaco alla produzione"),
+    ("production.release", "Produzione", "approve", "Esegue release check produzione"),
+    ("production.override_release", "Produzione", "approve", "Override manuale release produzione"),
+    ("customer_portal.manage_tracking", "Portale cliente", "edit", "Gestisce dati tracking cliente"),
+    ("customer_portal.manage_visibility", "Portale cliente", "edit", "Gestisce mapping stato cliente"),
 ]
 
 # Predefined roles with permissions

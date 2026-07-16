@@ -57,6 +57,7 @@ const NAV = [
     label: "Operativo",
     items: [
       { to: "/surveys", label: "Rilievi tecnici", icon: FileText, perm: "surveys.view" },
+      { to: "/technical-schedules", label: "Abaci tecnici", icon: FileText, perm: "surveys.view" },
       { to: "/sales-orders", label: "Ordini cliente", icon: FileText, perm: "sales_orders.view" },
       { to: "/suppliers", label: "Fornitori", icon: Buildings, perm: "suppliers.view" },
       { to: "/purchase-orders", label: "Ordini fornitore", icon: FileText, perm: "purchase_orders.view" },

@@ -85,4 +85,18 @@ async def ensure_indexes():
     await db.pricing_mode_configs.create_index([("tenant_id", 1), ("scope", 1), ("product_key", 1), ("scope_ref_id", 1)], name="ix_pricing_mode_scope")
     await db.scrap_stock.create_index([("tenant_id", 1), ("profile_id", 1), ("color_id", 1), ("scrap_status", 1)], name="ix_scrap_prof_col_st")
 
+    # ---------- Workflow M6.WF ----------
+    for coll in ("technical_schedules", "executive_orders", "timeline_events",
+                  "customer_status_mappings", "variances",
+                  "technical_schedule_tokens", "technical_schedule_signatures",
+                  "production_release_overrides"):
+        await db[coll].create_index([("tenant_id", 1), ("created_at", -1)], name=f"ix_{coll}_tenant_created")
+    await db.technical_schedules.create_index([("tenant_id", 1), ("contract_id", 1), ("is_current", 1)], name="ix_ts_contract_current")
+    await db.technical_schedules.create_index([("tenant_id", 1), ("survey_id", 1), ("is_current", 1)], name="ix_ts_survey_current")
+    await db.executive_orders.create_index([("tenant_id", 1), ("technical_schedule_id", 1)], name="ix_eo_ts", unique=False)
+    await db.timeline_events.create_index([("tenant_id", 1), ("contract_id", 1), ("created_at", -1)], name="ix_timeline_contract")
+    await db.timeline_events.create_index([("tenant_id", 1), ("customer_id", 1), ("is_customer_visible", 1), ("created_at", -1)], name="ix_timeline_customer_visible")
+    await db.timeline_events.create_index([("tenant_id", 1), ("dedup_hash", 1)], name="ix_timeline_dedup", unique=True, sparse=True)
+    await db.technical_schedule_tokens.create_index([("token_hash", 1)], name="ix_ts_token_hash", unique=True)
+
     logger.info("MongoDB indexes ensured.")

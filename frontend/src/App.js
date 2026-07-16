@@ -41,6 +41,8 @@ import {
 } from "@/pages/ErpModulePages";
 import ParametricConfiguratorPage from "@/pages/ParametricConfiguratorPage";
 import ParametricAdminPage from "@/pages/ParametricAdminPage";
+import TechnicalSchedulesPage from "@/pages/TechnicalSchedulesPage";
+import PublicSchedulePage from "@/pages/PublicSchedulePage";
 import AppLayout from "@/layouts/AppLayout";
 
 function Protected({ children }) {
@@ -63,6 +65,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/p/:token" element={<PublicQuotePage />} />
+        <Route path="/p/schedule/:token" element={<PublicSchedulePage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
@@ -116,6 +119,7 @@ function App() {
           <Route path="ai-cfo" element={<AICFOPage />} />
           <Route path="parametric" element={<ParametricConfiguratorPage />} />
           <Route path="parametric/admin" element={<ParametricAdminPage />} />
+          <Route path="technical-schedules" element={<TechnicalSchedulesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

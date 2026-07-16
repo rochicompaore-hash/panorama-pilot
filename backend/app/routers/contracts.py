@@ -75,6 +75,26 @@ async def sign_contract(cid: str, body: SignRequest, request: Request, user: dic
                           customer_id=doc.get("customer_id"),
                           user_id=user["id"], user_email=user["email"],
                           meta={"signature_hash": signature_hash})
+    # Hook workflow: crea Survey to_schedule (idempotente) + log timeline
+    try:
+        from app.services.workflow_engine import ensure_survey_from_contract, log_timeline_event
+        # Fetch updated doc (with signed status)
+        updated = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"]})
+        survey_id = await ensure_survey_from_contract(
+            tenant_id=user["tenant_id"], contract=updated, actor_id=user["id"],
+        )
+        await log_timeline_event(
+            tenant_id=user["tenant_id"], domain="contract", event_type="contract.signed",
+            ref_id=cid, contract_id=cid, customer_id=doc.get("customer_id"),
+            quote_id=doc.get("quote_id"), survey_id=survey_id,
+            source="user", actor_id=user["id"], actor_email=user["email"],
+            new_status="signed", is_customer_visible=True,
+            customer_label="Contratto firmato", customer_stage="contract_signed",
+        )
+    except Exception as e:
+        # Non fatale
+        import logging
+        logging.getLogger("infissi.contracts").warning("Post-sign workflow hook failed: %s", e)
     return {"ok": True, "signature_hash": signature_hash}
 
 

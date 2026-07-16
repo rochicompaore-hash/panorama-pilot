@@ -37,6 +37,26 @@ MAX_LEN = 500
 MAX_DEPTH = 20
 MAX_NODES = 200
 
+# Modalità strict per formule parametriche BOM/produzione.
+# In modalità strict, div/0 diventa un errore bloccante.
+# Le regole legacy pricing_v2 non usano strict (mantengono div/0 → 0 per retro-compatibilità).
+from contextvars import ContextVar
+_STRICT: ContextVar[bool] = ContextVar("_STRICT_FORMULA", default=False)
+
+
+class strict_mode:
+    """Context manager per abilitare la modalità strict.
+    Uso:
+        with strict_mode():
+            eval_formula("L / nr_ante", ctx)  # div/0 solleva FormulaError DIV_ZERO
+    """
+    def __enter__(self):
+        self._token = _STRICT.set(True)
+        return self
+
+    def __exit__(self, *a):
+        _STRICT.reset(self._token)
+
 ALLOWED_FUNCTIONS = {
     "min": min,
     "max": max,
@@ -75,7 +95,25 @@ ALLOWED_VARIABLES = {
 
 
 class FormulaError(Exception):
-    pass
+    """Errore bloccante di valutazione formula.
+    Attributi:
+      code: DIV_ZERO | SYNTAX | LIMIT | UNKNOWN_VAR | UNSAFE_NODE | UNSAFE_FN | NON_NUMERIC | INFINITE
+      formula: espressione originale
+      severity: blocking | warning
+    """
+    def __init__(self, message: str, *, code: str = "GENERIC", formula: str = "",
+                 severity: str = "blocking", meta: dict | None = None):
+        super().__init__(message)
+        self.code = code
+        self.formula = formula
+        self.severity = severity
+        self.meta = meta or {}
+
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code, "message": str(self),
+            "formula": self.formula, "severity": self.severity, "meta": self.meta,
+        }
 
 
 def _depth(node: ast.AST, current: int = 0) -> int:
@@ -117,6 +155,11 @@ def _eval(node: ast.AST, ctx: Dict[str, Any]) -> Any:
         if isinstance(node.op, ast.Mult): return left * right
         if isinstance(node.op, ast.Div):
             if right == 0:
+                if _STRICT.get():
+                    raise FormulaError(
+                        "Divisione per zero", code="DIV_ZERO",
+                        meta={"left": str(left), "right": str(right)},
+                    )
                 return Decimal("0")
             return left / right
         raise FormulaError("Operatore non supportato")
@@ -205,26 +248,42 @@ def validate_formula(expr: str) -> tuple[bool, str]:
     return True, ""
 
 
-def eval_formula(expr: str, context: Dict[str, Any]) -> Decimal:
+def eval_formula(expr: str, context: Dict[str, Any], *, strict: bool | None = None) -> Decimal:
     """Evaluate a formula against provided context. Raises FormulaError on invalid input.
     Returns Decimal.
+
+    strict:
+      - None (default): usa ContextVar attivo (default False)
+      - True: DIV_ZERO/INFINITE diventano FormulaError bloccanti
+      - False: DIV_ZERO → 0 (comportamento legacy pricing_v2)
     """
     if not expr or not expr.strip():
-        raise FormulaError("Formula vuota")
+        raise FormulaError("Formula vuota", code="SYNTAX", formula=expr)
     if len(expr) > MAX_LEN:
-        raise FormulaError(f"Formula troppo lunga (>{MAX_LEN} caratteri)")
+        raise FormulaError(f"Formula troppo lunga (>{MAX_LEN} caratteri)", code="LIMIT", formula=expr)
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError as e:
-        raise FormulaError(f"Sintassi non valida: {e.msg}")
+        raise FormulaError(f"Sintassi non valida: {e.msg}", code="SYNTAX", formula=expr)
     _depth(tree)
     if _count_nodes(tree) > MAX_NODES:
-        raise FormulaError(f"Formula troppo complessa (>{MAX_NODES} nodi)")
-    result = _eval(tree, context)
+        raise FormulaError(f"Formula troppo complessa (>{MAX_NODES} nodi)", code="LIMIT", formula=expr)
+    _tok = None
+    if strict is not None:
+        _tok = _STRICT.set(strict)
+    try:
+        result = _eval(tree, context)
+    finally:
+        if _tok is not None:
+            _STRICT.reset(_tok)
     if isinstance(result, bool):
         return Decimal("1") if result else Decimal("0")
     if not isinstance(result, Decimal):
         result = Decimal(str(result))
+    if (strict is True) or (strict is None and _STRICT.get()):
+        if result.is_nan() or result.is_infinite():
+            raise FormulaError("Risultato non finito", code="INFINITE",
+                                formula=expr, meta={"result": str(result)})
     return result
 
 

@@ -17,7 +17,7 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP, ROUND_UP, ROUND_DOWN
 from typing import Dict, Any, List, Optional, Tuple
 
-from app.services.formula import eval_formula, FormulaError, money
+from app.services.formula import eval_formula, FormulaError, money, _STRICT
 from app.services.conditions import evaluate_conditions
 
 
@@ -147,6 +147,7 @@ def resolve_bom(
     resolved: List[Dict[str, Any]] = []
     total_cost = Decimal("0")
     total_price = Decimal("0")
+    blocking_errors: List[Dict[str, Any]] = []
 
     for idx, comp in enumerate(bom_template.get("components") or []):
         # Condizione di applicabilità
@@ -159,43 +160,66 @@ def resolve_bom(
             nr_fissi=nr_fissi,
             ps_tech=tech, extra=params, component_index=idx,
         )
-        try:
-            qty = float(eval_formula(comp.get("quantity_formula") or "1", ctx))
-        except FormulaError as e:
-            warnings.append(f"[{comp.get('role') or comp.get('component_type')}] quantity_formula: {e}")
+
+        def _f(field: str, expr: str | None, *, required: bool = False):
+            """Evaluate a formula and record blocking error on failure."""
+            if not expr:
+                return None
+            try:
+                return float(eval_formula(expr, ctx, strict=True))
+            except FormulaError as e:
+                err = {
+                    "code": e.code,
+                    "message": str(e),
+                    "formula": expr,
+                    "component_id": comp.get("id"),
+                    "component_type": comp.get("component_type"),
+                    "role": comp.get("role") or comp.get("component_type"),
+                    "field": field,
+                    "severity": "blocking",
+                    "suggested_action": (
+                        "Verifica il valore di 'nr_ante' o del divisore nella formula" if e.code == "DIV_ZERO"
+                        else "Verifica formula e variabili disponibili" if e.code in ("SYNTAX", "UNKNOWN_VAR")
+                        else "Verifica limiti dimensionali/complessità" if e.code == "LIMIT"
+                        else "Contatta l'amministratore del preventivatore"
+                    ),
+                }
+                blocking_errors.append(err)
+                return None
+
+        qty = _f("quantity_formula", comp.get("quantity_formula") or "1")
+        if qty is None:
             continue
-        length_mm: Optional[float] = None
-        area_sqm: Optional[float] = None
-        weight_kg: Optional[float] = None
-        width_c: Optional[float] = None
-        height_c: Optional[float] = None
-        if comp.get("length_formula"):
-            try:
-                length_mm = float(eval_formula(comp["length_formula"], ctx))
-            except FormulaError as e:
-                warnings.append(f"[{comp.get('role')}] length_formula: {e}")
-        if comp.get("width_formula"):
-            try:
-                width_c = float(eval_formula(comp["width_formula"], ctx))
-            except FormulaError as e:
-                warnings.append(f"[{comp.get('role')}] width_formula: {e}")
-        if comp.get("height_formula"):
-            try:
-                height_c = float(eval_formula(comp["height_formula"], ctx))
-            except FormulaError as e:
-                warnings.append(f"[{comp.get('role')}] height_formula: {e}")
-        if comp.get("area_formula"):
-            try:
-                area_sqm = float(eval_formula(comp["area_formula"], ctx))
-            except FormulaError as e:
-                warnings.append(f"[{comp.get('role')}] area_formula: {e}")
-        elif width_c and height_c:
+        length_mm: Optional[float] = _f("length_formula", comp.get("length_formula"))
+        width_c: Optional[float] = _f("width_formula", comp.get("width_formula"))
+        height_c: Optional[float] = _f("height_formula", comp.get("height_formula"))
+        area_sqm: Optional[float] = _f("area_formula", comp.get("area_formula"))
+        if area_sqm is None and width_c and height_c:
             area_sqm = (width_c / 1000.0) * (height_c / 1000.0)
-        if comp.get("weight_formula"):
-            try:
-                weight_kg = float(eval_formula(comp["weight_formula"], ctx))
-            except FormulaError as e:
-                warnings.append(f"[{comp.get('role')}] weight_formula: {e}")
+        weight_kg: Optional[float] = _f("weight_formula", comp.get("weight_formula"))
+
+        # Se qualche formula rilevante del componente ha errore bloccante → salta il componente
+        comp_had_error = any(e.get("component_id") == comp.get("id") for e in blocking_errors)
+        if comp_had_error:
+            continue
+
+        # Verifica limite tecnico: taglio > barra utile
+        _bar_len = float(tech.get("bar_length_mm", 6500))
+        _head = float(tech.get("bar_head_offcut_mm", 50))
+        _tail = float(tech.get("bar_tail_offcut_mm", 50))
+        _usable = _bar_len - _head - _tail
+        if length_mm and length_mm > _usable and comp.get("is_cutting_relevant", True):
+            blocking_errors.append({
+                "code": "CUT_TOO_LONG",
+                "message": f"Taglio {length_mm:.0f}mm > barra utile {_usable:.0f}mm",
+                "formula": comp.get("length_formula"),
+                "component_id": comp.get("id"),
+                "role": comp.get("role"),
+                "field": "length_formula",
+                "severity": "blocking",
+                "suggested_action": "Aumenta bar_length_mm nel sistema profilo, oppure verifica dimensioni foro",
+            })
+            continue
 
         # Scarto tecnico waste_pct e minimo
         waste_pct = float(comp.get("waste_pct") or 0)
@@ -266,6 +290,7 @@ def resolve_bom(
         "materials_cost": float(money(total_cost)),
         "materials_price": float(money(total_price)),
         "warnings": warnings,
+        "blocking_errors": blocking_errors,
     }
 
 

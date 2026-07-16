@@ -43,12 +43,14 @@ class SurveyCreate(BaseModel):
 
 @router.get("")
 async def list_surveys(q: Optional[str] = None, customer_id: Optional[str] = None,
+                       contract_id: Optional[str] = None, quote_id: Optional[str] = None,
                        survey_status: Optional[str] = None, technician_id: Optional[str] = None,
                        skip: int = 0, limit: int = Query(50, le=200),
                        user: dict = Depends(require_permission("surveys.view"))):
     return await list_docs(
         collection="surveys", tenant_id=user["tenant_id"],
-        filters={"customer_id": customer_id, "survey_status": survey_status, "technician_id": technician_id},
+        filters={"customer_id": customer_id, "contract_id": contract_id, "quote_id": quote_id,
+                 "survey_status": survey_status, "technician_id": technician_id},
         search_fields=["number"], q=q,
         sort=[("scheduled_at", -1), ("created_at", -1)], skip=skip, limit=limit,
     )

@@ -428,14 +428,17 @@ async def validate_formula_endpoint(payload: dict, user: dict = Depends(get_curr
 
 @router.post("/formula/test")
 async def test_formula_endpoint(payload: dict, user: dict = Depends(get_current_user)):
-    """Testa una formula contro un contesto sample."""
+    """Testa una formula contro un contesto sample.
+    Passa `strict=true` nel payload per abilitare DIV_ZERO/INFINITE bloccanti (BOM engine)."""
     expr = payload.get("formula") or ""
     ctx = payload.get("context") or {"L": 1200, "H": 1400, "nr_ante": 2, "kerf": 3}
+    strict = bool(payload.get("strict", False))
     try:
-        result = eval_formula(expr, ctx)
+        result = eval_formula(expr, ctx, strict=strict)
         return {"ok": True, "result": float(result)}
     except FormulaError as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": str(e), "code": e.code,
+                "severity": e.severity, "meta": e.meta}
 
 
 # ---------------------------------------------------------------------

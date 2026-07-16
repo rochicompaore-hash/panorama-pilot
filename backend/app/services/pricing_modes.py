@@ -221,6 +221,9 @@ async def compute_parametric_preview(
             lookup_price=sell_lookup, lookup_cost=cost_lookup,
         )
         warnings.extend(bom_result.get("warnings") or [])
+        # Propaga errori bloccanti del BOM
+        for be in (bom_result.get("blocking_errors") or []):
+            errors.append(f"[{be.get('code')}] {be.get('role') or ''} · {be.get('message')}")
 
     unit_price = 0.0
     unit_cost = 0.0
@@ -412,6 +415,7 @@ async def compute_parametric_preview(
         "perimeter_m": round(((width_mm + height_mm) * 2) / 1000.0, 3),
         **output,
         "bom_resolved": (bom_result or {}).get("components") or [],
+        "bom_blocking_errors": (bom_result or {}).get("blocking_errors") or [],
         "cutting_preview": cutting_preview,
         "price_breakdown": breakdown,
         "svg": svg,
