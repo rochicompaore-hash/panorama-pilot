@@ -298,9 +298,17 @@ async def public_get_quote(token: str, request: Request, response: Response):
 
     # Determine expired / superseded
     is_expired = False
-    if snap_q.get("valid_until"):
+    vu_raw = snap_q.get("valid_until")
+    if vu_raw:
         try:
-            vu = datetime.fromisoformat(snap_q["valid_until"].replace("Z", "+00:00")) if isinstance(snap_q["valid_until"], str) else snap_q["valid_until"]
+            if isinstance(vu_raw, str):
+                s = vu_raw.replace("Z", "+00:00")
+                vu = datetime.fromisoformat(s)
+            else:
+                vu = vu_raw
+            # Normalize to timezone-aware (assume UTC if naive)
+            if vu.tzinfo is None:
+                vu = vu.replace(tzinfo=timezone.utc)
             is_expired = vu < datetime.now(timezone.utc)
         except Exception:
             pass

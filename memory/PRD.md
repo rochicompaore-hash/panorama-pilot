@@ -122,3 +122,90 @@ PDF 4 pagine, header ripetuto "Infissi Express · Preventivo PREV-2026-01383-R00
 - M3.3.6 Conversione contratto idempotente con snapshot completo
 - P1: Badge risparmio, KPI dashboard preventivi
 - P2: Import Excel listini
+
+## Iteration 8-9 (2026-02) — M3.3.3 Link pubblico + Object Storage
+
+### Storage migration (Emergent Object Storage)
+- Nuovo servizio `services/object_storage.py`: init lazy con `EMERGENT_LLM_KEY`, retry+backoff, path deterministica `infissi-express/tenants/{tid}/quotes/{qid}/{revision}/{pdf_id}.pdf`.
+- `pdf_router._generate_pdf` scrive su Emergent storage (nuovi PDF) con fallback base64 in caso di storage_unavailable.
+- `_fetch_pdf_bytes` legge da storage prima, fallback base64 per PDF pre-migrazione.
+- Documento MongoDB `quote_pdfs` conserva `storage_provider`, `storage_key`, `pdf_base64=None` per i nuovi.
+
+### Modello token pubblico (`QuotePublicToken`)
+Campi: `id, tenant_id, quote_id, quote_number, quote_revision, quote_pdf_id, snapshot_hash, token_hash (sha256), status (active|expired|revoked|invalidated|consumed|blocked), expires_at, revoked_at/by/reason, last_access_at, access_count, maximum_accesses, requires_otp, allowed_actions, invalidated_by_revision_id, metadata, version`.
+
+Il raw token (43 char URL-safe, 256 bit entropia da `secrets.token_urlsafe(32)`) viene restituito **una sola volta** al momento della creazione. In DB solo `token_hash` (sha256). Nessun UUID interno usato come credenziale.
+
+### Sessione pubblica
+Non JWT internal reuse. Ogni request al portale è stateless: il token risolve tenant + quote + pdf; il rate limiter è per (IP, token_prefix). Non c'è sessione persistente.
+
+### Strategia hashing
+- Token → `hashlib.sha256(raw).hexdigest()` (deterministico, 64 char hex)
+- IP → `sha256("iph:"+ip)[:16]` per logs (pseudonimizzazione)
+- Nessun HMAC secret (il token stesso è random 256 bit, hash-only per look-up rapido con index B-tree)
+
+### Endpoint pubblici (no auth)
+- `GET /api/public/quotes/{token}` → DTO PublicQuoteResponse (nessun ID interno, no cost/margin)
+- `GET /api/public/quotes/{token}/pdf` → stream con security headers
+
+### Endpoint admin (tenant-scoped)
+- `GET /api/quotes/{qid}/public-links` (mai token_hash o raw esposti)
+- `POST /api/quotes/{qid}/public-links` (idempotente, guard: PDF definitivo esistente, quote current, non cancelled)
+- `POST /api/quotes/{qid}/public-links/{tid}/revoke` (motivazione obbligatoria)
+- `POST /api/quotes/{qid}/public-links/regenerate`
+- `GET /api/quotes/{qid}/public-access-logs`
+
+### Security headers portale pubblico
+- `Cache-Control: private, no-store`
+- `X-Content-Type-Options: nosniff`
+- `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet`
+- `Referrer-Policy: no-referrer`
+- `X-Frame-Options: SAMEORIGIN`
+- Frontend `<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">`
+
+### Rate limiting
+Token bucket in-memory `(IP, token_prefix)` → 30 req/min → 429. Nessun blocco permanente. Da migrare a Redis in produzione multi-nodo.
+
+### Automatic invalidation
+Su `POST /quotes/{id}/revise` chiamato `invalidate_tokens_for_previous_revisions` → tutti i token attivi delle revisioni precedenti passano a `status=invalidated`, `revocation_reason=superseded_by_new_revision`.
+
+### Idempotenza
+- Create link: se esiste token attivo per (quote, pdf, snapshot_hash) → torna `{idempotent_hit:true, raw_token:null}`.
+- Il doppio click NON crea due token validi.
+- `Rigenera link` esplicito revoca il precedente + crea nuovo.
+
+### Isolamento tenant
+- Nessun `tenant_id` accettato dal client pubblico.
+- Risoluzione da `token_hash` → `tenant_id` interno.
+- Cross-tenant test: token di A non può accedere a PDF di B (verificato).
+
+### Compatibilità futura (M3.3.4-5)
+`allowed_actions` supporta già: `view, download, request_changes, reject, accept, sign`. Attualmente attivi solo `view, download`.
+
+### Access log tenant-scoped
+Collection `public_access_log`, append-only, campi: `token_id, quote_id, revision, event, result, reason, ip_hash, user_agent, created_at, tenant_id`.
+Eventi implementati: `link_opened, quote_viewed, pdf_opened, pdf_downloaded, token_expired, token_revoked, token_invalid, rate_limited`.
+**Nessun raw token nei log** — solo `token_id` (UUID del record).
+
+### Portale frontend (`/p/:token`)
+- Isolato da app layout (nessun sidebar/menu interno)
+- Mobile-responsive
+- Alert espliciti: `Revisione superata` / `Preventivo scaduto`
+- Download PDF + Apri PDF full-page
+- Info commerciale + telefono/email
+- Errori generici (`404 Link non disponibile`, `410 Documento non disponibile`, `429 Accessi eccessivi`) senza rivelare esistenza risorse
+
+### Permessi nuovi
+`quotes.public_link.create/view/revoke/regenerate/configure`, `quotes.public_access_logs.view`.
+
+### Test coverage
+- iteration_8: 17/18 backend PASS, frontend 100%. Bug HIGH rilevato (500 su valid_until datetime).
+- iteration_9: fix HIGH validato (200 con is_expired computato), fix clipboard graceful validato, secondo minor `is_expired` naive datetime rilevato.
+- Post-fix manuale: `is_expired: True` corretto per date passate anche naive.
+
+### Backlog M3.3.4-6 (prossime milestone)
+- **M3.3.4** Firma FES: canvas signature + hash chain (`quote_pdf_id + snapshot_hash + revision + firmatario_name + accepted_terms_version + timestamp + IP + user_agent + token_id`), PDF firmato archiviato in storage
+- **M3.3.5** Azioni portale cliente: `POST /public/quotes/{token}/accept-sign|request-changes|reject` con motivazione configurabile (7 opzioni preset)
+- **M3.3.6** Conversione contratto idempotente con snapshot + numerazione autonoma CTR-2026-
+- **P1** Badge risparmio · KPI dashboard preventivi
+- **M3.3.3.1** (nice-to-have) OTP email predisposto in `requires_otp` — provider mock, endpoint stub `POST /public/quotes/{token}/otp/request|verify`
