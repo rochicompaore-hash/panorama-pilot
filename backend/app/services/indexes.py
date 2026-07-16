@@ -99,4 +99,22 @@ async def ensure_indexes():
     await db.timeline_events.create_index([("tenant_id", 1), ("dedup_hash", 1)], name="ix_timeline_dedup", unique=True, sparse=True)
     await db.technical_schedule_tokens.create_index([("token_hash", 1)], name="ix_ts_token_hash", unique=True)
 
+    # ---------- M6.OPS ----------
+    for coll in ("operational_area_configs", "user_groups", "assignment_rules",
+                  "operational_handoffs", "commission_plans", "commission_entries",
+                  "commission_adjustments", "commission_invoices",
+                  "lead_webhook_configs", "lead_webhook_ingestions",
+                  "communication_channels", "conversations", "messages",
+                  "message_templates", "email_automations", "consents"):
+        await db[coll].create_index([("tenant_id", 1), ("created_at", -1)], name=f"ix_{coll}_tenant_created")
+    await db.operational_handoffs.create_index([("tenant_id", 1), ("assigned_user_ids", 1), ("handoff_status", 1)], name="ix_handoff_user_status")
+    await db.operational_handoffs.create_index([("tenant_id", 1), ("idempotency_key", 1)], name="ix_handoff_idem", sparse=True, unique=True)
+    await db.commission_entries.create_index([("tenant_id", 1), ("sales_rep_id", 1), ("entry_status", 1)], name="ix_comm_rep_status")
+    await db.commission_entries.create_index([("tenant_id", 1), ("contract_id", 1)], name="ix_comm_contract")
+    await db.lead_webhook_configs.create_index([("slug", 1)], name="ix_lead_wc_slug", unique=True, sparse=True)
+    await db.leads.create_index([("tenant_id", 1), ("dedup_key", 1)], name="ix_leads_dedup", sparse=True)
+    await db.notifications.create_index([("tenant_id", 1), ("dedup_hash", 1)], name="ix_notif_dedup", unique=True, sparse=True)
+    await db.consents.create_index([("tenant_id", 1), ("customer_id", 1), ("kind", 1)], name="ix_consents_customer_kind")
+    await db.conversations.create_index([("tenant_id", 1), ("channel_kind", 1), ("conv_status", 1)], name="ix_conv_status")
+
     logger.info("MongoDB indexes ensured.")

@@ -1,0 +1,60 @@
+{
+  "summary": "M6.OPS backend tests — 24 passed, 1 skipped (dipendenza dati), 1 xfailed (bug DB index). Coperti: handoff CRUD+idempotency+ack+overdue scan, user-groups CRUD+patch, assignment-rules create, dashboards company/team/my con KPI numerici+benchmark 30%, commission engine tiers (Fascia 1 pending 8%, Fascia 2 5% @12%, Fascia 3 10% @18%, Fascia 3 con MD -> 5% @18%, tier None se profitability=null), commission estimate su contratto firmato reale (completeness=missing gestito), lead webhook config create + verifica duplicate slug, Meta hub.challenge/verify_token (200 corretto + 403 su wrong token), public webhook receive crea lead+2 consent+handoff auto in lead_generation, dedup su phone+email (duplicate=true, stesso lead_id), template email create + variabili {{name}} sostituite in body, consents create+list+revoke con revoked_at, notification dedup via idempotency handoff, tutti gli endpoint /api/ops/* richiedono JWT (401 senza auth). Tenant isolation e RBAC sales_rep saltati come da nota review (nessun secondo tenant admin, ruolo sales_rep non presente in PREDEFINED_ROLES — è 'commerciale').",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "startup — ensure_indexes()",
+        "issue": "IndexOptionsConflict su db.roles ('tenant_id_1_name_1' pre-esistente con nome diverso) causa RAISE prematuro dentro try/except in seed.py:254. Conseguenza: TUTTI gli indici successivi (incluso ix_lead_wc_slug UNIQUE su lead_webhook_configs.slug, ix_notif_dedup UNIQUE su notifications.dedup_hash, ix_timeline_dedup UNIQUE) NON vengono creati. Duplicati già presenti in DB confermano la mancanza dell'indice."
+      },
+      {
+        "endpoint": "POST /api/ops/lead-webhooks",
+        "issue": "Nessuna pre-check applicativa su unicità slug — se l'indice UNIQUE non è enforced (vedi sopra), è possibile creare 2 config con lo stesso slug. Endpoint restituisce 200 anche al duplicato. Aggiungere find_one({slug}) prima di insert o wrap con IntegrityError."
+      },
+      {
+        "endpoint": "ops_workflow.list_entries / dashboard_team",
+        "issue": "Il codice usa user.get('_perms') per determinare can_view_team/is_admin, ma get_current_user NON popola mai '_perms' — resta sempre None. Per admin (is_superadmin=True) funziona correttamente via is_admin. Per utenti non-admin con permesso 'commission.view_team' assegnato via role_ids, il check '_perms' lo mancherebbe. Refactor: chiamare get_permission_keys_for_user(user) o iniettare _perms in get_current_user."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_ops_m6.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/iteration_14_ops.xml"
+  ],
+  "action_items": [
+    "FIX PRIORITARIO: risolvere IndexOptionsConflict in ensure_indexes() — o rinominare index esistente 'tenant_id_1_name_1' su db.roles a 'ix_roles_tenant_name' (dropIndex + createIndex), oppure wrappare ogni create_index in try/except individuale (idempotenza vera). Attualmente ~5 unique index critici (slug, dedup_hash) non vengono creati.",
+    "Aggiungere pre-check applicativa slug in POST /api/ops/lead-webhooks (find_one prima di insert) OPPURE aggiungere validation E11000 catch che ritorni 409.",
+    "Popolare user['_perms'] dentro get_current_user (chiamata a get_permission_keys_for_user) — attualmente la logica RBAC di dashboard_team/list_entries si affida a un campo non popolato. Per admin funziona via is_superadmin, ma per utenti con 'commission.view_team' via ruolo custom il check fallirebbe.",
+    "OPZIONALE: creare un ruolo 'sales_rep' dedicato con set minimo di permessi (dashboard.view + commission.view_own) per abilitare test RBAC deterministico su /api/ops/dashboard/sales-team (403), /api/ops/profitability/{id} (403), /api/ops/dashboard/my (200), /api/ops/commissions/entries?scope=own (200). Attualmente PREDEFINED_ROLES ha 'commerciale' che è più ampio.",
+    "OPZIONALE: aggiungere endpoint di seeding di conversation demo per abilitare il test inbox_send end-to-end (attualmente skippato — verifica sostituzione variabili {{name}} non eseguibile senza conversazione preesistente)."
+  ],
+  "critical_code_review_comments": [
+    "GOOD: services/handoff_engine.py::create_handoff — idempotency su idempotency_key robusto (find_one prima di insert). resolve_assignment: match_provinces, match_zip_prefixes, match_source, priorità sortata — logica corretta.",
+    "GOOD: services/handoff_engine.py::notifications dedup via SHA256(handoff:{ho_id}:in_app:{uid}) — corretto e granulare. Combinato con indice UNIQUE su notifications.dedup_hash previene duplicati (SE l'indice viene creato, vedi bug ensure_indexes).",
+    "GOOD: services/commission_engine.py::compute_commission — logica tier match matematicamente corretta: Fascia 1 <10% pending, Fascia 2 [10,15] 5%, Fascia 3 (15,inf) 10%. Major discount override a 5% con warning IT. entry_status='pending_configuration' se flat_fee non definito.",
+    "GOOD: services/commission_engine.py::_detect_major_discount ispeziona sia line-level che header discount_classification.kind ∈ {major,exceptional} o affects_commission=True — pattern strutturato non stringy.",
+    "GOOD: routers/ops_workflow.py::verify_webhook — supporta hub.challenge come int se numerico, altrimenti stringa; verify_token confrontato con eq (potrebbe migliorare a hmac.compare_digest per timing-safety).",
+    "GOOD: routers/ops_workflow.py::receive_lead_webhook — pipeline pulita: signature verify → JSON parse → field mapping → dedup_key = sha256(tenant|source|phone|email|social) → check existing → create/update+consents+handoff+timeline+ingestion audit. Corrisponde esattamente alla review.",
+    "MINOR: routers/ops_workflow.py::_dedup_lead_key — usa first 32 chars di SHA256 (128-bit truncate). Sufficiente per il volume atteso ma documentare la scelta.",
+    "MINOR: routers/ops_workflow.py::send_message — template rendering supporta sia {{ var }} (con spazi) che {{var}} (senza spazi). Buono, ma senza whitespace-strip di variazioni intermedie ({{  var  }}). Sufficiente per il seed.",
+    "MINOR: routers/ops_workflow.py::verify_webhook signature comparison usa hmac.compare_digest ma solo se signature_algorithm=='hmac_sha256' e c'è secret_key_hash. Il verify_token è confrontato con == diretto — timing attack teoricamente possibile. Preferire hmac.compare_digest.",
+    "MINOR: services/commission_engine.py::compute_profitability — approssima labor_cost come 0 se non definito e installation/transport da snap. Se snap.subtotal=0 profitability=None (buono, evita div/0). Il completeness='missing' se >2 categorie assenti (materiali/manodopera/posa) — coerente con la review.",
+    "MINOR: models_commissions.py — DEFAULT_TIERS Fascia 3 usa min_exclusive=True (p > 15%). Coerente con testo review '>15%'. Fascia 2 include 10 e 15 (inclusive). Fascia 1 usa max_exclusive=True (p < 10%). Corretto.",
+    "BUG (già segnalato): startup ensure_indexes silenziosamente NON crea 4-5 indici critici a causa del raise da IndexOptionsConflict su db.roles. Impatto: unicità slug/dedup_hash/timeline non enforced. Duplicati già presenti in DB confermano assenza indice.",
+    "BUG (già segnalato): user['_perms'] usato in ops_workflow.py::list_entries e ::dashboard_team ma mai popolato da get_current_user. Funziona per admin ma NON per utenti con permessi granulari via role_ids custom."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_ops_m6.py (NUOVO — 26 test)",
+    "/app/backend/tests/conftest.py (NUOVO — carica backend/.env e frontend/.env per pytest)"
+  ],
+  "success_rate": {"backend": "96% (24 passed / 1 xfailed known-bug / 1 skipped data-dep)", "frontend": "n/a (backend-only)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin)",
+  "seed_data_creation": "Test creano dinamicamente: user_groups TEST_GRP_*, assignment_rules 'TEST Rule MI/MB', lead_webhook_configs slug 'test-wh-*', leads TEST via webhook receive, consents, templates TEST_TPL_*, handoffs con idempotency_key 'test-*'. Tutti i dati sono taggabili tramite prefisso TEST_ o pattern 'test-'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test suite in /app/backend/tests/test_ops_m6.py (26 test, ~3.6s con xdist). Copre M6.OPS della review §386. 24 pass, 1 skip (test_inbox_send necessita conversation seed), 1 xfail (test_a_create_config_unique_slug documenta BUG DB index). Il ruolo 'sales_rep' menzionato nella review §24 NON esiste in PREDEFINED_ROLES (esiste 'commerciale' con permessi più ampi) — test RBAC granulare saltato. Tenant isolation non testabile senza secondo tenant admin. Il bug ensure_indexes() è la RCA più importante: fix probabile in services/indexes.py wrappando ogni create_index in try/except o rinominando index roles esistente.",
+  "rca of the issue": "BUG PRINCIPALE (minore ma sistemico): ensure_indexes() in /app/backend/app/services/indexes.py fallisce sulla PRIMA create_index in conflitto (db.roles 'tenant_id_1_name_1' già esistente con nome/opzioni diverse — IndexOptionsConflict code 85) e propaga l'eccezione UP. Il seed.py:254 wrappa TUTTA la chiamata in un unico try/except (non granulare per indice), quindi TUTTI gli indici successivi (~30+) NON vengono creati. Impatto verificato: mongo db.lead_webhook_configs.index_information() mostra SOLO _id_. Tentativo di ricreazione manuale fallisce con DuplicateKeyError perché duplicati sono già presenti (letteralmente evidenza che il codice permette dupes da tempo). Mitigazione: (a) drop e recreate index roles con nome corretto, poi (b) refattorizzare ensure_indexes() con try/except per-indice, oppure (c) sostituire con motor.create_indexes batch API con IndexOptionsConflict handling."
+}

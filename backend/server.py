@@ -68,6 +68,7 @@ from app.routers.bi import router as bi_router
 from app.routers.ai_cfo import router as ai_cfo_router
 from app.routers.parametric import router as parametric_router
 from app.routers.workflow import router as workflow_router, public_router as workflow_public_router, customer_router as customer_portal_router
+from app.routers.ops_workflow import router as ops_workflow_router, public_leads_router as public_leads_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -159,6 +160,8 @@ api.include_router(parametric_router)
 api.include_router(workflow_router)
 api.include_router(workflow_public_router)
 api.include_router(customer_portal_router)
+api.include_router(ops_workflow_router)
+api.include_router(public_leads_router)
 
 app.include_router(api)
 

@@ -210,6 +210,21 @@ PERMISSION_CATALOG = [
     ("production.override_release", "Produzione", "approve", "Override manuale release produzione"),
     ("customer_portal.manage_tracking", "Portale cliente", "edit", "Gestisce dati tracking cliente"),
     ("customer_portal.manage_visibility", "Portale cliente", "edit", "Gestisce mapping stato cliente"),
+    # M6.OPS — handoff, commissioni, redditività, lead intake, inbox
+    ("dashboard.view", "Dashboard", "view", "Visualizza dashboard aziendale"),
+    ("profitability.view", "Redditività", "view_financials", "Visualizza redditività commesse"),
+    ("profitability.view_breakdown", "Redditività", "view_financials", "Visualizza breakdown costi per redditività"),
+    ("profitability.configure", "Redditività", "edit", "Configura formula/soglie redditività"),
+    ("profitability.override", "Redditività", "approve", "Override soglie redditività"),
+    ("commission.view_own", "Commissioni", "view", "Visualizza proprie commissioni"),
+    ("commission.view_team", "Commissioni", "view", "Visualizza commissioni del team"),
+    ("commission.manage", "Commissioni", "edit", "Gestisce piani/regole commissionali"),
+    ("commission.approve", "Commissioni", "approve", "Approva/rifiuta fatture commissioni"),
+    ("commission.invoice", "Commissioni", "edit", "Carica fatture commissioni proprie"),
+    ("commission.pay", "Commissioni", "approve", "Registra pagamento fatture commissioni"),
+    ("handoff.view", "Passaggi", "view", "Visualizza pratiche in passaggio"),
+    ("handoff.reassign", "Passaggi", "edit", "Riassegna handoff con motivazione"),
+    ("leads.webhook.manage", "Lead Intake", "edit", "Gestisce configurazioni webhook lead"),
 ]
 
 # Predefined roles with permissions

@@ -288,6 +288,7 @@ class TimelineEvent(BaseDoc):
         "lead", "quote", "contract", "survey", "technical_schedule",
         "executive_order", "purchase_order", "production", "quality_control",
         "logistics", "installation", "final_check", "payment", "service", "warranty",
+        "handoff", "commission",
     ]
     event_type: str                 # es. "quote.sent", "contract.signed", "abaco.signed"
     ref_id: Optional[str] = None    # id dell'entità di dominio
