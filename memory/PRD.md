@@ -246,3 +246,44 @@ Chiama il tool "Deploy" dall'interfaccia Emergent per pubblicare. deployment_age
 3. Disabilitare `OTP_DEBUG_ENABLED` (o rimuoverlo) in prod
 4. Scegliere e configurare provider firma esterno (Namirial/InfoCert/Aruba) se serve FEA/FEQ
 5. Definire policy retention PDF contratti (attualmente illimitata)
+
+## 2026-02 — Fase 3: Chiusura, Deployment Check e Smoke Test (COMPLETATA)
+
+**Scope**: NESSUNA feature nuova. Verifica reale delle dichiarazioni + hardening produzione + deploy check + smoke test URL pubblico.
+
+### Hardening applicato
+- `OTP_DEBUG_ENABLED` auto-forzato `false` se `APP_ENV in (staging, production)` — override sicuro.
+- Email `delivery_status='configuration_required'` quando `EMAIL_PROVIDER=mock` in prod (invece del generico `mocked_dev`).
+- Endpoint `GET /api/config/production-status` per introspezione config senza segreti (email, storage, otp, providers, features, cors).
+- `.gitignore` con esclusione `/app/storage/` per file uploaded.
+- 4 valori `.env` quotati (deployment agent warning risolto).
+
+### Deployment agent — status: PASS
+- Nessun segreto hardcodato in codice
+- CORS/URL/ports corretti
+- Supervisor OK
+- Nessun blocker
+
+### Smoke test URL pubblico (https://serramento-ops.preview.emergentagent.com)
+11/11 PASS:
+1. `/api/health` → 200
+2. `/api/customers` list → 200
+3. `/api/quotes` list → 200
+4. `/api/leads` list → 200
+5. `/api/pricing-hub/bom-recipes` → **20 ricette**
+6. `/api/geometry/templates` → **6 template**
+7. `/api/geometry/compute` finestra 2 ante → **materials_price 206.42€, nr_ante=2, SVG generato, snapshot_hash SHA-256**
+8. `/api/importer/schema/profile` → 200
+9. `/api/contracts` list → **28 contratti**
+10. `/api/contracts/{id}/pdf/preview` → **HTTP 200, %PDF-1.7 valid, 24KB reale**
+11. `/api/contracts/config/signature-providers` → `internal_canvas` level `electronic_simple`
+
+### Screenshot verificati (playwright)
+- `/geometry-builder` — editor visuale SVG interattivo funzionante con toolbar completa
+- `/contracts/{id}` — CON-2026-00024 stato signed con **20 versioni PDF archiviate** con hash SHA-256 (immutabilità confermata)
+
+### Test totali cumulativi (Fase 1 + 2 + 3)
+- iteration_19: Blocco A BOM avanzato — 22/23 pass (poi 23/23 post-fix)
+- iteration_20: Blocco B+C+D+Contract — 23/23 (post-fix)
+- iteration_21: Fase 2 revisioni prod — 18/18 backend + 10/10 frontend
+- Smoke test finale URL live — 11/11 PASS
