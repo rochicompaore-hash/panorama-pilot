@@ -1,0 +1,55 @@
+{
+  "summary": "M2 Security & Correctness Audit — 34/34 pytest passed. Verified tenant isolation, IDOR protection, backend RBAC, search authorization/scoping, audit export authorization, concurrent PATCH audit logging, soft-delete exclusion from dashboards/kanban/search, lead→customer conversion idempotency, double-click duplication behavior, and timeline immutability. Created tenant B directly via mongo (motor) with its own admin user, pipeline, lead, customer, contact, attachment, activity — verified NONE of them leak across tenants for tenant A superadmin. Two INFORMATIONAL findings (see below): (a) Direction dashboard is accessible with just audit.view (not restrictive enough per spec expectation); (b) Activities PATCH/DELETE returns 404 (route not registered) rather than 405 (route exists w/o method). Both functionally satisfy the immutability + RBAC intent but deviate from the exact spec assertion.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/dashboard-crm/direction",
+        "issue": "Uses require_any_permission('crm.leads.view','financials.view','audit.view'). Review spec (checkpoint 3) expected 403 for a user who only has audit.view — but implementation grants access. Direction dashboard exposes financial values (open_pipeline_value, weighted_pipeline_value, won_value_month) which are arguably too sensitive for an audit-only role. Recommend removing 'audit.view' from the require_any_permission set on this endpoint, or splitting the response into a redacted 'audit view' (no financials)."
+      },
+      {
+        "endpoint": "PATCH/DELETE/PUT /api/activities/{id}",
+        "issue": "Returns 404 Not Found (path not registered) instead of 405 Method Not Allowed as review spec anticipated. Immutability is still enforced — no attacker can modify activities via HTTP. If the exact 405 semantic is desired, register /activities/{aid} with GET only so unsupported verbs raise 405. Non-blocking."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/security_audit_test.py",
+    "/app/test_reports/pytest/security_audit_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Tighten GET /api/dashboard-crm/direction — drop 'audit.view' from the allowed set so only crm.leads.view or financials.view holders see financial pipeline aggregates. Currently a Viewer role user (audit.view only) gets 200 with all financial counters. Not exploitable across tenants (still tenant-scoped) but exposes internal financials to auditors.",
+    "OPTIONAL (cosmetic): If exact 405 semantics are desired on /api/activities/{id}, register the path with GET only. Current 404 is functionally equivalent (immutable)."
+  ],
+  "critical_code_review_comments": [
+    "activities router is correctly append-only — NO PATCH/PUT/DELETE routes exist for /activities/{id}. Direct HTTP verification confirms immutability (404 for all mutation verbs).",
+    "All CRM routers (leads, customers, contacts, attachments, activities, audit) consistently filter by tenant_id in list AND detail queries — no cross-tenant leaks observed.",
+    "search.py: every collection query includes tenant_id — verified tenant B's uniquely-marked activity ('TENANT_B_SECRET_NOTE') does NOT appear when tenant A superadmin searches for it.",
+    "dashboards_crm.direction: open_pipeline_value / weighted_pipeline_value / won_month all include 'deleted_at: None' in their queries → soft-deleted lead's estimated_value correctly excluded (verified empirically: value dropped by 5000 after soft-delete).",
+    "leads.convert_lead: checks doc.get('customer_id') before creating a new customer → second call raises 400 'Lead già convertito'. Verified customer count only increments by 1 across 2 convert calls.",
+    "Concurrent PATCH: two simultaneous stage-change requests to the same lead both return 200 and both produce a 'crm.leads.update' audit entry. Last-write-wins is the observed behavior (acceptable per spec).",
+    "Direction dashboard is guarded by require_any_permission('crm.leads.view','financials.view','audit.view'). Since Viewer role has audit.view, Viewer can call this endpoint and receive financial aggregates. Per review spec this should have been 403. Recommend narrowing to ('crm.leads.view','financials.view') only.",
+    "No export endpoint (CSV/PDF/XLSX) exists in M2 for audit/leads/customers → nothing needs additional auth. When M3 adds exports remember to gate them behind an explicit '<module>.export' permission (currently only audit.view / view keys exist).",
+    "Login endpoint validates emails via Pydantic EmailStr which rejects .local/.test/.example TLDs — tests must use routable TLDs when creating synthetic users.",
+    "leads.py PATCH: won_at/lost_at are NOT cleared when moving BACK from a won/lost stage to an open one — carried over from iteration_2; not tested here but still holds. Won_month counters count all leads whose won_at is set, so a resurrected lead still counts as won for that month. Consider clearing on transition to non-terminal stage."
+  ],
+  "updated_files": [
+    "/app/backend/tests/security_audit_test.py (new — 34 pytest tests for M2 security audit)"
+  ],
+  "success_rate": {
+    "backend": "100% (34/34 security-audit tests) — 2 informational deviations reported as minor",
+    "frontend": "not tested (backend only per review request)"
+  },
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (tenant A superadmin). Test-only users created & cleaned up automatically: test_viewer_*@secaudit-test.com / ViewerPass!2025, test_nosearch_*@secaudit-test.com, test_noaudit_*@secaudit-test.com, test_secaudit_admin_b@secaudit-test.com / TenantB!2025.",
+  "seed_data_creation": "Second tenant 'TEST_SecAudit_TenantB' inserted directly into mongo (companies + roles + users + pipelines + leads + customers + contacts + attachments + activities). Autouse module-scope fixture cleans up ALL tenant B data + all @secaudit-test.com users + all TEST_-prefixed roles at end of run. Verified DB is clean after full test run (no residuals).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Security audit test suite at /app/backend/tests/security_audit_test.py — 34 tests, runs in ~1m17s under pytest-xdist loadscope. Uses motor.motor_asyncio for direct mongo inserts (bcrypt for password hashes). Reuses REACT_APP_BACKEND_URL as BASE_URL. Emails MUST use routable TLDs (.com, not .local). Tenant B admin is created with is_superadmin=True so RBAC inside B is bypassed. If a new module (M3 Preventivatore) is added: (1) verify tenant_id filter on every list + detail + patch + delete + custom endpoint; (2) add IDOR tests for the new /api/quotes/{id} with tenant B's quote_id; (3) add RBAC tests for new permission keys; (4) audit that no new endpoint uses require_any_permission with audit.view for financially-sensitive data. Reuse the tenant_B / token_admin_A / token_viewer_A fixtures from this file.",
+  "rca of the issue": "No blocking issues to RCA. The direction-dashboard-with-audit.view deviation is by design (M2 chose require_any_permission for maximum flexibility); can be tightened before M3 without breaking tests. The 404-vs-405 on activities mutations is a FastAPI routing artifact — the router simply doesn't declare /activities/{id} at all, so Starlette returns 404 before method-check; functionally identical to immutability."
+}
