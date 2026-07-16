@@ -51,3 +51,42 @@ Non-versionate (append-only): `audit_logs`, `notifications`, timeline `activitie
 
 ## Test credentials
 Vedi `/app/memory/test_credentials.md`.
+
+## Iteration 6 (2026-02) — Correzione economica + Autosalvataggio
+### Fix ambiguità applicazione regole
+- Campi espliciti su PriceRuleV2:
+  - `application_scope`: unit | line | opening | quote (default unit)
+  - `apply_before_quantity` (default true; scope=unit)
+  - `once_per_line` (default false; se true su fixed+unit → deferimento a line)
+- Motore pricing_v2 rifatto in 3 passi: (1) unit rules → (2) quantity mult → (3) line/once-per-line rules
+- Migrate DB one-shot: `COLOR_FILM_DIFF_FIXED`, `ROLLER_MOTOR_MECHANICAL`, `ROLLER_MOTOR_RADIO` → scope=line
+- Breakdown v2: ogni entry ha `scope`, `unit_before/after`, `line_before/after`, `per_piece`
+- Response arricchita: `unit_price_pre_qty` (per pezzo prima quantità) + `unit_price_final` (per pezzo effettivo = subtotale/qty)
+
+### Verifica economica
+| Qty | Base unit | +22% unit | €150 (line) | Subtotale | Precedente (buggy) |
+|-----|-----------|-----------|-------------|-----------|--------------------|
+| 1 | 806,40 | 177,41 | 150,00 (×1) | 1.133,81 | 1.133,81 |
+| 2 | 806,40 | 177,41 | 150,00 (×1) | **2.117,62** | 2.267,62 ❌ |
+| 5 | 806,40 | 177,41 | 150,00 (×1) | **5.069,05** | 5.669,05 ❌ |
+
+### Autosalvataggio (M3.3.1)
+- Endpoint `POST /api/quotes/{id}/autosave` (whitelist campi, version check, blocco consolidati)
+- Hook `useAutosave`: debounce 800ms, AbortController, request_id out-of-order guard, beforeunload guard
+- `AutosaveIndicator`: 6 stati (idle/dirty/saving/saved/error/conflict) + retry manuale
+- Integrato: title (inline editable), notes, payment_terms, delivery_days, warranty_months, valid_until, internal_notes
+- Auto-flush prima di azioni critiche (invia, revise, converti)
+
+### Test coverage
+- `tests/test_pricing_scope.py`: 10/10 (qty 1/2/5, deterministic order, once_per_line, min_billable, scope line/unit)
+- iteration_6.json: backend 22/22 · frontend Playwright 100%
+
+## Backlog M3.3 residuo (ordine confermato)
+- P0: PDF professionale con snapshot revisione (template configurabile)
+- P0: Link pubblico read-only sicuro (token high-entropy, hash, scadenza, rate limit)
+- P0: Firma elettronica canvas legata a hash+revisione
+- P0: Azioni portale cliente: Accetta&Firma / Richiedi modifica / Rifiuta (con motivazione configurabile)
+- P0: Conversione contratto idempotente con snapshot completo
+- P1: Badge risparmio (solo con snapshot valido)
+- P1: KPI dashboard preventivi (conversion, avg deal, WoW)
+- P2: Template Excel import listini
