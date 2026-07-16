@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 20 — Test end-to-end Blocchi B (Importer), C (BOM UI), D (Geometria) + Contratti + Firma. Backend 19/20 pass (1 xfail su idempotency importer). Frontend: 4 pagine testate (geometry-builder, pricelist-importer, contracts, contract-viewer) — 1 bug critico trovato e fixed (React crash su address object). Regressione Blocco A: OK (20 ricette BOM + bom-simulate).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/importer/upload", "issue": "Idempotency non attiva se il job è in stato 'parsed' (solo published/draft/preview_ready). Aggiungere 'parsed' e 'validated' allo $in del filtro di deduplica in importer.py:71."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ContractViewerPage.jsx", "issue": "React crash 'Objects are not valid as a React child' quando company.address o customer.address è un oggetto {street, city, zip_code, province, country} (accade su tutti i contratti con customer con indirizzo strutturato). FIX applicato dal test agent: helper formatAddress().", "selector": "[data-testid='contract-viewer']", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Geometry compute UX", "issue": "Il click su btn-compute NON commuta automaticamente sul tab '4. Risultato' — l'utente deve cliccarlo manualmente. Il calcolo funziona, ma il risultato non è visibile finché non si cambia tab. Consigliato: setActiveTab('result') dopo setResult(data).", "affected_selectors": ["[data-testid='btn-compute']", "[data-testid='tab-result']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_blocco_bcd_iter20.py",
+    "/app/test_reports/pytest/iteration_20_bcd.xml"
+  ],
+  "action_items": [
+    "Fix importer idempotency: aggiungere 'parsed' e 'validated' agli stati filtrati per la deduplica in /app/backend/app/routers/importer.py (linea ~71).",
+    "Auto-switch al tab Risultato dopo compute in GeometryBuilderPage.jsx (aggiungere state activeTab e Tabs value/onValueChange controllati).",
+    "Verificare il fix helper formatAddress applicato in ContractViewerPage.jsx (righe 14-24). Consigliato rendere questo helper condiviso in /app/frontend/src/lib/ o simile.",
+    "Il totale contratto mostra 0.00 € anche per contratti che dovrebbero avere prodotti (Product rows: 0 → snap.products vuoto). Verificare che quote_snapshot.products venga popolato correttamente in /generate-from-quote quando il preventivo ha righe."
+  ],
+  "critical_code_review_comments": [
+    "importer.py filtro idempotency non copre lo stato 'parsed' (bug funzionale — l'utente rende molto probabile riuploadare senza aver ancora mappato).",
+    "ContractViewerPage.jsx rendeva oggetti direttamente causando crash React — necessario type-check su tutti i campi company/customer nel snapshot.",
+    "GeometryBuilderPage.jsx: il tab non è controllato quindi il feedback UX post-compute è nascosto. Aggiungere Tabs value+onValueChange.",
+    "geometry.py compute: `blocking_errors` viene incluso nel result solo se sell_pricelist_id specificato — corretto, ma verificare che il frontend mostri sempre `blocking_errors` in modo prominente prima dei `errors` normali.",
+    "contracts.py:315 e :373 usano `deleted_at: None` per il find_one del token — ok. Tuttavia i test verificano che il token consumed=True non sia più raggiungibile: attualmente 404 corretto.",
+    "Il totale amount nel contract viewer usa `snap.quote_totals?.total || 0` — se il preventivo non ha calcolato i totali, sempre 0. Considerare fallback a somma dei products."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/ContractViewerPage.jsx",
+    "/app/backend/tests/test_blocco_bcd_iter20.py"
+  ],
+  "success_rate": {"backend": "95% (19/20 pass, 1 xfail bug noto)", "frontend": "90% (4/4 pagine caricano, 1 bug critico fixato in loco, 1 UX minor aperto)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "seed_data_creation": "Creati rule sets test (TEST_RS_*), CSV import job test, 1 nuovo contratto CT-2026-00002 generato da preventivo attivo e firmato (con variante). Cleanup: N/A (i dati di test sono TEST_ prefixed).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend blocchi B/C/D + contratti + firma sono funzionalmente completi. Bug noto: importer idempotency per stato 'parsed'. Sono stati creati diversi contratti di test (CT-2026-000XX) e potrebbe essere utile pulirli. Test file /app/backend/tests/test_blocco_bcd_iter20.py è riutilizzabile per regressione futura. Il fix del ContractViewer (formatAddress helper) è già applicato ma minimal — considerare estrarlo in un file condiviso e applicare la stessa logica ovunque `address` venga renderizzato.",
+  "rca of the issue": "Bug 1 (React crash contract viewer): snapshot company.address salvato come oggetto (schema Company.address = AddressModel) ma renderizzato come stringa in JSX → React 18 lancia errore invalid child. Fix: helper formatAddress() converte oggetto in stringa CSV. Bug 2 (importer idempotency): filter im_status $in mancante di 'parsed' → dopo un upload iniziale non ancora mappato, un secondo upload del medesimo file crea sempre nuovo job. Fix suggerito main agent: aggiungere 'parsed' e 'validated' al filter."
+}

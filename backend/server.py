@@ -78,6 +78,8 @@ from app.routers.product_catalog import router as product_catalog_router
 from app.routers.landing import public_site_router, platform_site_router
 from app.routers.quote_structure import router as quote_structure_router
 from app.routers.pricing_hub import router as pricing_hub_router
+from app.routers.geometry import router as geometry_router
+from app.routers.importer import router as importer_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -181,6 +183,8 @@ api.include_router(public_site_router)
 api.include_router(platform_site_router)
 api.include_router(quote_structure_router)
 api.include_router(pricing_hub_router)
+api.include_router(geometry_router)
+api.include_router(importer_router)
 
 app.include_router(api)
 
