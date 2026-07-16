@@ -28,6 +28,7 @@ export default function GeometryBuilderPage() {
   const [tree, setTree] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("templates");
 
   useEffect(() => {
     (async () => {
@@ -74,6 +75,7 @@ export default function GeometryBuilderPage() {
         include_costs: false,
       });
       setResult(data);
+      setActiveTab("result");
       if (data.errors?.length) {
         toast.warning(`Calcolo con ${data.errors.length} errore/i bloccante/i`);
       } else {
@@ -98,7 +100,7 @@ export default function GeometryBuilderPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="templates" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="templates" data-testid="tab-templates">1. Template</TabsTrigger>
           <TabsTrigger value="dimensions" data-testid="tab-dimensions">2. Dimensioni</TabsTrigger>

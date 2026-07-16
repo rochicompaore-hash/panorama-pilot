@@ -144,3 +144,43 @@ Chiama il tool "Deploy" dall'interfaccia Emergent per pubblicare. deployment_age
 **Test:** `/app/test_reports/iteration_19.json` — 22/23 PASS + fix snapshot_hash deterministico verificato manualmente → 23/23 effettivi.
 
 **Prossimo blocco:** B — Importer XLS/CSV listini (pandas+openpyxl, mapping colonne, draft/publish/rollback, entità estese).
+
+## 2026-02 — Blocchi B + C + D + Contratto + Firma (COMPLETATO)
+
+**Scope realizzato in un unico blocco (Messaggio 300):**
+- **Blocco B — Importer XLS/CSV**: upload → parse (pandas+openpyxl) → mapping colonne → validate → preview → publish (merge in listino, +version) → rollback (snapshot pre-publish). 11 entità supportate. Vincoli: 25MB, 100k righe, 30 fogli, 200 preview, idempotenza via file hash.
+- **Blocco C (implicito)** — UI Visuale BOM: Il Pricing Hub esistente + nuovo Geometry Builder + Importer costituiscono l'UI visuale completa (v1 con template + JSON tree). L'editor drag&drop full-free-form dell'albero è deferrato a v2 (backend supporta tutto).
+- **Blocco D — Configuratore Geometrico Libero**: 
+  - `models_geometry.py` — GeometryTree (root→split→cell→module, 10 tipi moduli), DimensionRuleSet versionato, ImportJob
+  - `services/geometry_engine.py` — **adapter** (NON secondo motore): walk albero → dimensioni concrete via DimensionRuleSet → params per resolve_bom_full esistente. Restituisce: components (BOM completo), geometry_summary (aggregated + dimension_verification riga per riga), svg coerente con albero, geometry_snapshot_hash
+  - 6 template built-in: 1-anta batt., 2-ante batt+ribalta, 3-moduli, fisso, portafinestra, con-sopraluce
+  - Endpoint `/api/geometry/{templates,dimension-rule-sets,compute}` con versioning e nuova-versione automatica
+  - Blocco valori demo: se sell_pricelist_id valido ma manca prezzo pubblicato → `MISSING_PUBLISHED_PRICE` bloccante
+- **Contratto completo**:
+  - State machine 11 stati (draft, ready_for_review, ready_for_signature, sent, viewed, signing, signed, rejected, expired, cancelled, superseded) con transizioni controllate
+  - `POST /generate-from-quote` — snapshot immutabile con company + customer + environments + openings + products + clauses + payment_terms + snapshot_hash
+  - State transitions + timeline audit trail
+  - `POST /send-for-signature` — token pubblico + expires_at 7gg
+  - `GET /public/{token}` — visualizzazione integrale senza auth + auto-marca `viewed`
+  - `POST /public/{token}/sign` — canvas signature + OTP opzionale + signature_hash sha256(id|signer|ip|ua|ts|number|snapshot) + audit
+  - Immutabilità: signed → solo `superseded` (via create-variation)
+  - Hook post-firma: crea Survey automaticamente (workflow_engine.ensure_survey_from_contract)
+
+**Files creati/modificati (backend):**
+- NEW: `app/models_geometry.py`, `app/services/geometry_engine.py`, `app/services/importer_service.py`
+- NEW: `app/routers/geometry.py`, `app/routers/importer.py`
+- REWRITTEN: `app/routers/contracts.py` (state machine + firma + snapshot)
+- Extended: `app/permissions.py` (11 nuovi permessi Blocco D + contract lifecycle)
+- Extended: `server.py` (register geometry + importer router)
+- Dep: `pandas`, `openpyxl` (già installati)
+
+**Files creati (frontend):**
+- `pages/GeometryBuilderPage.jsx` — configuratore geometrico con template picker, dimensioni, calcolo, SVG, verifica dimensionale, BOM viewer
+- `pages/PricelistImporterPage.jsx` — wizard XLS/CSV upload/mapping/validate/preview/publish/rollback + storico
+- `pages/ContractsPage.jsx` — lista + generate-from-quote
+- `pages/ContractViewerPage.jsx` — visualizzazione integrale contratto + canvas firma + timeline stati
+- Extended: `App.js` (5 rotte), `AppLayout.jsx` (voci sidebar)
+
+**Test:** `/app/test_reports/iteration_20.json` — Backend 19/20 pass (fix applicato su idempotency), Frontend 4/4 pagine funzionanti (2 issue minor fixati: address formatter + auto-tab-switch). Regressione Blocco A: OK.
+
+**Prossimo:** UX drag&drop full-free-form tree editor (Blocco D v2), integrazione FEA/FEQ provider (Blocco Firma v2), PDF renderer contratto server-side (esistente ma da collegare a viewer).

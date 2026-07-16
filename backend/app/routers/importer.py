@@ -68,7 +68,7 @@ async def upload_file(
     existing = await db.import_jobs.find_one({
         "tenant_id": user["tenant_id"], "file_hash": file_hash,
         "entity_type": entity_type, "target_pricelist_id": target_pricelist_id,
-        "im_status": {"$in": ["published", "draft", "preview_ready"]},
+        "im_status": {"$in": ["published", "draft", "preview_ready", "parsed", "validated"]},
         "deleted_at": None,
     })
     if existing:
