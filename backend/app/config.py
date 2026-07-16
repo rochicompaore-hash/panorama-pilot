@@ -46,7 +46,11 @@ class Settings:
     # OTP
     OTP_TTL_SECONDS: int = int(os.environ.get("OTP_TTL_SECONDS", "600"))
     OTP_LENGTH: int = int(os.environ.get("OTP_LENGTH", "6"))
-    OTP_DEBUG_ENABLED: bool = os.environ.get("OTP_DEBUG_ENABLED", "true").lower() == "true"
+    # OTP debug: espone il codice in chiaro nella risposta API. SOLO dev/test.
+    # In produzione forzato a False anche se env dice true.
+    _otp_debug_raw: bool = os.environ.get("OTP_DEBUG_ENABLED", "true").lower() == "true"
+    _otp_debug_prod_safe: bool = _otp_debug_raw and os.environ.get("APP_ENV", "development").lower() not in ("staging", "stage", "production", "prod")
+    OTP_DEBUG_ENABLED: bool = _otp_debug_prod_safe
     # Signature
     SIGNATURE_EVIDENCE_ISSUER: str = os.environ.get("SIGNATURE_EVIDENCE_ISSUER", "Infissi Express Cloud")
 

@@ -378,7 +378,11 @@ async def public_request_otp(token: str, request: Request):
     req_doc["created_at"] = datetime.now(timezone.utc)
     await db.quote_otp_requests.insert_one(req_doc)
     # Prova invio email (se provider configurato)
-    email_status = "mocked_dev"
+    from app.config import settings as _s, is_prod_like as _prod
+    if _s.EMAIL_PROVIDER == "mock" or not _s.RESEND_API_KEY:
+        email_status = "configuration_required" if _prod() else "mocked_dev"
+    else:
+        email_status = "mocked_dev"
     try:
         subj = f"Codice OTP firma contratto {contract.get('number')}"
         html = f"<p>Il tuo codice OTP è: <b style='font-size:24px'>{raw_code}</b></p><p>Scade in {settings.OTP_TTL_SECONDS//60} minuti.</p>"

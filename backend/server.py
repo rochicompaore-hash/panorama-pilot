@@ -107,6 +107,47 @@ async def health():
         return {"status": "error", "detail": str(e)}
 
 
+@api.get("/config/production-status")
+async def production_status():
+    """Stato configurazioni per report deploy. NON espone segreti — solo booleani/labels."""
+    from app.config import settings, is_prod_like
+    from app.services.signature_provider import list_providers as _lp
+    email_configured = bool(settings.RESEND_API_KEY) and settings.EMAIL_PROVIDER != "mock"
+    s3_configured = settings.STORAGE_PROVIDER == "s3" and bool(settings.S3_BUCKET)
+    providers = _lp()
+    return {
+        "app_env": settings.APP_ENV,
+        "is_prod_like": is_prod_like(),
+        "otp": {
+            "debug_enabled": settings.OTP_DEBUG_ENABLED,
+            "ttl_seconds": settings.OTP_TTL_SECONDS,
+            "rate_limit_max_per_window": settings.RATE_LIMIT_OTP_REQUEST_MAX,
+            "rate_limit_window_sec": settings.RATE_LIMIT_OTP_REQUEST_WINDOW_SEC,
+            "status": "safe" if not settings.OTP_DEBUG_ENABLED else ("configuration_required" if is_prod_like() else "dev_only"),
+        },
+        "email": {
+            "provider": settings.EMAIL_PROVIDER,
+            "configured": email_configured,
+            "status": "configured" if email_configured else "configuration_required",
+            "from": settings.EMAIL_FROM if email_configured else None,
+        },
+        "storage": {
+            "provider": settings.STORAGE_PROVIDER,
+            "s3_configured": s3_configured,
+            "status": "s3" if s3_configured else "local_persistent",
+            "local_path": settings.STORAGE_LOCAL_PATH if settings.STORAGE_PROVIDER != "s3" else None,
+        },
+        "signature_providers": providers,
+        "cors_origins": "restricted" if settings.CORS_ORIGINS not in ("*", "") else "permissive",
+        "jwt": {"access_ttl_min": settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+                 "refresh_ttl_days": settings.REFRESH_TOKEN_EXPIRE_DAYS},
+        "features": {
+            "geometry_engine": True, "importer": True, "bom_recipes": True,
+            "contract_pdf": True, "otp_real": True, "signature_electronic_simple": True,
+        },
+    }
+
+
 # Mount domain routers under /api
 api.include_router(auth_router)
 api.include_router(users_router)

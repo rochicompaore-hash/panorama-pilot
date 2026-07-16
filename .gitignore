@@ -28,6 +28,20 @@ next-env.d.ts
 # Production builds
 /build
 dist/
+
+# Environment variables (secrets)
+.env
+.env.local
+.env.production
+.env.development
+backend/.env
+frontend/.env
+!.env.example
+!*.env.example
+
+# Storage locale (uploads)
+/app/storage/
+storage/
 dist
 
 # Environment files (comprehensive coverage)
