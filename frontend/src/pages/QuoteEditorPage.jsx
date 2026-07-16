@@ -14,7 +14,10 @@ import { ArrowLeft, Plus, Trash, PaperPlaneTilt, ArrowsClockwise, FileText, Chec
 import { toast } from "sonner";
 import { ConflictModal } from "@/components/app/ConflictModal";
 import { ConfiguratorDialog } from "@/components/app/ConfiguratorDialog";
+import { AutosaveIndicator } from "@/components/app/AutosaveIndicator";
 import { useConflict, getVersion, withVersion, withForce } from "@/hooks/useConflict";
+import { useAutosave } from "@/hooks/useAutosave";
+import { Textarea } from "@/components/ui/textarea";
 
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0); } catch { return "€ 0"; } }
 
@@ -65,6 +68,31 @@ export default function QuoteEditorPage() {
     [conflict, canForce, reload]
   );
 
+  const editable = q ? !["accepted", "converted", "superseded", "rejected", "cancelled", "expired", "sent", "signed"].includes(q.quote_status) : false;
+
+  // ---- Autosave for editable header/notes fields (M3.3.1) ----
+  const autosave = useAutosave({
+    endpoint: `/quotes/${id}/autosave`,
+    enabled: editable,
+    getVersion: () => (q ? q.version : 1),
+    onSuccess: () => {
+      // Bump cached version without full refetch to avoid overwriting user edits
+      qc.setQueryData(["quote", id], (old) => old ? { ...old, version: (old.version || 1) + 1 } : old);
+    },
+    onConflict: (detail, fields) => {
+      conflict.open(detail, fields, {
+        canForceOverride: canForce,
+        allowForce: true,
+        onReload: reload,
+        onForce: async (reason) => {
+          // Send fields as force override PATCH
+          await api.patch(`/quotes/${id}`, fields, { ...withVersion(getVersion(q)), ...withForce(reason) });
+          reload();
+        },
+      });
+    },
+  });
+
   const addOpening = useMutation({
     mutationFn: async (p) => (await api.post(`/quotes/${id}/openings`, p, withVersion(getVersion(q)))).data,
     onSuccess: () => { toast.success("Vano aggiunto"); reload(); },
@@ -96,7 +124,6 @@ export default function QuoteEditorPage() {
 
   if (!q) return <div className="text-sm text-muted-foreground">Caricamento…</div>;
 
-  const editable = !["accepted", "converted", "superseded", "rejected", "cancelled", "expired"].includes(q.quote_status);
   const allowForce = editable;
 
   const updateLine = async (lid, patch) => {
@@ -128,24 +155,110 @@ export default function QuoteEditorPage() {
       <div className="flex items-end justify-between">
         <div>
           <div className="overline font-mono-plex">{q.number}</div>
-          <h1 className="mt-1 font-display text-3xl font-black tracking-tight">{q.title || "Preventivo"}</h1>
+          {editable ? (
+            <Input
+              defaultValue={q.title || ""}
+              placeholder="Titolo preventivo"
+              onChange={(e) => autosave.schedule({ title: e.target.value })}
+              className="mt-1 font-display text-3xl font-black tracking-tight border-0 border-b border-transparent hover:border-border focus:border-primary rounded-none px-0 h-auto bg-transparent"
+              data-testid="quote-title-input"
+            />
+          ) : (
+            <h1 className="mt-1 font-display text-3xl font-black tracking-tight">{q.title || "Preventivo"}</h1>
+          )}
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="rounded-sm uppercase">{q.quote_status}</Badge>
             <Badge variant="outline" className="rounded-sm">{q.revision_label}</Badge>
             <Badge variant="outline" className="rounded-sm font-mono-plex text-[10px]" data-testid="quote-version">v.{q.version || 1}</Badge>
             {q.approval?.status === "pending" && <Badge className="rounded-sm bg-orange-500">Approvazione pendente</Badge>}
+            {editable && <AutosaveIndicator state={autosave.state} lastSavedAt={autosave.lastSavedAt} lastError={autosave.lastError} onRetry={autosave.retry} />}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {editable && has("quotes.send") && q.quote_status === "draft" && <Button variant="outline" className="rounded-sm" onClick={() => changeStatus.mutate("sent")} data-testid="quote-send"><PaperPlaneTilt size={14} className="mr-1" /> Invia</Button>}
+          {editable && has("quotes.send") && q.quote_status === "draft" && <Button variant="outline" className="rounded-sm" onClick={async () => { await autosave.flushNow(); changeStatus.mutate("sent"); }} data-testid="quote-send"><PaperPlaneTilt size={14} className="mr-1" /> Invia</Button>}
           {q.quote_status === "sent" && <Button variant="outline" className="rounded-sm" onClick={() => changeStatus.mutate("accepted")} data-testid="quote-accept"><Check size={14} className="mr-1" /> Accettato</Button>}
-          {["accepted", "approved"].includes(q.quote_status) && !q.contract_id && has("quotes.convert_contract") && <Button className="rounded-sm bg-emerald-600 hover:bg-emerald-700" onClick={() => convert.mutate()} data-testid="quote-convert"><FileText size={14} className="mr-1" /> Genera contratto</Button>}
-          {editable && q.is_current && <Button variant="outline" className="rounded-sm" onClick={() => revise.mutate()} data-testid="quote-revise"><ArrowsClockwise size={14} className="mr-1" /> Nuova revisione</Button>}
+          {["accepted", "approved"].includes(q.quote_status) && !q.contract_id && has("quotes.convert_contract") && <Button className="rounded-sm bg-emerald-600 hover:bg-emerald-700" onClick={async () => { await autosave.flushNow(); convert.mutate(); }} data-testid="quote-convert"><FileText size={14} className="mr-1" /> Genera contratto</Button>}
+          {editable && q.is_current && <Button variant="outline" className="rounded-sm" onClick={async () => { await autosave.flushNow(); revise.mutate(); }} data-testid="quote-revise"><ArrowsClockwise size={14} className="mr-1" /> Nuova revisione</Button>}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          <Card className="rounded-sm border-border p-4" data-testid="quote-details-card">
+            <div className="flex items-center justify-between mb-3">
+              <div className="overline">Dettagli commerciali</div>
+              <span className="text-[10px] font-mono-plex text-muted-foreground">Autosalvataggio ogni 800ms</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="col-span-2">
+                <Label className="text-xs">Note visibili in preventivo</Label>
+                <Textarea
+                  defaultValue={q.notes || ""}
+                  rows={2}
+                  disabled={!editable}
+                  onChange={(e) => autosave.schedule({ notes: e.target.value })}
+                  className="rounded-sm"
+                  data-testid="quote-notes-input"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Termini di pagamento</Label>
+                <Input
+                  defaultValue={q.payment_terms || ""}
+                  disabled={!editable}
+                  onChange={(e) => autosave.schedule({ payment_terms: e.target.value })}
+                  placeholder="Es. 30% acconto, 70% a saldo"
+                  className="rounded-sm h-9"
+                  data-testid="quote-payment-input"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Tempi di consegna (giorni)</Label>
+                <Input
+                  type="number" defaultValue={q.delivery_days ?? ""}
+                  disabled={!editable}
+                  onChange={(e) => autosave.schedule({ delivery_days: Number(e.target.value) || null })}
+                  className="rounded-sm h-9 font-mono-plex"
+                  data-testid="quote-delivery-input"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Garanzia (mesi)</Label>
+                <Input
+                  type="number" defaultValue={q.warranty_months ?? ""}
+                  disabled={!editable}
+                  onChange={(e) => autosave.schedule({ warranty_months: Number(e.target.value) || null })}
+                  className="rounded-sm h-9 font-mono-plex"
+                  data-testid="quote-warranty-input"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Valido fino al</Label>
+                <Input
+                  type="date"
+                  defaultValue={q.valid_until ? q.valid_until.slice(0, 10) : ""}
+                  disabled={!editable}
+                  onChange={(e) => autosave.schedule({ valid_until: e.target.value || null })}
+                  className="rounded-sm h-9 font-mono-plex"
+                  data-testid="quote-valid-input"
+                />
+              </div>
+              {(has("quotes.view_internal") || has("quotes.view_margins")) && (
+                <div className="col-span-2">
+                  <Label className="text-xs">Note interne (non visibili al cliente)</Label>
+                  <Textarea
+                    defaultValue={q.internal_notes || ""}
+                    rows={2}
+                    disabled={!editable}
+                    onChange={(e) => autosave.schedule({ internal_notes: e.target.value })}
+                    className="rounded-sm bg-amber-50/40 dark:bg-amber-950/10"
+                    data-testid="quote-internal-notes-input"
+                  />
+                </div>
+              )}
+            </div>
+          </Card>
+
           {/* Openings */}
           <Card className="rounded-sm border-border p-4" data-testid="openings-card">
             <div className="flex items-center justify-between mb-3">

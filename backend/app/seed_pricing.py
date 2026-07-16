@@ -51,6 +51,7 @@ INFISSI_RULES = [
     {
         "code": "COLOR_FILM_DIFF_FIXED", "name": "Supplemento pellicolatura differente (+€ 150)",
         "category": "color", "priority": 101, "cumulative": True,
+        "application_scope": "line",  # applied ONCE per line, not per piece
         "conditions": [{"field": "color_kind", "op": "eq", "value": "film_diff"}],
         "formula": "150", "effect_type": "fixed",
     },
@@ -86,12 +87,14 @@ INFISSI_RULES = [
     {
         "code": "ROLLER_MOTOR_MECHANICAL", "name": "Motore meccanico (+€ 180)",
         "category": "roller", "priority": 120,
+        "application_scope": "line",  # motor is per-line kit, not per m²
         "conditions": [{"field": "motorization", "op": "eq", "value": "mechanical"}],
         "formula": "180", "effect_type": "fixed",
     },
     {
         "code": "ROLLER_MOTOR_RADIO", "name": "Motore radio + telecomando (+€ 260)",
         "category": "roller", "priority": 121,
+        "application_scope": "line",
         "conditions": [{"field": "motorization", "op": "eq", "value": "radio"}],
         "formula": "260", "effect_type": "fixed",
     },
@@ -256,6 +259,9 @@ async def seed_default_rules(tenant_id: str, pricelist_id: str):
             conditions=rule.get("conditions", []),
             formula=rule["formula"], effect_type=rule["effect_type"],
             priority=rule.get("priority", 100), cumulative=rule.get("cumulative", True), active=True,
+            application_scope=rule.get("application_scope", "unit"),
+            apply_before_quantity=rule.get("apply_before_quantity", True),
+            once_per_line=rule.get("once_per_line", False),
         )
         await db.price_rules.insert_one(to_mongo(r.model_dump(by_alias=True)))
 

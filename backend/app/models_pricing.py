@@ -47,6 +47,15 @@ class PriceRuleV2(BaseDoc):
     formula: str = "0"
     effect_type: str = "fixed"  # pct | fixed | set
     effect_target: str = "unit_price"  # unit_price | subtotal
+    # ---- Explicit application scope (v2.1) ----
+    # unit  = applied to per-piece price before quantity multiplication (default)
+    # line  = applied ONCE to the line subtotal (after quantity)
+    # opening = applied ONCE per opening (aggregate of lines linked to same opening)
+    # quote = applied ONCE to the quote total (quote-wide surcharges/discounts)
+    application_scope: str = "unit"
+    # For explicit control regardless of scope:
+    apply_before_quantity: bool = True   # meaningful only when scope=unit
+    once_per_line: bool = False          # if true, fixed rules apply once even when scope=unit
     priority: int = 100  # applied in ascending order
     cumulative: bool = True
     active: bool = True
@@ -66,6 +75,9 @@ class PriceRuleV2Create(BaseModel):
     formula: str = "0"
     effect_type: str = "fixed"
     effect_target: str = "unit_price"
+    application_scope: str = "unit"
+    apply_before_quantity: bool = True
+    once_per_line: bool = False
     priority: int = 100
     cumulative: bool = True
     active: bool = True
@@ -79,6 +91,9 @@ class PriceRuleV2Update(BaseModel):
     formula: Optional[str] = None
     effect_type: Optional[str] = None
     effect_target: Optional[str] = None
+    application_scope: Optional[str] = None
+    apply_before_quantity: Optional[bool] = None
+    once_per_line: Optional[bool] = None
     priority: Optional[int] = None
     cumulative: Optional[bool] = None
     active: Optional[bool] = None
@@ -125,6 +140,7 @@ class ConfiguratorPreviewResponse(BaseModel):
     billable_sqm: float
     perimeter_m: float
     base_price: float
+    unit_price_pre_qty: float = 0.0
     unit_price_final: float
     subtotal_line: float
     vat_amount: float

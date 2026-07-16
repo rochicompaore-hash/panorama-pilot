@@ -211,6 +211,60 @@ async def update_quote(
     return _strip_costs_if_needed(updated, perms)
 
 
+# --------- Autosave endpoint (M3.3.1) ---------
+class AutosaveRequest(BaseModel):
+    """Autosave payload — accepts arbitrary quote-level draft fields.
+
+    Only applied when quote is in draft/to_complete/to_approve state.
+    Rejects mutation of consolidated states with 400.
+    Uses optimistic concurrency (version).
+    Returns fresh {version, updated_at} so client can chain the next save.
+    """
+    version: int
+    fields: dict
+    request_id: Optional[str] = None
+
+
+@router.post("/{qid}/autosave")
+async def autosave_quote(
+    qid: str, body: AutosaveRequest, request: Request,
+    user: dict = Depends(require_permission("quotes.edit")),
+):
+    """Debounced autosave. Draft-only. Returns 409 on version mismatch.
+
+    Accepted fields (whitelist to prevent misuse):
+      title, notes, payment_terms, delivery_days, warranty_months,
+      valid_until, discount_pct_global, internal_notes, site_address, description
+    """
+    ALLOWED = {
+        "title", "notes", "payment_terms", "delivery_days", "warranty_months",
+        "valid_until", "discount_pct_global", "internal_notes", "site_address",
+        "description",
+    }
+    payload = {k: v for k, v in (body.fields or {}).items() if k in ALLOWED}
+    if not payload:
+        raise HTTPException(status_code=400, detail="Nessun campo autosalvabile")
+    if "site_address" in payload and payload["site_address"] is not None and not isinstance(payload["site_address"], dict):
+        payload["site_address"] = payload["site_address"].model_dump() if hasattr(payload["site_address"], "model_dump") else payload["site_address"]
+    try:
+        updated = await update_with_version(
+            collection="quotes", entity_id=qid, tenant_id=user["tenant_id"],
+            entity_type="quote", expected_version=body.version,
+            set_fields=payload, user=user, request=request,
+        )
+    except HTTPException as e:
+        raise
+    # Return minimal payload for autosave — avoid heavy quote body
+    return {
+        "ok": True,
+        "id": qid,
+        "version": updated.get("version"),
+        "updated_at": updated.get("updated_at"),
+        "request_id": body.request_id,
+        "autosaved_fields": list(payload.keys()),
+    }
+
+
 @router.delete("/{qid}")
 async def delete_quote(qid: str, request: Request, user: dict = Depends(require_permission("quotes.delete"))):
     db = get_db()
