@@ -29,6 +29,7 @@ def from_mongo(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         return None
     d = dict(doc)
     # map _id -> id for pydantic alias handling
-    if "_id" in d and "id" not in d:
-        d["id"] = d["_id"]
+    if "_id" in d:
+        d.setdefault("id", d["_id"])
+        d.pop("_id", None)
     return d

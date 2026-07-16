@@ -217,3 +217,84 @@ Eventi implementati: `link_opened, quote_viewed, pdf_opened, pdf_downloaded, tok
 - **M3.3.6** Conversione contratto idempotente con snapshot + numerazione autonoma CTR-2026-
 - **P1** Badge risparmio · KPI dashboard preventivi
 - **M3.3.3.1** (nice-to-have) OTP email predisposto in `requires_otp` — provider mock, endpoint stub `POST /public/quotes/{token}/otp/request|verify`
+
+## Iteration 12 (2026-02) — M6.PAR Engine Parametrico Preventivi/BOM/Nesting
+
+### Scope (implementato interamente in un unica esecuzione — d)
+Motore parametrico completo per: sistemi profilo → profili → BOM parametrica versionata → matrici prezzi L×H → 3 modalità pricing (A tabella / B BOM / C ibrida) → nesting 1D FFD+BFD+auto_best → categorie colore con logica scarto → SVG server-side sanitizzato → snapshot canonici input/output.
+
+### Data model (nuove collezioni tenant-scoped)
+`profile_systems`, `profiles`, `color_categories`, `colors`, `glass_types`, `hardware_kits`, `accessories`, `item_pricelists` (sell/cost versionati), `price_matrices`, `bom_templates` (versionate), `pricing_mode_configs` (scope tenant|profile_system|product|quote_line), `cutting_lists`, `scrap_stock`, `bar_optimization_runs`, `parametric_snapshots`.
+
+### Modalità pricing (priorità: line → product → profile_system → tenant)
+- **A_table**: prezzo da matrix.lookup(w,h) con `nearest_up|nearest|linear`, `oversize_surcharge_pct`, `allow_extrapolation`
+- **B_bom**: prezzo = costo_materiali + costi_lavorazioni + costi_indiretti + margine (formula configurabile, `b_markup_pct`, `b_indirect_pct`)
+- **C_hybrid**: prezzo dalla matrice · costo dalla BOM · margine reale automatico
+
+### Parser formule (nessun eval)
+`services/formula.py` esteso con variabili: L, H, width_mm, height_mm, nr_ante/traversi/montanti/fissi/vetri, kerf, bar_length, frame_width/depth, sash_width/depth, central_node, rebate, glass_clearance, glass_deduction, weld_allowance, glazing_bead_clearance, threshold_height, mullion_offset, transom_offset, coupling_gap, installation_gap, profile_length_adjustment, glass_width/height/area/weight, profile_weight, total_weight, component_index. Whitelist rigorosa AST, limiti MAX_LEN=500 / MAX_DEPTH=20 / MAX_NODES=200, div-by-zero → 0.
+
+### Nesting 1D
+- FFD (First Fit Decreasing) e BFD (Best Fit Decreasing)
+- `auto_best`: sceglie meno barre, tie-break minor waste
+- kerf per taglio, head/tail offcut, `min_reusable_scrap_mm` → scarto vs sfrido riutilizzabile
+- Raggruppamento per `(profile_id, color_category_id, color_id, lot, bar_length)`
+- `respect_order_isolation=true` → non aggrega tra ordini (Cat.2/Cat.3)
+- Fatal error 400 se TUTTI i tagli di un gruppo superano la barra utile
+- Endpoint compare FFD vs BFD con `winner`
+
+### Categorie colore (`services/color_scrap.py`)
+- **Cat.1 global_reuse**: costo proporzionale, residuo → magazzino generico compatibile
+- **Cat.2 order_reuse**: costo proporzionale, residuo → utilizzabile solo nello stesso ordine
+- **Cat.3 order_full_cost**: cliente paga barra intera, residuo → magazzino con costo netto 0 (ammortizzato)
+- Policy riuso: `same_color_same_profile_only | same_color_any_compatible_profile | generic_stock | non_reusable | manual_approval`
+- Sovrapprezzo commerciale `surcharge_pct` + `surcharge_fixed` applicato nel breakdown come voce separata
+
+### SVG server-side (`services/svg_drawing.py`)
+- Generazione programmatica da parametri numerici (nessuna stringa utente)
+- Whitelist tag: svg, g, defs, marker, rect, line, path, polygon, polyline, text, title, desc
+- `sanitize_svg()`: rimuove script/iframe/foreignObject, event handlers on*, href esterni, `javascript:` scheme
+- Quote automatiche, frecce apertura, montanti/traversi dinamici
+
+### Permessi nuovi
+`pricing.mode.view`, `pricing.mode.override`, `pricing.mode.manage_defaults`, `pricing.mode.view_cost_basis`, `parametric.bom.view/manage`, `parametric.matrix.view/manage`, `parametric.color.manage`, `parametric.nesting.run`, `parametric.svg.generate`.
+
+### Cost/margin hiding
+Se utente non ha `quotes.view_costs` OR `financials.view` (né superadmin):
+- `unit_cost`, `total_cost`, `margin_abs`, `margin_pct` → 0
+- `bom_resolved[*].line_cost`, `bom_resolved[*].unit_cost` → 0
+- `price_breakdown` filtrato (rimosse voci `bom_cost`, `labor`, `indirect`)
+- `cutting_preview.total_cost` e `bars[*].cost_bar` → 0
+
+### Endpoints (tutti sotto `/api/parametric/`)
+`profile-systems`, `profiles`, `color-categories`, `colors`, `glass-types`, `hardware-kits`, `accessories`, `item-pricelists`, `price-matrices`, `bom-templates` (+`/duplicate-as-new-version`), `pricing-modes`, `formula/validate|test`, `preview`, `nesting/run|compare`, `cutting-lists` (+`/from-nesting`), `scrap-stock`, `svg`, `bom/resolve`, `demo/status`.
+
+### Snapshot canonico
+Ogni preview genera un `ParametricSnapshot` con `input_hash` (sha256 di input canonicalizzato) e `output_hash`. `engine_version=1.0.0`, `formula_schema_version=1`. Rigenerazione idempotente a parità di input+versioni.
+
+### Frontend
+- **`/parametric`** — Configuratore Live: parametri (product, W, H, qty, ante, colore) → preview real-time (debounce 350ms) con SVG dinamico, prezzo/costo/margine (permission-gated), breakdown, distinta base risolta, preview lista taglio con efficienza.
+- **`/parametric/admin`** — Tab per: sistemi profilo, profili, categorie colore, colori, vetri, ferramenta, accessori, listini articoli, matrici prezzi, BOM parametriche, modalità pricing.
+
+### Seed demo (`is_demo=true`)
+1× Sistema PVC 70mm 5 camere, 7 profili (telaio, anta, montante, traverso, fermavetro, 2 rinforzi), 3 categorie colore (CAT1/CAT2/CAT3), 3 colori (bianco 9016, noce/bianco, RAL 7016 strutturato), 3 vetri (doppio, triplo, stratificato acustico), 5 ferramenta (fissa, 1anta, tilt-turn, 2ante, scorrevole), 3 accessori (guarnizione, davanzale, vite), 2 listini (sell/cost), 2 matrici prezzi (1anta 5×6, 2ante 5×6), 4 BOM parametriche (finestra 1a/2a, fisso, portafinestra 1a), 4 pricing_mode_configs (tenant C_hybrid + product per 2ante/fisso/portafinestra).
+
+### Test coverage
+- iteration_12.json: **25/25 backend PASS** + 1 XFAIL corretto post-report
+- Copertura: seed integrity, parser AST (validi + malevoli + div/0), preview A/B/C con fallback, oversize matrice, CAT3 sovrapprezzo, mode_override senza permesso, tenant isolation (9 collezioni), nesting FFD healthy + oversize hard-fail 400, SVG sanitization no `<script>` no `on*`, snapshot input/output_hash presenti.
+- Post-report fix: `_id` popped dai payload (mongo_utils.from_mongo), nesting oversize → 400 se tutti impossibili, cost hiding esteso a bom_resolved/breakdown/cutting_preview/bars.
+
+### Verifica economica live
+1200×1400 window_1_leaf CAT1 · mode `C_hybrid tenant` → unit €690.40, cost €142.60, **margin 79.35%**.
+Con CAT3 (+15%) → unit €793.96, breakdown mostra voce `color_surcharge`.
+Fuori matrice 2500×2500 → warning esplicito + rincaro 15%.
+
+### Backlog post-M6.PAR
+- **P0** Integrazione con QuoteEditor: sostituire product picker esistente con `parametric_config` per riga
+- **P0** Persistenza `cutting_lists` da ordine di produzione + snapshot BOM produttiva (non commerciale)
+- **P1** UI editor BOM con formula validator inline
+- **P1** UI editor matrice prezzi (grid inline)
+- **P1** Bar Optimization audit UI (confronto FFD/BFD, storico)
+- **P2** Auto-gestione `scrap_stock` con FIFO/LIFO su nuovi ordini
+- **P2** Preview visuale multi-vano (SVG composito)
+- **P2** Import/export BOM/matrici via Excel

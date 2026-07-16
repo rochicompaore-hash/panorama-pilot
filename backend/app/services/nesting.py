@@ -205,6 +205,7 @@ def optimize(
         groups.setdefault(gk, []).append(c)
 
     min_reusable_per_bar = default_min_reusable_mm
+    fatal_impossible: List[str] = []
     for gk, group in groups.items():
         pkey = (gk[0], gk[1], gk[2])  # profile_id, color_category_id, color_id
         pdef = (profile_defaults or {}).get(pkey) or {}
@@ -214,6 +215,14 @@ def optimize(
         tail = float(pdef.get("tail_offcut_mm") or default_tail_offcut_mm)
         min_reusable = float(pdef.get("min_reusable_mm") or default_min_reusable_mm)
         bar_cost = float(pdef.get("bar_cost") or default_bar_cost)
+        usable_group = bar_length - head - tail
+        # Se TUTTI i cut del gruppo superano l'utile della barra → errore hard
+        if group and all(float(c["length_mm"]) > usable_group for c in group):
+            fatal_impossible.append(
+                f"Tutti i tagli del profilo {gk[0]} superano la barra utile "
+                f"{usable_group:.0f}mm (bar {bar_length}mm - {head}-{tail}mm)"
+            )
+            continue
         meta = {
             "profile_id": gk[0], "color_id": gk[2], "color_category_id": gk[1],
             "bar_length_mm": bar_length, "kerf_mm": kerf,
@@ -229,6 +238,10 @@ def optimize(
             all_bars.extend(bars)
         except ValueError as e:
             warnings.append(str(e))
+
+    if fatal_impossible and not all_bars:
+        # Nessun taglio piazzabile → errore hard (400 dal router)
+        raise ValueError("; ".join(fatal_impossible))
 
     summary = _summarize(all_bars, min_reusable_per_bar)
     summary["algorithm"] = used_algorithm

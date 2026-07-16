@@ -425,4 +425,17 @@ async def compute_parametric_preview(
         response["total_cost"] = 0.0
         response["margin_abs"] = 0.0
         response["margin_pct"] = 0.0
+        # Occulta anche i costi per riga BOM e le voci "cost" del breakdown
+        for c in response.get("bom_resolved") or []:
+            c["unit_cost"] = 0.0
+            c["line_cost"] = 0.0
+        response["price_breakdown"] = [
+            b for b in (response.get("price_breakdown") or [])
+            if b.get("step") not in ("bom_cost", "labor", "indirect")
+        ]
+        # Occulta anche il costo delle barre nel cutting preview
+        if response.get("cutting_preview"):
+            response["cutting_preview"]["total_cost"] = 0.0
+            for b in response["cutting_preview"].get("bars") or []:
+                b["cost_bar"] = 0.0
     return response
