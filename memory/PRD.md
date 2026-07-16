@@ -67,3 +67,24 @@ Copertura end-to-end: Lead → Preventivo → Contratto → Rilievo → Produzio
 - P1: Riclassificazione bilancio (schema civilistico + stato patrimoniale + conto economico)
 - P2: Portale cliente finale (M9 completo)
 - P2: Firma elettronica FEA/FES/FEQ (provider da scegliere)
+
+## Iteration 16-18 — Quote Structure Refactor (Feb 2026)
+### Fatto
+- **Nuova gerarchia**: Preventivo → Ambiente (Camera/Cucina/…) → Vano/Nicchia → Prodotti multipli (serramento + tapparella + cassonetto + zanzariera).
+- **Modelli**: `models_quote_structure.py` — QuoteEnvironment, ProductRole (13 ruoli), ProductCompatibilityRule, DimensionFormula, OpeningDimensions.
+- **Motore compatibilità**: `services/quote_structure.check_compatibility()` — regole default in code (tapparella/persiana/scuro mutualmente esclusive; cassonetto ↔ tapparella; persiana non genera cassonetto). Extensibile via `product_compatibility_rules` collection.
+- **Ereditarietà misure**: `services/quote_structure.resolve_dimensions()` — formula-based per ruolo/tipologia. Default: tapparella +60/+40, cassonetto +40/220, zanzariera -10/-5, serramento identità.
+- **Composite drawing**: `services/composite_drawing.render_opening_composite()` — SVG con layer: nicchia + cassonetto + serramento + simbologia aperture + persiana/scuro/tapparella + zanzariera + quote + legenda. Sanitizzato (no script/onclick/js).
+- **Router**: `/api/quote-structure/*` — environments, openings, products, compatibility/check, dimensions/resolve, composite-drawing, tree, migrate-structure.
+- **PDF**: `templates/quote_pdf.html` refactorato — raggruppa per Environment → Opening → Products by role. Totale per vano + eredità corrette.
+- **Migrazione legacy**: `POST /migrate-structure` — crea env "Non specificato" (o da `room`), assegna environment_id, mappa category→role. Idempotente (no-op skip). Rispetta lock `quote_status ∈ sent/accepted/signed/converted`.
+- **UI**: `QuoteStructurePage` con stepper (Cliente → Ambienti → Vani → Prezzi → PDF), 3 colonne (config / prodotti / anteprima live), auto-caricamento drawing, totale generale.
+
+### Navigazione consolidata
+- Menu commerciale: **Preventivatore** → Nuovo preventivo (/quote-structure) + I tuoi preventivi (/quotes) + Modelli/Clausole.
+- Menu admin: **Configurazione tecnica** → Catalogo prodotti, Listini, Engine parametrico (avanzato), Sistemi profilo & formule, Test questionario cantiere. Protetti da perm `products.manage` / `pricelists.manage` — commerciali non li vedono.
+- Le vecchie route `/parametric`, `/parametric/admin`, `/quote-structure` restano funzionanti; solo il menu è stato ristrutturato.
+
+### Testing
+- Iter 16: 20/21 backend PASS. 1 Critical trovato: migration lock usava campo sbagliato → **FIXED**.
+- Iter 17: 3/3 fix confermati (lock uses quote_status, migration idempotent con no_changes, migration_required corretto).

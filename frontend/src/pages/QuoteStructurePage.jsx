@@ -76,6 +76,13 @@ export default function QuoteStructurePage() {
 
   useEffect(() => { loadQuotes(); }, []);
   useEffect(() => { if (quoteId) load(quoteId); }, [quoteId]);
+  // Auto-load drawings when tree changes
+  useEffect(() => {
+    if (!tree) return;
+    tree.environments.forEach(e => e.openings.forEach(op => {
+      if (op.products.length > 0 && !openingDrawings[op.opening.id]) loadDrawing(op.opening.id);
+    }));
+  }, [tree]);
 
   const createEnv = async () => {
     if (!newEnv.name) return toast.error("Nome ambiente richiesto");
@@ -161,19 +168,73 @@ export default function QuoteStructurePage() {
 
   if (!tree) return <div className="p-6">Caricamento…</div>;
 
+  const stats = tree.environments.reduce((acc, e) => {
+    acc.envs++;
+    acc.openings += e.openings.length;
+    e.openings.forEach(o => { acc.products += o.products.length; acc.total += o.subtotal; });
+    return acc;
+  }, { envs: 0, openings: 0, products: 0, total: 0 });
+
+  const currentStep = (
+    stats.envs === 0 ? 1 :
+    stats.openings === 0 ? 2 :
+    stats.products === 0 ? 3 :
+    stats.total > 0 ? 4 : 3
+  );
+  const STEPS = [
+    { n: 1, label: "Cliente e immobile" },
+    { n: 2, label: "Ambienti" },
+    { n: 3, label: "Vani e prodotti" },
+    { n: 4, label: "Prezzi e anteprima" },
+    { n: 5, label: "Genera PDF" },
+  ];
+
+  const openPdf = () => {
+    window.open(`/quotes/${quoteId}`, "_blank");
+  };
+
   return (
     <div className="space-y-6" data-testid="quote-structure-page">
+      {/* Stepper */}
+      <Card className="p-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          {STEPS.map((s, i) => {
+            const done = s.n < currentStep;
+            const active = s.n === currentStep;
+            return (
+              <React.Fragment key={s.n}>
+                <div className={`flex items-center gap-2 px-3 py-2 rounded ${
+                  active ? "bg-red-600 text-white" : done ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"
+                }`} data-testid={`step-${s.n}`}>
+                  <div className={`w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold ${
+                    active ? "bg-white text-red-600" : done ? "bg-green-600 text-white" : "bg-white"
+                  }`}>{done ? "✓" : s.n}</div>
+                  <div className="text-sm font-medium">{s.label}</div>
+                </div>
+                {i < STEPS.length - 1 && <ArrowRight size={14} className="text-slate-400"/>}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div className="overline text-muted-foreground">Struttura preventivo</div>
+          <div className="overline text-muted-foreground">Preventivatore</div>
           <h1 className="font-display text-3xl font-black tracking-tight">Ambienti → Vani → Prodotti</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Ogni vano è una nicchia muraria che può contenere più prodotti coordinati (serramento + oscurante + cassonetto + zanzariera).
+            Un vano è la nicchia muraria che può contenere più prodotti coordinati (serramento + oscurante + cassonetto + zanzariera). I calcoli avvengono automaticamente in background.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <div className="text-right">
+            <div className="overline text-[10px]">Totale preventivo</div>
+            <div className="text-2xl font-bold font-mono">{fmt(stats.total)}</div>
+            <div className="text-xs text-muted-foreground">{stats.envs} amb · {stats.openings} vani · {stats.products} prod</div>
+          </div>
           <Select value={quoteId} onValueChange={setQuoteId}>
-            <SelectTrigger className="w-64" data-testid="quote-selector"><SelectValue/></SelectTrigger>
+            <SelectTrigger className="w-56" data-testid="quote-selector"><SelectValue/></SelectTrigger>
             <SelectContent>
               {quotes.map(q => <SelectItem key={q.id} value={q.id}>{q.number || q.id.substring(0,8)}</SelectItem>)}
             </SelectContent>
@@ -200,6 +261,9 @@ export default function QuoteStructurePage() {
               <DialogFooter><Button onClick={createEnv} data-testid="btn-save-env">Crea</Button></DialogFooter>
             </DialogContent>
           </Dialog>
+          <Button onClick={openPdf} disabled={stats.total === 0} className="bg-red-600 hover:bg-red-700" data-testid="btn-generate-pdf">
+            Anteprima / PDF<ArrowRight size={14} className="ml-1"/>
+          </Button>
         </div>
       </div>
 

@@ -43,12 +43,10 @@ const NAV = [
   },
   {
     group: "commercial",
+    label: "Preventivatore",
     items: [
-      { to: "/quotes", i18n: "nav.quotes", icon: FileText, perm: "quotes.view" },
-      { to: "/quote-structure", label: "Struttura vani", icon: FileText, perm: "quotes.view" },
-      { to: "/parametric", label: "Configuratore live", icon: FileText, perm: "quotes.view" },
-      { to: "/parametric/admin", label: "Engine parametrico", icon: FileText, perm: "products.view" },
-      { to: "/pricelists", i18n: "nav.pricelists", icon: Hash, perm: "pricelists.view" },
+      { to: "/quote-structure", label: "Nuovo preventivo", icon: FileText, perm: "quotes.edit" },
+      { to: "/quotes", label: "I tuoi preventivi", icon: FileText, perm: "quotes.view" },
       { to: "/templates", i18n: "nav.templates", icon: FileText, perm: "quotes.view" },
       { to: "/clauses", i18n: "nav.clauses", icon: FileText, perm: "quotes.view" },
     ],
@@ -80,13 +78,22 @@ const NAV = [
     ],
   },
   {
+    group: "tech_config",
+    label: "Configurazione tecnica",
+    items: [
+      { to: "/product-catalog", label: "Catalogo prodotti", icon: FileText, perm: "products.view" },
+      { to: "/pricelists", label: "Listini e regole prezzo", icon: Hash, perm: "pricelists.view" },
+      { to: "/parametric", label: "Engine parametrico (avanzato)", icon: FileText, perm: "products.manage" },
+      { to: "/parametric/admin", label: "Sistemi profilo & formule", icon: FileText, perm: "products.manage" },
+      { to: "/site-conditions", label: "Test questionario cantiere", icon: FileText, perm: "quotes.view" },
+    ],
+  },
+  {
     group: "platform",
     label: "Platform Owner",
     items: [
       { to: "/saas-platform", label: "SaaS Modularization", icon: ShieldCheck, perm: null },
       { to: "/platform-site-config", label: "Configurazione landing", icon: Buildings, perm: null },
-      { to: "/product-catalog", label: "Catalogo prodotti", icon: FileText, perm: "products.view" },
-      { to: "/site-conditions", label: "Test questionario cantiere", icon: FileText, perm: "quotes.view" },
     ],
   },
   {
