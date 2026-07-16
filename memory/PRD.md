@@ -326,3 +326,31 @@ configurazioni residue:
   - MFA disattivato di default (attivabile da utente)
   - nessun seed di clienti/preventivi (tenant pulito)
 ```
+
+## 2026-02 — Fase 5: Cleanup dati demo tenant PanoramaPilot (COMPLETATA)
+
+### Report cleanup
+- **Backup**: script idempotente con dry-run — nessun dato demo trovato da eliminare (il tenant era già pulito dalla nascita)
+- **Tenant target**: PanoramaPilot (id `ae9168f6-d96e-4c5d-bb33-25acbb9a8410`) — solo questo tenant toccato
+- **Raccolte verificate**: 60 collezioni operative ispezionate (`customers, leads, quotes, contracts, opening_products, sales_orders, production_orders, invoices, bom_templates, profile_systems, item_pricelists, import_jobs, ecc.`) — **tutte con 0 record**
+- **Record eliminati**: 0 (nessuno da eliminare)
+- **File eliminati dallo storage**: 0 (`/app/storage/ae9168f6-...` non esiste)
+- **Record preservati**:
+  - Utenza `pilot@panoramapilot.com` (id `b2286106-...`)
+  - Ruolo `tenant_owner` (id `e4a05b01-...`) con 247 permission_keys
+  - Company `PanoramaPilot` (id `ae9168f6-...`)
+  - 12 audit log entries (immutabili)
+- **Elementi unknown**: 0
+- **Seed demo disabilitati**: già inattivi per PanoramaPilot — `run_seed()` in `seed.py` è ancorato a `company_id` di Infissi Express (Msg 5.1), nessun riferimento a "panoramapilot" nei seed. Il restart backend non ricrea dati demo su PanoramaPilot.
+
+### Stato login e test post-cleanup
+- **Login owner**: verificato 200 OK
+- **Ambiente vuoto confermato via API live**: `/api/customers=0, /api/leads=0, /api/quotes=0, /api/contracts=0, /api/parametric/item-pricelists=0, /api/parametric/bom-templates=0, /api/parametric/profile-systems=0, /api/importer/jobs=0`
+- **Config sistema preservate**: 20 ricette BOM, 6 template geometrici, 1 signature provider disponibile
+- **Errori Critical/High**: 0
+
+### Audit registrato
+Action `tenant.cleanup.demo_data_removed` registrato in `audit_logs` con `tenant_id=ae9168f6-...`, `user_email=pilot@panoramapilot.com`, timestamp UTC.
+
+### Note
+Il tenant era già in stato desiderato dalla nascita (creato da `provision_owner.py` senza seed demo). Lo script cleanup è idempotente: rieseguibile in sicurezza.
