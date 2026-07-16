@@ -122,6 +122,13 @@ PERMISSION_CATALOG = [
     ("quotes.public_link.regenerate", "Preventivi", "approve", "Rigenera link pubblico (revoca+crea)"),
     ("quotes.public_link.configure", "Preventivi", "create", "Configura durata/OTP/max accessi"),
     ("quotes.public_access_logs.view", "Preventivi", "view", "Visualizza log accessi portale pubblico"),
+    # Public portal actions (M3.3.4)
+    ("quotes.public_action.review", "Preventivi", "view", "Visualizza azioni cliente dal portale (richieste modifica, rifiuti)"),
+    ("quotes.public_action.take_over", "Preventivi", "edit", "Prendi in carico richieste cliente dal portale"),
+    ("quotes.public_action.close", "Preventivi", "approve", "Chiudi richieste cliente dal portale"),
+    ("quotes.reopen", "Preventivi", "approve", "Riapri preventivo rifiutato"),
+    # OTP debug (M3.3.4) — dev/test only
+    ("debug.otp.read", "Debug", "view", "Legge OTP mock in ambiente dev/test"),
 ]
 
 # Predefined roles with permissions

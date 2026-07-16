@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="{{ snap.template.language or 'it' }}">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ snap.quote.number }} — Preventivo firmato</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 15mm 24mm 15mm;
+      @top-left { content: element(header); }
+      @bottom-left {
+        content: "Documento firmato elettronicamente — Evidence ID: {{ evidence.short_id }}";
+        font-size: 7pt; color: #666; font-family: 'DejaVu Sans','Liberation Sans',sans-serif;
+      }
+      @bottom-right {
+        content: "Pag. " counter(page) " di " counter(pages);
+        font-size: 8pt; color: #666; font-family: 'DejaVu Sans','Liberation Sans',sans-serif;
+      }
+    }
+    html, body { margin: 0; padding: 0; font-family: 'DejaVu Sans','Liberation Sans','Helvetica',sans-serif; color: #1a1a1a; font-size: 10pt; line-height: 1.35; }
+    :root {
+      --brand: {{ snap.company.primary_color or '#0F1720' }};
+      --accent: {{ snap.company.secondary_color or '#D42027' }};
+      --border: #d8d8d8;
+      --soft: #f5f5f5;
+      --muted: #666;
+    }
+    /* Signature page — always starts on new page */
+    .sig-page { page-break-before: always; }
+    .sig-header { border-bottom: 3pt solid var(--brand); padding-bottom: 4mm; margin-bottom: 8mm; }
+    .sig-header h1 { margin: 0; font-size: 20pt; color: var(--brand); letter-spacing: 0.3pt; }
+    .sig-header .subtitle { font-size: 10pt; color: var(--muted); margin-top: 1mm; }
+    .sig-badge {
+      display: inline-block; padding: 2mm 4mm; background: var(--brand); color: #fff;
+      font-size: 8pt; font-weight: bold; letter-spacing: 1pt; text-transform: uppercase; margin-bottom: 3mm;
+    }
+    .sig-grid { display: table; width: 100%; margin-bottom: 8mm; border-collapse: collapse; }
+    .sig-grid .row { display: table-row; }
+    .sig-grid .k { display: table-cell; width: 42%; font-size: 8.5pt; color: var(--muted);
+      padding: 2.5mm 3mm; border-bottom: 0.4pt solid var(--border); text-transform: uppercase; letter-spacing: 0.5pt; }
+    .sig-grid .v { display: table-cell; padding: 2.5mm 3mm; border-bottom: 0.4pt solid var(--border); font-weight: 500; }
+    .sig-image-box {
+      border: 0.5pt dashed var(--brand); padding: 6mm; text-align: center; margin: 6mm 0;
+      background: var(--soft);
+    }
+    .sig-image-box img { max-height: 40mm; max-width: 120mm; background: #fff; padding: 2mm; }
+    .sig-image-caption { font-size: 8pt; color: var(--muted); margin-top: 2mm; }
+    .consents { margin: 6mm 0; }
+    .consents li { margin: 2mm 0; font-size: 9.5pt; }
+    .consents .ok { color: #16803D; font-weight: bold; }
+    .consents .no { color: #b91c1c; font-weight: bold; }
+    .evidence-box {
+      background: #fafafa; border: 0.5pt solid var(--border); padding: 5mm; margin-top: 6mm;
+      font-family: 'DejaVu Sans Mono','Liberation Mono',ui-monospace,Consolas,monospace; font-size: 8pt;
+    }
+    .evidence-box .k { color: var(--muted); text-transform: uppercase; letter-spacing: 0.5pt; font-size: 7.5pt; }
+    .evidence-box .hash { word-break: break-all; letter-spacing: 0.2pt; }
+    .fes-disclaimer {
+      margin-top: 8mm; font-size: 8pt; color: var(--muted); background: #fff8e6;
+      border-left: 3pt solid #d4a017; padding: 3mm 4mm;
+    }
+    .short-id-badge {
+      display: inline-block; background: var(--accent); color: #fff; padding: 2mm 5mm;
+      font-family: 'DejaVu Sans Mono',ui-monospace,monospace; font-weight: bold; font-size: 13pt; letter-spacing: 2pt;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- SIGNATURE PAGE                                                -->
+<!-- ============================================================ -->
+<div class="sig-page">
+  <div class="sig-header">
+    <div class="sig-badge">Documento firmato — {{ signature.signature_type_label }}</div>
+    <h1>Accettazione e firma elettronica</h1>
+    <div class="subtitle">
+      Preventivo <b>{{ snap.quote.number }}</b> · Revisione <b>{{ snap.quote.revision_label or snap.quote.revision }}</b>
+      · Emittente: <b>{{ snap.company.commercial_name or snap.company.name }}</b>
+    </div>
+  </div>
+
+  <!-- Evidence ID prominent -->
+  <div style="margin-bottom: 6mm">
+    <div style="font-size:8pt;color:var(--muted);text-transform:uppercase;letter-spacing:1pt;margin-bottom:1mm">Evidence ID</div>
+    <span class="short-id-badge">{{ evidence.short_id }}</span>
+  </div>
+
+  <div class="sig-grid">
+    <div class="row"><div class="k">Firmatario</div><div class="v">
+      <b>{{ signature.signer_first_name }} {{ signature.signer_last_name }}</b>
+      {% if signature.signer_fiscal_role %}<div style="font-size:8.5pt;color:var(--muted)">Ruolo: {{ signature.signer_fiscal_role }}</div>{% endif %}
+      {% if signature.signer_company_represented %}<div style="font-size:8.5pt;color:var(--muted)">In rappresentanza di: {{ signature.signer_company_represented }}</div>{% endif %}
+    </div></div>
+    <div class="row"><div class="k">Email verificata (mascherata)</div><div class="v">{{ signature.signer_email_masked }}</div></div>
+    <div class="row"><div class="k">Data e ora firma (UTC)</div><div class="v">{{ signature.signed_at_utc }}</div></div>
+    <div class="row"><div class="k">Data e ora firma (Europe/Rome)</div><div class="v">{{ signature.signed_at_local }}</div></div>
+    <div class="row"><div class="k">Riferimento indirizzo di rete</div><div class="v">Indirizzo di rete registrato e pseudonimizzato ai fini probatori</div></div>
+    <div class="row"><div class="k">Hash del PDF originale</div><div class="v" style="font-family:'DejaVu Sans Mono',monospace;font-size:8pt;word-break:break-all">{{ evidence.original_pdf_hash }}</div></div>
+    <div class="row"><div class="k">Snapshot hash del preventivo</div><div class="v" style="font-family:'DejaVu Sans Mono',monospace;font-size:8pt;word-break:break-all">{{ evidence.snapshot_hash }}</div></div>
+    <div class="row"><div class="k">Versione condizioni contrattuali</div><div class="v" style="font-family:'DejaVu Sans Mono',monospace;font-size:8pt">{{ signature.clauses_version_hash or '—' }}</div></div>
+    <div class="row"><div class="k">Tipo firma</div><div class="v">{{ signature.signature_type_label }}</div></div>
+  </div>
+
+  <!-- Signature image -->
+  <div class="sig-image-box">
+    <img src="{{ signature.signature_image_data_url }}" alt="firma"/>
+    <div class="sig-image-caption">Grafia acquisita elettronicamente · Hash immagine: {{ signature.signature_image_hash[:16] }}…</div>
+  </div>
+
+  <!-- Consents -->
+  <div>
+    <div style="font-size:10pt;font-weight:bold;color:var(--brand);margin-bottom:2mm">Dichiarazioni accettate</div>
+    <ul class="consents">
+      <li><span class="{{ 'ok' if signature.consents.accept_terms else 'no' }}">
+        {{ '✓' if signature.consents.accept_terms else '✗' }}
+      </span> Accettazione delle condizioni contrattuali riportate nel preventivo.</li>
+      <li><span class="{{ 'ok' if signature.consents.accept_payment_terms else 'no' }}">
+        {{ '✓' if signature.consents.accept_payment_terms else '✗' }}
+      </span> Accettazione dei termini di pagamento indicati.</li>
+      <li><span class="{{ 'ok' if signature.consents.accept_privacy else 'no' }}">
+        {{ '✓' if signature.consents.accept_privacy else '✗' }}
+      </span> Presa visione dell'informativa privacy.</li>
+      <li><span class="{{ 'ok' if signature.consents.consent_electronic_sign else 'no' }}">
+        {{ '✓' if signature.consents.consent_electronic_sign else '✗' }}
+      </span> Consenso all'accettazione tramite firma elettronica semplice.</li>
+    </ul>
+  </div>
+
+  <!-- Evidence hash -->
+  <div class="evidence-box">
+    <div class="k">Evidence hash (SHA-256 del payload canonico)</div>
+    <div class="hash">{{ evidence.evidence_hash }}</div>
+    <div class="k" style="margin-top:3mm">Evidence ID (riferimento sintetico)</div>
+    <div class="hash">{{ evidence.short_id }}</div>
+  </div>
+
+  <div class="fes-disclaimer">
+    Il presente documento è stato accettato mediante <b>Firma Elettronica Semplice (FES)</b>
+    e verifica del contatto indicato dal firmatario. L'efficacia probatoria dipende dal processo
+    di raccolta delle evidenze; il presente sistema non attesta il valore di firma qualificata o marca temporale certificata.
+    Il documento originale non firmato e questo documento firmato sono archiviati separatamente e non modificabili.
+  </div>
+</div>
+
+</body>
+</html>

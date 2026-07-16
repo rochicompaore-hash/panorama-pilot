@@ -15,6 +15,14 @@
         content: element(footer);
         font-size: 8pt;
       }
+      @bottom-left {
+        {% if signed_evidence_id %}
+        content: "Documento firmato elettronicamente — Evidence ID: {{ signed_evidence_id }}";
+        font-size: 7pt;
+        color: #666;
+        font-family: 'DejaVu Sans', 'Liberation Sans', sans-serif;
+        {% endif %}
+      }
       @bottom-right {
         content: "Pag. " counter(page) " di " counter(pages);
         font-size: 8pt;

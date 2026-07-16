@@ -36,7 +36,7 @@ class PublicLinkCreate(BaseModel):
     expires_at: Optional[datetime] = None
     requires_otp: bool = False
     maximum_accesses: Optional[int] = None
-    allowed_actions: List[str] = Field(default_factory=lambda: ["view", "download"])
+    allowed_actions: List[str] = Field(default_factory=lambda: ["view", "download", "sign", "request_changes", "reject"])
 
 
 class PublicLinkRevoke(BaseModel):

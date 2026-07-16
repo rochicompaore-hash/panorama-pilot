@@ -29,4 +29,32 @@ class Settings:
     MAX_UPLOAD_SIZE_MB: int = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "25"))
     CORS_ORIGINS: str = os.environ.get("CORS_ORIGINS", "*")
 
+    # M3.3.4 — Redis / rate limiter / OTP / signature
+    APP_ENV: str = os.environ.get("APP_ENV", "development").lower()  # development|test|staging|production
+    REDIS_URL: str = os.environ.get("REDIS_URL", "")
+    DEGRADED_PUBLIC_VIEW_ALLOWED: bool = os.environ.get("DEGRADED_PUBLIC_VIEW_ALLOWED", "true").lower() == "true"
+    # Rate limits
+    RATE_LIMIT_LINK_OPEN_PER_MIN: int = int(os.environ.get("RATE_LIMIT_LINK_OPEN_PER_MIN", "30"))
+    RATE_LIMIT_PDF_DOWNLOAD_PER_MIN: int = int(os.environ.get("RATE_LIMIT_PDF_DOWNLOAD_PER_MIN", "10"))
+    RATE_LIMIT_OTP_REQUEST_WINDOW_SEC: int = int(os.environ.get("RATE_LIMIT_OTP_REQUEST_WINDOW_SEC", "600"))
+    RATE_LIMIT_OTP_REQUEST_MAX: int = int(os.environ.get("RATE_LIMIT_OTP_REQUEST_MAX", "3"))
+    RATE_LIMIT_OTP_REQUEST_COOLDOWN_SEC: int = int(os.environ.get("RATE_LIMIT_OTP_REQUEST_COOLDOWN_SEC", "60"))
+    RATE_LIMIT_OTP_REQUEST_DAILY_MAX: int = int(os.environ.get("RATE_LIMIT_OTP_REQUEST_DAILY_MAX", "10"))
+    RATE_LIMIT_OTP_VERIFY_MAX_ATTEMPTS: int = int(os.environ.get("RATE_LIMIT_OTP_VERIFY_MAX_ATTEMPTS", "5"))
+    RATE_LIMIT_OTP_VERIFY_DAILY_MAX_FAIL: int = int(os.environ.get("RATE_LIMIT_OTP_VERIFY_DAILY_MAX_FAIL", "20"))
+    RATE_LIMIT_SIGN_PER_HOUR: int = int(os.environ.get("RATE_LIMIT_SIGN_PER_HOUR", "5"))
+    # OTP
+    OTP_TTL_SECONDS: int = int(os.environ.get("OTP_TTL_SECONDS", "600"))
+    OTP_LENGTH: int = int(os.environ.get("OTP_LENGTH", "6"))
+    OTP_DEBUG_ENABLED: bool = os.environ.get("OTP_DEBUG_ENABLED", "true").lower() == "true"
+    # Signature
+    SIGNATURE_EVIDENCE_ISSUER: str = os.environ.get("SIGNATURE_EVIDENCE_ISSUER", "Infissi Express Cloud")
+
 settings = Settings()
+
+def is_dev_or_test() -> bool:
+    return settings.APP_ENV in ("development", "dev", "test", "testing")
+
+
+def is_prod_like() -> bool:
+    return settings.APP_ENV in ("staging", "stage", "production", "prod")

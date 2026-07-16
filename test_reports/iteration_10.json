@@ -1,0 +1,54 @@
+{
+  "summary": "M3.3.4 Firma Elettronica Semplice — comprehensive backend test coverage. 26/26 tests PASS covering: OTP request/cooldown/supersede/masked recipient, debug OTP endpoint auth + dev-only, OTP verify correct/wrong/attempts, signature full flow (evidence_id 8-hex, signed_pdf_id, footer stamp on every page, extra signature page appended, original PDF unmodified, quote_status→signed, allowed_actions filtered to view/download/download_signed), signature idempotency (2nd request-otp on signed quote → 409 quote_not_open), consent missing → 400 consents_missing, invalid signature image → 400 invalid_signature, request-changes creates CustomerRequest kind=change_request + updates quote_status + narrows token actions to view/download + subsequent 409, reject creates kind=rejection + PDF still downloadable, admin take/close/reopen workflow (400 for non-rejected quote), sales rep notification in db.notifications with meta.kind=signed, rate limits link_open 30/min + pdf_download 10/min triggering 429 with Retry-After header, no plaintext OTP or hashed identifiers leak in public DTO.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/public/quotes/{token}/verify-otp",
+        "issue": "Spec says '5 failed attempts marks OTP failed and returns 429'. Actual implementation: 5th wrong attempt returns 400 invalid_code and sets status=failed; 6th+ attempts return 404 not_found (because doc.status != 'pending' short-circuits BEFORE the attempts>=max check in services/otp.py::verify_otp lines 101-102). The dedicated 'too_many_attempts' → 429 branch is therefore unreachable in normal flow. Security intent (block further attempts) is achieved but the HTTP status code does not match spec."
+      },
+      {
+        "endpoint": "GET /api/public/quotes/{token}/signed-pdf",
+        "issue": "Signed PDF has 2 signature pages appended (not 1 as documented in spec). For a 4-page original quote the signed PDF is 6 pages (matches manual smoke note). Likely quote_signed_pdf.html template overflows onto page 2. Cosmetic — footer stamp is present on all 6 pages."
+      },
+      {
+        "endpoint": "PATCH /api/quotes/{qid}",
+        "issue": "PATCH /quotes/{qid} silently ACCEPTS sales_rep_id in body (returns 200) but does not persist it (DB read-back shows sales_rep_id=None). Confirmed by test (direct DB update was required to trigger sales rep notification). Should either accept and persist, or reject with 400."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_public_signature_m334.py",
+    "/app/test_reports/pytest/iteration_10_m334.xml"
+  ],
+  "action_items": [
+    "MINOR: services/otp.py::verify_otp — reorder checks so that when doc.status becomes 'failed' due to attempts exhaustion, the NEXT verify call returns 429 'too_many_attempts' instead of 404 'not_found'. Currently the status!=pending check at line 101 runs BEFORE the attempts>=max check at line 117, making the 429 branch unreachable once status is set to 'failed'. Suggested fix: differentiate 'failed_due_to_attempts' from 'superseded'/'expired' by checking status=='failed' explicitly and returning 'too_many_attempts'.",
+    "MINOR: templates/quote_signed_pdf.html — content is overflowing onto a second page, producing +2 pages instead of +1 documented. Tighten CSS/max-height or split into an explicit continuation page. Non-blocking.",
+    "MINOR: routers/quotes (PATCH endpoint) — either accept & persist sales_rep_id or return 400 on attempts to change it. Currently silently returns 200 with no persistence, which is confusing for API consumers.",
+    "NOTE (from iteration_9): is_expired remains False when snapshot valid_until is a naive datetime — normalization to tz-aware UTC still recommended before the comparison in public_get_quote."
+  ],
+  "critical_code_review_comments": [
+    "routers/public.py sign_quote — good: idempotency lock via limiter.set_lock('sign_idem', 30s) prevents double-click double-signature race; existing_sig check returns 200 with already_signed=true for retries; original PDF is preserved (kind='definitive' unchanged, new kind='signed' record created). Excellent design.",
+    "routers/public.py sign_quote — good: superseded pending OTPs after successful sign (line 863-866); token allowed_actions narrowed to view/download/download_signed post-sign (line 840).",
+    "routers/public.py _ensure_quote_open_for_signing — properly blocks OTP request/sign for quotes in signed/rejected/change_requested states with 409 quote_not_open and state=<status> detail. Verified via double-request test.",
+    "services/signature.py canonical_payload — good: PII (email, IP, UA) only in hashed form; deterministic sort via sort_keys=True; version_hash referenced.",
+    "services/signature.py parse_signature_data_url — good validation: strict regex, size bounds (200..500KB), b64 validate=True.",
+    "routers/debug.py — good: dev/test gate via is_dev_or_test() returning 404 in prod; permission-checked via require_permission('debug.otp.read'); audit logged with quote_id and channel.",
+    "services/otp.py verify_otp — has the ordering bug described in action_items (status check before attempts check makes 429 branch unreachable in practice).",
+    "routers/public.py public_get_quote — signature_ready check correctly hides sign/request_changes/reject actions when limiter isn't ready for sensitive scope OR quote is expired/superseded (line 412-414). Fail-closed contract honored.",
+    "services/rate_limiter.py — solid abstraction: Redis primary + in-memory dev fallback, fail-closed in prod-like when Redis down for sensitive scopes; hkey uses sha256[:24] never raw identifiers.",
+    "MINOR OBSERVATION: routers/public.py sign_quote line 683-688 — when existing_sig branch fires, response schema differs slightly from success (adds 'already_signed:true' and omits 'signed_at' / 'message'). Consider unifying for API consumers."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_public_signature_m334.py (NEW — 26 tests, ~500 lines)"
+  ],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "n/a (backend-only per request)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin wildcard *)",
+  "seed_data_creation": "~15 disposable quotes created (TEST_M334_*) each with 1 line + PDF + public link. All draft/signed/rejected/change_requested variants isolated to Super Admin tenant. Signed quotes leave signed PDF records in quote_pdfs. Notifications and customer_requests documents also created for testing. Nothing modifies existing production/seed data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Full M3.3.4 backend coverage in /app/backend/tests/test_public_signature_m334.py. Test file is idempotent and self-contained: creates its own fresh quotes/links/OTPs. Runs in ~30s with 2 workers on preview URL. The 3 reference quotes noted by main agent (2120d4d0..., 7ddcdd12..., 2c7f91f7...) are already terminal-state (signed/rejected/sent) from prior smoke tests — this test file does NOT depend on them. Uses direct MongoDB access ONLY for: (a) setting sales_rep_id (PATCH doesn't accept), (b) reading db.notifications for sales rep notification verification. Both are documented in the test file with comments.",
+  "rca of the issue": "Three minor issues discovered — none are blockers for M3.3.4 acceptance. (1) OTP verify status-code ordering bug in services/otp.py: doc.status check runs before attempts check, making 429 too_many_attempts unreachable — security intent is preserved but spec mismatch. (2) Signed PDF page overflow: signature template renders 2 pages instead of 1, giving +2 pages total (matches manual smoke test observation). (3) PATCH /quotes doesn't persist sales_rep_id — silent 200 with no update. Rate limits, idempotency, notifications, PDF footer stamp, evidence chain (all hashes/no PII/consents/clauses hash) are all correctly implemented and tested."
+}

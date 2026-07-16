@@ -105,12 +105,13 @@ def safe_filename(*parts: str, ext: str = "pdf", max_len: int = 200) -> str:
     return f"{name}.{ext}"
 
 
-def render_quote_pdf(snapshot: dict, watermark: Optional[str] = None) -> bytes:
+def render_quote_pdf(snapshot: dict, watermark: Optional[str] = None, signed_evidence_id: Optional[str] = None) -> bytes:
     """Render the given quote snapshot to PDF bytes. No external network calls."""
     template = _env.get_template("quote_pdf.html")
     html_str = template.render(
         snap=snapshot,
         watermark=watermark,
+        signed_evidence_id=signed_evidence_id,
         now=datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
     )
     # WeasyPrint: base_url points to templates dir for any relative asset (should be none for security)
