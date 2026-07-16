@@ -7,7 +7,7 @@ import {
   House, Users, ShieldCheck, Buildings, Hash, Files, ClockCounterClockwise,
   Bell, Devices, EnvelopeSimple, MagnifyingGlass, SignOut, List, X, CaretDown,
   UserCircle, IdentificationCard, ListChecks, CalendarBlank, Target, WhatsappLogo,
-  Kanban,
+  Kanban, FileText,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,12 @@ const NAV = [
       { to: "/calendar", i18n: "nav.calendar", icon: CalendarBlank, perm: "crm.appointments.view" },
       { to: "/goals", i18n: "nav.goals", icon: Target, perm: "crm.goals.view" },
       { to: "/attachments", i18n: "nav.attachments", icon: Files, perm: "attachments.view" },
+    ],
+  },
+  {
+    group: "commercial",
+    items: [
+      { to: "/quotes", i18n: "nav.quotes", icon: FileText, perm: "quotes.view" },
     ],
   },
   {

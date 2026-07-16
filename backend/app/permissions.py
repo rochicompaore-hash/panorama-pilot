@@ -81,6 +81,31 @@ PERMISSION_CATALOG = [
     ("crm.commissions.manage", "Provvigioni", "edit", "Gestisce provvigioni"),
     # Onboarding
     ("onboarding.access", "Onboarding", "view", "Accesso wizard onboarding"),
+    # Quotes (M3)
+    ("quotes.view", "Preventivi", "view", "Visualizza preventivi"),
+    ("quotes.create", "Preventivi", "create", "Crea preventivi"),
+    ("quotes.edit", "Preventivi", "edit", "Modifica preventivi"),
+    ("quotes.delete", "Preventivi", "delete", "Elimina preventivi"),
+    ("quotes.send", "Preventivi", "create", "Invia preventivi"),
+    ("quotes.approve", "Preventivi", "approve", "Approva preventivi"),
+    ("quotes.export", "Preventivi", "export", "Esporta preventivi"),
+    ("quotes.view_costs", "Preventivi", "view_financials", "Visualizza costi interni preventivi"),
+    ("quotes.view_margins", "Preventivi", "view_margins", "Visualizza marginalità preventivi"),
+    ("quotes.edit_prices", "Preventivi", "edit", "Modifica prezzi manualmente"),
+    ("quotes.apply_discount", "Preventivi", "edit", "Applica sconti"),
+    ("quotes.override_discount", "Preventivi", "approve", "Sconto oltre soglia (bypass approvazione)"),
+    ("quotes.convert_contract", "Preventivi", "approve", "Converte preventivo in contratto"),
+    # Pricelists
+    ("pricelists.view", "Listini", "view", "Visualizza listini"),
+    ("pricelists.manage", "Listini", "edit", "Gestisce listini e regole prezzo"),
+    # Products
+    ("products.view", "Prodotti", "view", "Visualizza catalogo prodotti"),
+    ("products.manage", "Prodotti", "edit", "Gestisce catalogo prodotti"),
+    # Contracts
+    ("contracts.view", "Contratti", "view", "Visualizza contratti"),
+    ("contracts.create", "Contratti", "create", "Crea contratti"),
+    ("contracts.sign", "Contratti", "approve", "Firma contratti"),
+    ("contracts.cancel", "Contratti", "delete", "Annulla contratti"),
 ]
 
 # Predefined roles with permissions
@@ -115,6 +140,10 @@ PREDEFINED_ROLES = {
             "crm.appointments.view", "crm.appointments.manage",
             "crm.goals.view", "crm.commissions.view",
             "onboarding.access",
+            "quotes.view", "quotes.create", "quotes.edit", "quotes.send", "quotes.apply_discount",
+            "quotes.convert_contract",
+            "pricelists.view", "products.view",
+            "contracts.view", "contracts.create",
         ],
     },
     "tecnico_rilievo": {

@@ -36,6 +36,8 @@ from app.routers.tasks import router as tasks_router
 from app.routers.appointments import router as appointments_router
 from app.routers.sales import goals_router, commissions_router
 from app.routers.dashboards_crm import router as dashboards_crm_router
+from app.routers.quotes import router as quotes_router
+from app.routers.contracts import router as contracts_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -88,6 +90,8 @@ api.include_router(appointments_router)
 api.include_router(goals_router)
 api.include_router(commissions_router)
 api.include_router(dashboards_crm_router)
+api.include_router(quotes_router)
+api.include_router(contracts_router)
 
 app.include_router(api)
 

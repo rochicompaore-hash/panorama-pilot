@@ -1,0 +1,80 @@
+{
+  "summary": "M3.1 Preventivatore Fondazioni — full backend + frontend E2E verification. 32/32 pytest tests in m3_quotes_test.py PASSED. Frontend E2E playwright flow PASSED (login → sidebar Commerciale M3 → Preventivi list → new quote dialog (lead select) → editor page with correct PREV-YYYY-NNNNN-R00 number → add opening V01 with dims → add line (window qty=2 price=800 → subtotal 1600) → apply 10% discount → totals recomputed to 1440 → Invia → sent → Accettato → accepted → Genera contratto → contract CON-2026-00003 created via POST 200). Sequence 'quote' verified current_number>=1349 → first-next=1350 (created quotes observed at 01362, 01363, 01364…). Price engine verified: 800*2*0.9=1440 subtotal, VAT 22%=316.8, total=1756.8, margin_abs=1440 (no internal_cost). Status flow, transition validation (draft→accepted rejected 400 with exact Italian message), price_snapshot freeze on send, superadmin bypass of discount threshold, revisions R00→R01 (parent superseded, is_current flags), history endpoint, convert-to-contract idempotency (2nd call 400 'già convertito'), convert on draft rejected 400 'accepted/approved', contract sign (SHA-256 hash 64 chars, IP+UA captured), double-sign guard, accept_terms=false 400, RBAC (viewer 403 on POST/approve/sign), tenant isolation (fake UUID lead 400, non-existent quote 404), cost/margin masking (viewer without quotes.view returns 403 — masking codepath verified in code review; if viewer had quotes.view, _strip_costs_if_needed would set internal_cost/margin_abs/margin to None). All specified data-testid selectors present and functional.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/users",
+        "issue": "The `password` field is silently ignored (always sets password_hash=None). Only invitation-based user creation actually sets a working password. Not a blocker but the field should either be honored or removed from UserCreate model to avoid misleading API consumers. Test suite works around this by using accept-invitation flow."
+      },
+      {
+        "endpoint": "POST /api/quotes/{id}/lines PATCH discount governance",
+        "issue": "Approval auto-flip only triggers via PATCH /lines (discount_pct check). If a user creates a line directly with discount_pct=99 via POST /lines (add_line), no threshold check runs — the discount is applied silently. Consider mirroring the threshold enforcement in add_line as well. Superadmin bypass path is fine."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "QuoteEditorPage (dev-only overlay)",
+        "issue": "The react-scripts webpack dev server overlay intercepts pointer events with a benign 'ResizeObserver loop completed with undelivered notifications' error, which is a well-known non-blocking Chrome/react-scripts noise (introduced by shadcn Select/animations). It appears intermittently but ALWAYS blocks direct playwright .click() until dismissed. In production build this overlay is not shipped. Consider: (a) upgrade to react-scripts 5.x + configure webpack overlay to ignore ResizeObserver errors, or (b) add a small polyfill/global handler in index.js to swallow this specific error before it reaches the overlay. Non-blocking for users; only affects Selenium/Playwright automation.",
+        "selector": "iframe#webpack-dev-server-client-overlay",
+        "priority": "LOW"
+      },
+      {
+        "component": "QuoteEditorPage convert-to-contract",
+        "issue": "After successful convert, navigation goes to /contracts/{id} which is NOT registered in App.js yet (route missing). The user lands on a fallback (dashboard/404-ish) even though the toast 'Contratto CON-YYYY-NNNNN generato' shows correctly. Expected per review note ('may 404 since /contracts route not in App.js yet') — flagged for M3.3.",
+        "selector": "[data-testid=\"quote-convert\"]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "QuoteEditorPage totals card",
+        "issues": [
+          "Margine displayed as '100%' when internal_cost=0 — technically correct but misleading; consider hiding margin_pct row when internal_cost is 0 (i.e., no cost data yet), or showing '—' instead of '100%'.",
+          "Totals card 'Riservato' section is always visible if user has quotes.view_margins, even before any cost data — could be conditionally hidden until at least one line has internal_cost>0."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/m3_quotes_test.py",
+    "/app/test_reports/pytest/m3_quotes.xml"
+  ],
+  "action_items": [
+    "M3.3 backlog: add /contracts and /contracts/:id routes in App.js so post-convert navigation lands on a real Contract page (currently dev shows dashboard fallback).",
+    "OPTIONAL: mirror discount threshold enforcement in add_line (POST /quotes/{id}/lines), currently only PATCH /lines checks it.",
+    "OPTIONAL: remove/document the ignored `password` field in POST /api/users OR wire it into an admin-set-password path (currently always None until invitation accepted).",
+    "OPTIONAL (cosmetic): swallow ResizeObserver overlay error in dev-mode react-error-overlay to avoid blocking automation and preview-URL testers."
+  ],
+  "critical_code_review_comments": [
+    "quotes.py _next_quote_number: correctly atomic via find_one_and_update with $inc; padding=5 respected; year_reset logic present. Sequence 'quote' seeded to current_number>=1349 in seed.py so first call returns 01350 as expected.",
+    "quotes.py convert_to_contract: falls back to auto-creating 'contract' sequence if absent — good resiliency. First contract number was CON-2026-00001 in a fresh tenant, CON-2026-00003 observed in this run (prior test runs incremented it).",
+    "quotes.py _strip_costs_if_needed: correctly masks internal_cost/margin_abs/margin_pct at quote level AND per-line internal_cost/margin. Uses set membership on '*' or 'quotes.view_costs' / 'quotes.view_margins' — clean.",
+    "quotes.py create_revision: deep-copies parent, generates fresh IDs for lines/openings, remaps opening_id references correctly (id_map). Parent gets is_current=False + quote_status='superseded'. History endpoint walks parent chain up to root then $regex-matches all family. Sound.",
+    "quotes.py STATUS_FLOW map: draft→accepted NOT allowed (correctly returns 400 with Italian 'Transizione non consentita: draft → accepted'). accepted→converted allowed. superseded/rejected/expired/cancelled/converted are terminal.",
+    "contracts.py sign: SHA-256 payload includes cid|signer|ip|ua|iso_ts|number → 64-hex signature_hash. IP + UA persisted. accept_terms=false → 400. Double-sign → 400. FES-simple compliant.",
+    "pricing.py compute_line: pipeline correct (base * qty_factor → surcharges → discount_pct → discount_amount → round). Verified 800*2*0.9=1440 empirically. margin = subtotal - (internal_cost * qty) — correct.",
+    "pricing.py compute_quote_totals: aggregates VAT per rate then sums — correctly handles mixed 4/10/22% (only 22% used in tests). taxable_amount = subtotal (before VAT). No total_discounts / total_surcharges aggregation implemented (currently always 0 in totals) — cosmetic gap: add these later when detailed breakdown UI is built.",
+    "quotes.py update_line: superadmin bypass on discount threshold works (verified: 50% discount on superadmin left status=draft). Non-superadmin without quotes.override_discount and over threshold auto-flips to to_approve with pending approval — but note this only fires if role has thresholds configured in db.discount_thresholds; no seed data exists yet so all non-superadmin users currently have max_allowed=0 → any discount>0 flips to to_approve. Consider seeding sensible defaults (Commerciale 15%, Admin Azienda 30%) in seed.py.",
+    "permissions.py: 23 M3 permissions correctly added (quotes.* 13, pricelists.* 2, products.* 2, contracts.* 4). Viewer role does NOT include quotes.view — so a pure viewer gets 403 on GET /api/quotes/{id} (rather than 200 with masked costs). This is stricter than the review spec expected; either add quotes.view to Viewer (so the mask path is exercised) or update spec.",
+    "No PDF endpoint, no signed-URL for signature_data_url storage yet (base64 stored inline in mongo) — acceptable for M3.1 foundations. M3.3 should move signature blob to object storage.",
+    "No email/whatsapp sending on quote_sent / contract_signed events — spec note says these are MOCKED via email mock; verify E-2-E via /api/email-logs in a future test."
+  ],
+  "updated_files": [
+    "/app/backend/tests/m3_quotes_test.py (new — 32 pytest tests covering M3.1)"
+  ],
+  "success_rate": {
+    "backend": "100% (32/32)",
+    "frontend": "100% (all E2E steps: login, sidebar, list, create dialog, add opening, add line, discount recompute, send, accept, convert-to-contract)"
+  },
+  "test_credentials": "admin@infissiexpress.com / Admin!2025. Test users auto-created via invitation flow with pattern test_m3_view_*@example.com / ViewOnly!2025.",
+  "seed_data_creation": "No manual DB seed. Tests reuse existing tenant, existing leads, and create additional TEST_-prefixed quotes/openings/lines. Viewer user created via /api/users + /api/auth/accept-invitation flow.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "M3.1 test suite at /app/backend/tests/m3_quotes_test.py — 32 tests, ~5s runtime with pytest-xdist. Reuses admin_token, seed_lead, created_quote module-scoped fixtures. Viewer role currently does NOT have quotes.view so test_viewer_gets_masked_costs_or_403 accepts EITHER 403 OR masked 200 (both correct behaviors). If M3.2/M3.3 tests are added, prefix TEST_ on all created entities and reuse the invitation-based viewer_token fixture pattern. Frontend E2E note: dev-mode ResizeObserver overlay blocks direct .click() — use page.evaluate(() => document.querySelector('[data-testid=...]').click()) as workaround. Contract page frontend route missing — expected per review; do not fail tests on post-convert navigation.",
+  "rca of the issue": "No blocking issues. Two minor code-review observations: (1) POST /api/users silently ignores `password` field — misleading API surface, test suite worked around by using /api/auth/accept-invitation flow. (2) discount threshold enforcement is PATCH-only, not enforced in POST /lines — this creates a bypass path where a user could create a line with 99% discount directly via POST and skip the approval workflow. Both non-blocking for M3.1 foundations but worth addressing before M3.2 ships to production sellers."
+}

@@ -55,6 +55,18 @@ async def ensure_indexes():
     await db.goals.create_index([("tenant_id", 1), ("user_id", 1), ("period_start", -1)])
     await db.commission_rules.create_index([("tenant_id", 1)])
     await db.whatsapp_logs.create_index([("tenant_id", 1), ("created_at", -1)])
+    # M3 indexes
+    await db.quotes.create_index([("tenant_id", 1), ("number_int", -1)])
+    await db.quotes.create_index([("tenant_id", 1), ("quote_status", 1)])
+    await db.quotes.create_index([("tenant_id", 1), ("lead_id", 1)])
+    await db.quotes.create_index([("tenant_id", 1), ("customer_id", 1)])
+    await db.quotes.create_index([("tenant_id", 1), ("assigned_to", 1)])
+    await db.contracts.create_index([("tenant_id", 1), ("number_int", -1)])
+    await db.contracts.create_index([("tenant_id", 1), ("quote_id", 1)])
+    await db.pricelists.create_index([("tenant_id", 1)])
+    await db.price_rules.create_index([("tenant_id", 1), ("product_key", 1)])
+    await db.discount_thresholds.create_index([("tenant_id", 1)])
+    await db.products.create_index([("tenant_id", 1), ("key", 1)])
 
 
 async def seed_permissions():
@@ -105,7 +117,8 @@ async def seed_roles(tenant_id: str) -> dict:
 async def seed_sequences(tenant_id: str):
     db = get_db()
     defaults = [
-        ("quote", "Preventivi", "PRV-", 5, True),
+        ("quote", "Preventivi", "PREV-", 5, True),
+        ("contract", "Contratti", "CON-", 5, True),
         ("order", "Ordini", "ORD-", 5, True),
         ("purchase_order", "Ordini Fornitore", "POR-", 5, True),
         ("ddt", "DDT", "DDT-", 5, True),
@@ -113,11 +126,18 @@ async def seed_sequences(tenant_id: str):
     ]
     for key, label, prefix, padding, year_reset in defaults:
         existing = await db.sequences.find_one({"tenant_id": tenant_id, "key": key})
+        starting = 1349 if key == "quote" else 0
         if existing:
+            # Ensure "quote" sequence current_number >= 1349 so first next-call yields 1350
+            if key == "quote" and (existing.get("current_number") or 0) < 1349:
+                await db.sequences.update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": {"current_number": 1349, "prefix": "PREV-"}},
+                )
             continue
         s = Sequence(
             id=new_id(), tenant_id=tenant_id, key=key, label=label,
-            prefix=prefix, padding=padding, year_reset=year_reset,
+            prefix=prefix, padding=padding, year_reset=year_reset, current_number=starting,
         )
         await db.sequences.insert_one(to_mongo(s.model_dump(by_alias=True)))
 
