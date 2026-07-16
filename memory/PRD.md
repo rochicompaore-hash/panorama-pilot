@@ -184,3 +184,65 @@ Chiama il tool "Deploy" dall'interfaccia Emergent per pubblicare. deployment_age
 **Test:** `/app/test_reports/iteration_20.json` — Backend 19/20 pass (fix applicato su idempotency), Frontend 4/4 pagine funzionanti (2 issue minor fixati: address formatter + auto-tab-switch). Regressione Blocco A: OK.
 
 **Prossimo:** UX drag&drop full-free-form tree editor (Blocco D v2), integrazione FEA/FEQ provider (Blocco Firma v2), PDF renderer contratto server-side (esistente ma da collegare a viewer).
+
+## 2026-02 — Fase 2: Revisioni e Produzione (COMPLETATA)
+
+**Scope della Fase 2 (Messaggio 302): trasformare le parti mocked/JSON/simulate in funzionalità production-ready mantenendo integralmente quanto esistente.**
+
+### Cosa è stato completato
+1. **Editor Geometrico Visuale** — riscritta `GeometryBuilderPage.jsx` con:
+   - Canvas SVG interattivo click-to-select
+   - Toolbar: divisione H/V, duplica, elimina, undo/redo (20 step)
+   - Selezione tipo modulo (10 tipi: battente/ribalta/battente-ribalta/scorrevole/fisso/vetro fisso/pannello/sopra/sotto/fiancoluce)
+   - Lato cerniere, etichetta, dimensione (mm/pct/auto)
+   - Real-time compute che aggiorna SVG + BOM + prezzo + verifica dimensionale
+   - **NESSUN JSON tree editor obbligatorio** — l'utente lavora solo con controlli visivi
+2. **PDF Contratto Server-side** (WeasyPrint):
+   - Template `contract_pdf.html` con logo, intestazione, ambienti/vani/prodotti, importi, condizioni pagamento, clausole, firma canvas, watermark BOZZA/FIRMATO, footer hash
+   - Endpoint `GET /pdf/preview` (stream inline, auth), `POST /pdf/generate` (versione archiviata immutabile con hash SHA-256 + storage_key), `GET /pdf/download/{version}`, `GET /pdf/list`
+   - Ogni generazione crea nuova versione (nessuna sovrascrittura)
+   - Storage privato via `services.storage` (Local + S3 con signed URLs)
+3. **OTP Reale**:
+   - Usa `services.otp.create_otp` + `verify_otp` (hash + expiry + max tentativi + rate limit)
+   - Endpoint `/public/{token}/request-otp` ritorna `request_id`, `expires_in_seconds`, `recipient_masked`, `delivery_status`
+   - `debug_code` esposto SOLO se `OTP_DEBUG_ENABLED=true` (dev)
+   - Rate limit: max 3 richieste in 5 min per token
+   - Firma richiede `otp_request_id` + `otp_code` (non più solo "123456")
+4. **Storage Privato Importer**:
+   - `POST /importer/upload` salva file in `services.storage` con key `{tenant}/imports/{hash}/{filename}`
+   - Fallback automatico a Mongo blob se storage fallisce
+   - `_read_import_blob(job)` legge da storage preferred, blob legacy in fallback
+5. **Adapter Signature Provider**:
+   - `services/signature_provider.py` — interfaccia `SignatureProvider` con `create_envelope/send/poll/download_signed/download_audit`
+   - Registry pluggable: attualmente registrato `internal_canvas` (level=`electronic_simple`)
+   - Endpoint `/config/signature-providers` per pannello configurazione UI
+   - **Terminologia corretta**: mai chiamato "digitale/qualificato" — sempre "electronic_simple" per canvas
+6. **ContractViewerPage** aggiornata:
+   - Pulsanti "Anteprima PDF" (iframe con blob URL via api auth) + "Archivia PDF"
+   - Tabella versioni PDF con hash + size + download per versione
+   - Firma canvas rimane (ES); metadata firma mostrata con etichetta corretta "electronic_simple"
+
+### Test — iteration_21.json
+- Backend: **18/18 pass** (1 skip per limiti env — signed_url in Local storage)
+- Frontend: **10/10 pass**
+- Zero issue critical/minor
+- Nessuna regressione su Blocco A/B/C/D
+
+### Stato produzione
+| Feature | Stato | Note |
+|---|---|---|
+| Editor geometrico visuale | ✅ Prod | SVG interattivo + toolbar completa |
+| PDF contratto | ✅ Prod | WeasyPrint + storage versionato |
+| OTP reale | ✅ Prod | Hash + rate limit; debug code solo dev |
+| Storage privato import | ✅ Prod | Local/S3, signed URLs |
+| Signature adapter | ✅ Framework | Solo internal_canvas registrato |
+| Email real delivery | ⚠️ Config | Resend richiede API key; ora ritorna `delivery_status='mocked_dev'` se non configurato |
+| FEA/FEQ provider | ⚠️ Config | Adapter pronto per Namirial/InfoCert/Aruba — richiede credenziali |
+| Object storage S3 | ⚠️ Config | Local di default; abilitare via env `STORAGE_BACKEND=s3` |
+
+### Attività manuali residue per il deploy produzione
+1. Configurare `RESEND_API_KEY` per email reale
+2. Configurare S3 (`AWS_ACCESS_KEY_ID`, `S3_BUCKET`, ecc.) per storage in cloud
+3. Disabilitare `OTP_DEBUG_ENABLED` (o rimuoverlo) in prod
+4. Scegliere e configurare provider firma esterno (Namirial/InfoCert/Aruba) se serve FEA/FEQ
+5. Definire policy retention PDF contratti (attualmente illimitata)
