@@ -10,7 +10,7 @@ Tests all endpoints under /api/parametric/*:
 - BOM resolve
 - Cutting preview embedded in /preview when include_cutting_preview=true
 
-Requires: /app/memory/test_credentials.md — admin@infissiexpress.com / Admin!2025.
+Requires: env vars ADMIN_EMAIL / ADMIN_PASSWORD (see tests/_creds.py).
 """
 from __future__ import annotations
 import os

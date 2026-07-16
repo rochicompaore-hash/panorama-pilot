@@ -1,0 +1,37 @@
+{
+  "summary": "Iterazione 25 — Verifica backend del Code Quality iteration (simpleeval + import-time guard, refactor 7 funzioni high-complexity, cleanup import server.py, scrub segreti test, nuova regression suite). Health OK, backend attivo. Eseguita la nuova regression suite `tests/test_code_quality_regression.py` = 14/14 PASS in 2.20s. Aggiunta smoke suite `tests/test_iter25_smoke.py` = 6/6 PASS (health, /auth/me admin shape, login token/user shape, /api/contracts/generate-from-quote 404 su quote inesistente, /api/bi/quotes/kpi rispetta period_days=7, openapi route count = 561 operations su 406 paths — molto vicino al ~565 dichiarato). Confermato assenza di eval()/exec() in formula.py/parametric_engine.py/breakeven.py; presenti solo menzioni docstring del tipo 'NO eval()'. formula_security._assert_no_eval_in_module verificato su entrambi i moduli. Nessuna regressione trovata: login admin OK, /auth/me OK, /bi/quotes/kpi ritorna tutte le chiavi attese (counts_by_status, weighted_pipeline_value, conversion_rate_pct, avg_hours_to_first_open, avg_hours_to_sign, quotes_never_viewed, quotes_expiring_7d, rejection_reasons), /ai-cfo/generate ritorna {generated, items:list}, /contracts/public/<bogus>/sign → 404, /contracts/public/<bogus> → 404, formula engine rifiuta variabili sconosciute + funzioni + div/0 in strict, guard import-time OK. Scrub segreti verificato con grep: 0 occorrenze di password admin nei test files (unica menzione in docstring di test_parametric_m6.py rimossa in questa iterazione).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "openapi.json ingress", "issue": "GET https://<preview>/openapi.json ritorna text/html (SPA catch-all) invece dello schema. Solo /api/* è proxato al backend. Non è un bug del refactor, ma vale la pena documentare che l'OpenAPI non è pubblico via ingress; nei test si accede via http://localhost:8001/openapi.json."},
+      {"endpoint": "tests/test_parametric_m6.py:13", "issue": "Docstring conteneva credenziale in chiaro 'admin@infissiexpress.com / Admin!2025'. Rimossa in questa iterazione (sostituita con riferimento a env vars). Consigliato aggiungere un pre-commit grep che blocchi pattern password-like nei file test."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_code_quality_regression.py",
+    "/app/backend/tests/test_iter25_smoke.py",
+    "/app/test_reports/pytest/iteration_25.xml",
+    "/app/test_reports/pytest/iteration_25_smoke.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "formula.py/parametric_engine.py/breakeven.py sono confermati eval-free (solo docstring mention). Il guard formula_security._assert_no_eval_in_module è una buona difesa in profondità: consigliato aggiungerlo a un test permanente CI (già fatto in test_code_quality_regression.py).",
+    "auth_helpers.py + contracts_helpers.py presenti e i router auth.py/contracts.py continuano a passare tutti i casi di errore (401 bad password, 400 short password, 400 unknown invite token, 404 quote non esiste, 404 token pubblico invalido). Comportamento invariato dopo l'estrazione delle helper.",
+    "server.py conta 561 operations su 406 paths — coerente col ~565 dichiarato nel review request (il delta è nell'ordine dei 4 ops e potrebbe corrispondere a endpoint pubblici vs privati / metodi HEAD/OPTIONS non contati). Nessun router mancante.",
+    "Suggerimento (non bloccante): il test test_openapi_route_count deve girare in-cluster (http://localhost:8001) perché l'ingress SPA-catch-all mangia /openapi.json. Se si vuole testare dal preview URL, esporre /api/openapi.json oppure lasciarlo così — è comunque coperto dal test locale.",
+    "simpleeval==1.0.7 aggiunto a requirements.txt: verificato che l'import di app.services.formula_security funziona (SafeExpression evaluate('2+3*4') = 14 e rifiuta __import__)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter25_smoke.py (NEW)",
+    "/app/backend/tests/test_parametric_m6.py (rimossa credenziale in docstring)",
+    "/app/test_reports/iteration_25.json"
+  ],
+  "success_rate": {"backend": "100% (20/20 = 14 regression + 6 smoke)", "frontend": "N/A (backend-only run per request)"},
+  "test_credentials": "ADMIN_EMAIL e ADMIN_PASSWORD letti da backend/.env via tests/_creds.py (mai stampati). Nessun altro segreto usato.",
+  "seed_data_creation": "Nessun seed persistente creato. /api/ai-cfo/generate con force_regen=true può aver aggiornato la collezione ai_cfo_suggestions del tenant admin (comportamento atteso della API). Nessun'altra scrittura DB.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Refactor Code Quality iteration completato senza regressioni. 20/20 test verdi (14 regression suite + 6 smoke suite). Il main agent può marcare l'iterazione come chiusa. Se in futuro qualcuno reintroduce eval()/exec()/compile() in app/services/{formula,parametric_engine,breakeven}.py, il test test_formula_security_module_asserts_no_eval fallirà a import-time. Per test futuri di /api/contracts/generate-from-quote sul happy path serve creare un quote con status in ('sent','accepted') e customer collegato — vedi test_public_signature_m334.py per un esempio di fixture completa.",
+  "rca_of_the_issue": "N/A — nessun bug trovato. Refactor comportamentalmente preservato in tutti i punti di ingresso testati (auth, BI, AI CFO, contracts pubblico, formula engine)."
+}
