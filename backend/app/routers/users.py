@@ -127,11 +127,31 @@ async def update_user(
     db = get_db()
     doc = await db.users.find_one({"_id": user_id, "tenant_id": user["tenant_id"], "deleted_at": None})
     if not doc:
+        # Also lookup globally — platform owner is tenant_id=None
+        doc = await db.users.find_one({"_id": user_id, "deleted_at": None})
+    if not doc:
         raise HTTPException(status_code=404, detail="Utente non trovato")
+
+    # Platform Owner protection: only the owner can modify themselves
+    from app.platform_owner import assert_can_modify_user
+    if doc.get("is_platform_owner") or doc.get("is_protected"):
+        await assert_can_modify_user(user_id, user, action="update")
+        # Additional guardrails: block dangerous fields
+        if body.is_active is False:
+            raise HTTPException(status_code=403, detail="L'utenza proprietaria non può essere disattivata")
+        if body.role_ids is not None:
+            # Ensure platform_owner role remains
+            from app.platform_owner import PLATFORM_OWNER_ROLE_KEY
+            po_role = await db.roles.find_one({"name": PLATFORM_OWNER_ROLE_KEY, "tenant_id": None})
+            if po_role and po_role["_id"] not in (body.role_ids or []):
+                raise HTTPException(status_code=403,
+                    detail="Il ruolo Platform Owner non può essere rimosso dall'utenza proprietaria")
 
     if body.role_ids is not None:
         if body.role_ids:
-            count = await db.roles.count_documents({"_id": {"$in": body.role_ids}, "tenant_id": user["tenant_id"]})
+            # Roles can be tenant-scoped OR global (platform owner role)
+            count = await db.roles.count_documents({"_id": {"$in": body.role_ids},
+                "$or": [{"tenant_id": user["tenant_id"]}, {"tenant_id": None}]})
             if count != len(body.role_ids):
                 raise HTTPException(status_code=400, detail="Ruoli non validi")
 
@@ -161,7 +181,11 @@ async def deactivate_user(
     db = get_db()
     doc = await db.users.find_one({"_id": user_id, "tenant_id": user["tenant_id"], "deleted_at": None})
     if not doc:
+        doc = await db.users.find_one({"_id": user_id, "deleted_at": None})
+    if not doc:
         raise HTTPException(status_code=404, detail="Utente non trovato")
+    if doc.get("is_platform_owner") or doc.get("is_protected"):
+        raise HTTPException(status_code=403, detail="L'utenza proprietaria della piattaforma non può essere eliminata o disattivata")
     now = datetime.now(timezone.utc).isoformat()
     await db.users.update_one(
         {"_id": user_id},

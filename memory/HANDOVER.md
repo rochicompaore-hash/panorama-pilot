@@ -5,6 +5,31 @@
 **Auth:** JWT access + refresh, RBAC (`*` = super admin) + ABAC-ready.
 **Multi-tenant:** predisposto — ogni scrittura richiede `tenant_id`.
 **Firma:** FES (Firma Elettronica Semplice) tramite canvas + OTP email.
+**Platform Owner:** utenza globale `rochicompaore@gmail.com`, is_platform_owner+is_protected, non tenant-scoped, non eliminabile/disattivabile/retrocessibile.
+
+## Platform Owner (proprietario piattaforma)
+
+Utente globale singolo, sopra qualsiasi Super Admin del tenant.
+
+- **Email:** `rochicompaore@gmail.com` (configurabile via `PLATFORM_OWNER_EMAIL`)
+- **Ruolo:** `platform_owner` (globale, tenant_id=null) con permessi wildcard `*` + `platform.*`
+- **Attivazione:** invito monouso generato al seed. Password mai hardcoded.
+- **Recupero invito (dev/test only):**
+  - `GET /api/debug/platform-owner-invite` — richiede login + permesso `debug.otp.read`
+  - `POST /api/debug/platform-owner-invite/regenerate` — invalida invito precedente e ne crea uno nuovo
+- **Protezioni backend (403 su tentativi non autorizzati):**
+  - Non eliminabile (`DELETE /api/users/{id}` → 403)
+  - Non disattivabile (`PATCH is_active=false` → 403)
+  - Ruolo Platform Owner non rimovibile (`PATCH role_ids=[]` → 403)
+  - Nessun altro può modificarne l'utenza (solo il PO stesso)
+- **Sessioni:** all'attivazione via invito, tutte le sessioni preesistenti dell'utente vengono revocate
+- **Audit:** ogni consultazione del debug endpoint + attivazione registrati in `audit_logs`
+
+**Backlog Platform Owner (P1):**
+- MFA TOTP obbligatoria + recovery codes (modelli già presenti `mfa_secret`, `mfa_recovery_codes_hashes`)
+- Impersonation con motivazione obbligatoria e banner "Modalità assistenza"
+- UI Platform Console (gestione tenant, backup, integrazioni globali)
+- Trasferimento proprietà con periodo di attesa e MFA
 
 ## Percorso di consegna
 

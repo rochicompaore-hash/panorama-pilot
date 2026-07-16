@@ -66,7 +66,7 @@ async def get_permission_keys_for_user(user: dict) -> List[str]:
 
 def require_permission(*required: str) -> Callable:
     async def dep(user: dict = Depends(get_current_user)) -> dict:
-        if user.get("is_superadmin"):
+        if user.get("is_superadmin") or user.get("is_platform_owner"):
             return user
         perms = await get_permission_keys_for_user(user)
         pset = set(perms)
@@ -84,7 +84,7 @@ def require_permission(*required: str) -> Callable:
 
 def require_any_permission(*required: str) -> Callable:
     async def dep(user: dict = Depends(get_current_user)) -> dict:
-        if user.get("is_superadmin"):
+        if user.get("is_superadmin") or user.get("is_platform_owner"):
             return user
         perms = await get_permission_keys_for_user(user)
         pset = set(perms)

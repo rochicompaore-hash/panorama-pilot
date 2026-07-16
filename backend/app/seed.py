@@ -173,26 +173,37 @@ async def seed_super_admin(tenant_id: str, super_admin_role_id: str) -> str:
 async def write_test_credentials():
     """Write admin credentials to /app/memory/test_credentials.md for testing agents."""
     os.makedirs("/app/memory", exist_ok=True)
-    content = f"""# Test Credentials — Infissi Express Cloud (M1)
+    from app.platform_owner import PLATFORM_OWNER_EMAIL
+    content = f"""# Test Credentials — Infissi Express Cloud
 
-## Super Admin
+## Platform Owner (proprietario globale, MFA-ready, attivazione via invito)
+- Email: `{PLATFORM_OWNER_EMAIL}`
+- Password: **NON hardcoded** — via invito monouso
+- Ruolo: `platform_owner` (globale, tenant_id=null)
+- Flag: `is_platform_owner=true`, `is_protected=true`
+- Recupero invito (dev/test only): `GET /api/debug/platform-owner-invite`
+- Rigenera invito: `POST /api/debug/platform-owner-invite/regenerate`
+- Non eliminabile, non disattivabile, non retrocessibile.
+
+## Super Admin (test tenant Infissi Express)
 - Email: `{settings.ADMIN_EMAIL}`
 - Password: `{settings.ADMIN_PASSWORD}`
-- Role: Super Admin (accesso completo, cross-tenant)
+- Role: Super Admin (tenant-scoped)
 
-## Auth endpoints (backend, tutti prefissati con `/api/auth`)
-- `POST /api/auth/login` — body `{{email, password}}` → returns tokens + user; sets httpOnly cookies
-- `POST /api/auth/logout` — invalidates current session
-- `POST /api/auth/logout-all` — invalidates all sessions of the user
-- `POST /api/auth/refresh` — reads refresh_token cookie / body, issues new access token
-- `GET  /api/auth/me` — current user + permission keys
-- `POST /api/auth/change-password` — body `{{current_password, new_password}}`
-- `POST /api/auth/forgot-password` — body `{{email}}`
-- `POST /api/auth/reset-password` — body `{{token, new_password}}`
-- `POST /api/auth/accept-invitation` — body `{{token, password, first_name?, last_name?}}`
+## Auth endpoints (`/api/auth`)
+- `POST /login` — body `{{email, password}}`
+- `POST /accept-invitation` — body `{{token, password, first_name?, last_name?}}`
+- `POST /logout`, `/logout-all`, `/refresh`
+- `GET  /me`
+- `POST /change-password`, `/forgot-password`, `/reset-password`
 
 ## App URL
-- Frontend base: read from `REACT_APP_BACKEND_URL` (dev preview URL).
+- Frontend base: `REACT_APP_BACKEND_URL` (dev preview URL).
+
+## M3.3.4 — Firma Elettronica Semplice
+- Redis: `redis://127.0.0.1:6379/0` (supervisord `redis`)
+- APP_ENV=development → OTP debug attivo (`GET /api/debug/otp/{{request_id}}`)
+- Fail-closed in staging/prod se Redis non disponibile.
 """
     with open("/app/memory/test_credentials.md", "w") as f:
         f.write(content)
@@ -214,5 +225,10 @@ async def run_seed():
     # Seed PDF templates + clauses (M3.3.2)
     from app.seed_pdf import run_pdf_seed
     await run_pdf_seed(company_id)
+    # Platform Owner (globale, sopra Super Admin del tenant)
+    from app.platform_owner import run_platform_owner_seed
+    po = await run_platform_owner_seed()
+    logger.info("Platform Owner seed: user_id=%s already_active=%s inv=%s",
+                po.get("user_id"), po.get("already_active"), po.get("invitation_token_id"))
     await write_test_credentials()
     logger.info("Seed completed. Company=%s", company_id)

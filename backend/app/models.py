@@ -156,8 +156,18 @@ class User(BaseDoc):
     avatar_url: Optional[str] = None
     role_ids: List[str] = Field(default_factory=list)
     is_superadmin: bool = False
+    # Platform Owner (globale, sopra Super Admin del tenant, non tenant-scoped)
+    is_platform_owner: bool = False
+    platform_role: Optional[str] = None  # "platform_owner" | None
+    platform_permissions: List[str] = Field(default_factory=list)  # extra flags globali
+    tenant_memberships: List[str] = Field(default_factory=list)  # tenant a cui l'utente globale ha diritto di accesso; se vuoto = tutti
+    # MFA
+    mfa_enabled: bool = False
+    mfa_secret: Optional[str] = None  # TOTP shared secret (base32)
+    mfa_recovery_codes_hashes: List[str] = Field(default_factory=list)
     must_change_password: bool = False
     is_active: bool = True
+    is_protected: bool = False  # se true → non eliminabile/disattivabile
     failed_login_attempts: int = 0
     locked_until: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
@@ -172,9 +182,13 @@ class UserPublic(BaseModel):
     phone: Optional[str] = None
     avatar_url: Optional[str] = None
     role_ids: List[str] = []
-    is_superadmin: bool = False
-    is_active: bool = True
-    must_change_password: bool = False
+    is_superadmin: Optional[bool] = False
+    is_platform_owner: Optional[bool] = False
+    platform_role: Optional[str] = None
+    is_protected: Optional[bool] = False
+    mfa_enabled: Optional[bool] = False
+    is_active: Optional[bool] = True
+    must_change_password: Optional[bool] = False
     last_login_at: Optional[datetime] = None
     tenant_id: Optional[str] = None
     created_at: Optional[datetime] = None

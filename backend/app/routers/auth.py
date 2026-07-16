@@ -384,8 +384,16 @@ async def accept_invitation(body: AcceptInvitationRequest, request: Request):
         user_id = u.id
     await db.invitations.update_one(
         {"_id": inv["_id"]},
-        {"$set": {"accepted_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {"accepted_at": datetime.now(timezone.utc).isoformat(),
+                   "consumed_at": datetime.now(timezone.utc).isoformat()},
+         "$unset": {"debug_raw_token": ""}},
     )
+    # Platform owner activation: revoke any pre-existing sessions for security
+    if inv.get("kind") == "platform_owner_activation":
+        await db.sessions.update_many(
+            {"user_id": user_id},
+            {"$set": {"revoked_at": datetime.now(timezone.utc).isoformat()}},
+        )
     await record_audit(
         action="auth.invitation_accepted", tenant_id=inv["tenant_id"],
         user_id=user_id, user_email=email, ip=get_client_ip(request),
