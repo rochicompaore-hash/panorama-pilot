@@ -445,6 +445,22 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
     if new == "sent" and doc.get("approval", {}).get("status") == "pending":
         raise HTTPException(status_code=400, detail="Preventivo in attesa di approvazione")
 
+    # Blocca invio se ci sono errori bloccanti sui prodotti collegati
+    if new == "sent":
+        blocked_products = await db.opening_products.find({
+            "tenant_id": user["tenant_id"], "quote_id": qid, "deleted_at": None,
+            "$or": [
+                {"blocking_errors": {"$exists": True, "$ne": []}},
+                {"last_compute.blocking_errors": {"$exists": True, "$ne": []}},
+            ],
+        }, {"_id": 1, "blocking_errors": 1}).to_list(50)
+        if blocked_products:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Preventivo non inviabile: {len(blocked_products)} prodotto/i con errori bloccanti "
+                        f"(prezzi mancanti o listini non pubblicati). Correggi prima dell'invio."
+            )
+
     now = datetime.now(timezone.utc).isoformat()
     update = {"quote_status": new, "updated_at": now, "updated_by": user["id"]}
     if new == "sent":

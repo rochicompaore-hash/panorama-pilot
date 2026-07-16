@@ -58,25 +58,45 @@ async def _build_lookups_with_origin(
     tenant_id: str,
     sell_pricelist_id: Optional[str],
     cost_pricelist_id: Optional[str],
+    *,
+    require_published: bool = True,
 ):
     """Come `pricing_modes._build_lookups` ma cattura l'origine (id, name, version)
     per ogni componente in un dict `origins` accessibile dopo il calcolo.
 
+    Se `require_published=True` (default per calcolo prezzi reali), i listini
+    con `ipl_status != 'active'` (draft/archived) NON vengono usati: le entries
+    diventano vuote e i lookup restituiranno 0, causando warning MISSING_PUBLISHED_PRICE
+    a valle. Un secondo campo `unpublished_pricelist_warning` viene aggiunto ai meta.
+
     Returns:
         (sell_lookup_fn, cost_lookup_fn, sell_meta, cost_meta, origins)
-        Dove `origins[(ref_type, ref_id, color_id)] = {sell:{...}, cost:{...}}`
     """
     db = get_db()
     sell_pl: Optional[Dict[str, Any]] = None
     cost_pl: Optional[Dict[str, Any]] = None
+    unpublished_warnings: List[str] = []
     if sell_pricelist_id:
         sell_pl = await db.item_pricelists.find_one({
             "_id": sell_pricelist_id, "tenant_id": tenant_id, "deleted_at": None,
         })
+        if sell_pl and require_published and sell_pl.get("ipl_status") != "active":
+            unpublished_warnings.append(
+                f"Listino vendita '{sell_pl.get('code')}' in stato "
+                f"'{sell_pl.get('ipl_status')}' — NON pubblicato, non utilizzabile "
+                f"nei preventivi reali. Solo un admin autorizzato può pubblicarlo."
+            )
+            sell_pl = None   # forza fallback a MISSING_PUBLISHED_PRICE
     if cost_pricelist_id:
         cost_pl = await db.item_pricelists.find_one({
             "_id": cost_pricelist_id, "tenant_id": tenant_id, "deleted_at": None,
         })
+        if cost_pl and require_published and cost_pl.get("ipl_status") != "active":
+            unpublished_warnings.append(
+                f"Listino costo '{cost_pl.get('code')}' in stato "
+                f"'{cost_pl.get('ipl_status')}' — NON pubblicato, escluso dal calcolo costi."
+            )
+            cost_pl = None
 
     sell_entries: List[Dict[str, Any]] = (sell_pl or {}).get("entries") or []
     cost_entries: List[Dict[str, Any]] = (cost_pl or {}).get("entries") or []
@@ -128,14 +148,16 @@ async def _build_lookups_with_origin(
         "pricelist_id": (sell_pl or {}).get("_id"),
         "pricelist_name": (sell_pl or {}).get("name"),
         "pricelist_version": (sell_pl or {}).get("version"),
+        "pricelist_status": (sell_pl or {}).get("ipl_status"),
     } if sell_pl else None
     cost_meta = {
         "pricelist_id": (cost_pl or {}).get("_id"),
         "pricelist_name": (cost_pl or {}).get("name"),
         "pricelist_version": (cost_pl or {}).get("version"),
+        "pricelist_status": (cost_pl or {}).get("ipl_status"),
     } if cost_pl else None
 
-    return sell_fn, cost_fn, sell_meta, cost_meta, origins
+    return sell_fn, cost_fn, sell_meta, cost_meta, origins, unpublished_warnings
 
 
 # ---------------------------------------------------------------------------
@@ -188,9 +210,10 @@ async def resolve_bom_full(
             "totals_by_type": {}, "warnings": [], "blocking_errors": [],
         }
 
-    # Costruisci lookup con cattura origine
-    sell_fn, cost_fn, sell_meta, cost_meta, origins = await _build_lookups_with_origin(
+    # Costruisci lookup con cattura origine + gating pubblicazione
+    sell_fn, cost_fn, sell_meta, cost_meta, origins, unpublished_warnings = await _build_lookups_with_origin(
         tenant_id, sell_pricelist_id, cost_pricelist_id if include_costs else None,
+        require_published=True,
     )
 
     result = resolve_bom(
@@ -254,6 +277,18 @@ async def resolve_bom_full(
         f"[{e.get('code')}] {e.get('role') or e.get('field')} · {e.get('message')}"
         for e in (result.get("blocking_errors") or [])
     ]
+    # Warning pubblicazione listino → append come errori bloccanti (i preventivi
+    # reali non devono partire con listini in draft/archived).
+    warnings_all = list(result.get("warnings") or []) + list(unpublished_warnings)
+    if unpublished_warnings:
+        for w in unpublished_warnings:
+            result.setdefault("blocking_errors", []).append({
+                "code": "PRICELIST_NOT_PUBLISHED",
+                "message": w,
+                "severity": "blocking",
+                "suggested_action": "Un amministratore autorizzato deve pubblicare il listino (ipl_status='active')",
+            })
+            errors_str.append(f"[PRICELIST_NOT_PUBLISHED] {w}")
 
     return {
         "bom_template_id": bom_template_id,
@@ -269,7 +304,8 @@ async def resolve_bom_full(
         "materials_cost": result.get("materials_cost", 0.0) if include_costs else 0.0,
         "materials_price": result.get("materials_price", 0.0),
         "totals_by_type": totals_by_type,
-        "warnings": result.get("warnings") or [],
+        "warnings": warnings_all,
+        "unpublished_pricelist_warnings": unpublished_warnings,
         "blocking_errors": result.get("blocking_errors") or [],
         "errors": errors_str,
         "snapshot": snapshot,

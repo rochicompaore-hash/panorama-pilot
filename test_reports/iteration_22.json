@@ -1,0 +1,35 @@
+{
+  "summary": "Iterazione 22 — Verifica gating pubblicazione listini (draft/archived → NON utilizzabile nei preventivi reali), snapshot completo con hash deterministico, blocco invio preventivi con opening_products bloccanti, tenant isolation, redazione costi per commerciali, e regressioni PDF/BOM/geometry. 16/16 test pass. Nessun bug rilevato. SELL-DEMO ripristinato a ipl_status='active' post-test.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pricelist_gating_iter22.py",
+    "/app/test_reports/pytest/iteration_22_gating.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "bom_engine_v2.py:283 muta il dict `result` originale con setdefault('blocking_errors', []).append(...) — accettabile perché il dict non è persistito, ma preferibile evitare mutazioni implicite del dict di ritorno di resolve_bom (side-effect indiretto).",
+    "quotes.py:449-462 query su opening_products usa $or su blocking_errors e last_compute.blocking_errors ma non filtra per severity — un warning marcato accidentalmente come blocking_errors=[]  passa; nome campo consistente e la logica sembra corretta ma sarebbe utile verificare che ogni scrittura su opening_products.blocking_errors provenga solo dal motore BOM (evitare mutazioni parziali).",
+    "geometry compute (routers/geometry.py:275-288) aggiunge MISSING_PUBLISHED_PRICE solo se sell_pricelist_id è fornito. Se il chiamante omette sell_pricelist_id NON scatta il blocco → per l'uso 'preventivo reale' il router deve garantire (a monte) che sell_pricelist_id sia obbligatorio. Considerare un enforce con HTTPException(400) se manca in production.",
+    "pricing_hub.py:429-433 (redazione costi) — l'insieme di permessi che sbloccano la vista costi è duplicato in bom_simulate e in geometry.compute (righe 261-263). DRY: estrarre una utility `can_view_costs(user) -> bool`.",
+    "Snapshot hash canonico (bom_engine_v2.py:270) NON include eventuali override runtime (glass_type_id/hardware_kit_id via `extra_params`) esplicitamente — sono inclusi in `params` che è nel snapshot. Verificato OK, ma un test con extra_params variabili confermerebbe.",
+    "item-pricelists PATCH non ha validazione di transizione di stato (draft ↔ active ↔ archived). Un admin può passare direttamente da 'archived' a 'active' senza review — considerare una macchina a stati e un log obbligatorio per audit."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pricelist_gating_iter22.py"
+  ],
+  "success_rate": {"backend": "100% (16/16 pass)", "frontend": "N/A — testing type: backend only"},
+  "test_credentials": "Super Admin: admin@infissiexpress.com / Admin!2025 — tenant_id 5e353147-2416-4ef7-aa3f-3e0007435c42. SELL-DEMO id 4db4b91f-22c9-422b-aa7f-e235967b6698. BOM-WIN-2A id 76d7b931-09b7-419f-bb79-1e47281a915e. Contratto PDF preview id 899c4115-d4be-41a3-8d57-b1cdfb488754. Role Commerciale id c9015476-9167-48f9-a7e3-9cf594c78f9d (usato per test redazione costi).",
+  "seed_data_creation": "Test crea temporaneamente: (a) 1 quote 'TEST_ITER22_quote_send_blocked' + 1 opening_product 'TEST_OP_*' con blocking_errors — entrambi cleanup deterministico via motor a fine test; (b) 1 utente 'test_low_*@test.com' con ruolo Commerciale — cleanup via DELETE /api/users. SELL-DEMO ipl_status modificato temporaneamente a 'draft'/'archived' durante test bloccanti e ripristinato a 'active' via autouse fixture + teardown_module (safety double-net). Verificato manualmente: SELL-DEMO=='active' post-run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Tutti i 12 requisiti della review_request sono verificati e passing: (1) bom-simulate con listino active → materials_price>0 e sell_pricelist.pricelist_status='active'; (2) draft → materials_price=0, sell_pricelist=null, blocking_errors[PRICELIST_NOT_PUBLISHED], errors['[PRICELIST_NOT_PUBLISHED] ...'], unpublished_pricelist_warnings non vuoto; (3) idem per archived; (4) geometry/compute con listino draft → blocking_errors contiene PRICELIST_NOT_PUBLISHED (via resolve_bom_full con require_published=True); (5) pricelist_status incluso in sell_pricelist meta (verificato in test_active_returns_prices); (6) snapshot include sell_pricelist_id + cost_pricelist_id + bom_version + profile_system_version; (7) snapshot_hash deterministico (2 chiamate identiche → stesso hash SHA-256); (8) POST /quotes/{id}/status new_status='sent' con opening_product.blocking_errors non vuoto → 400 con detail 'Preventivo non inviabile: N prodotto/i con errori bloccanti'; (9) regressioni OK: bom-recipes=20, geometry/templates=6, /contracts list 200, PDF preview 200 con %PDF- header; (10) tenant isolation: get_item_pricelist filtra per tenant_id (404 per id inesistente e via codice per cross-tenant); (11) costi redatti per Commerciale: materials_cost=None, cost_pricelist=None, unit_cost=None nei componenti, cost_redacted=True. Il file test_pricelist_gating_iter22.py è riutilizzabile per regression. Nessuna modifica al codice sorgente applicata durante i test.",
+  "rca of the issue": "N/A — nessun issue trovato. L'implementazione del gating è corretta e coerente: bom_engine_v2._build_lookups_with_origin usa require_published=True come default; se listino ha ipl_status != 'active' viene marcato pl=None, il lookup restituisce 0 e viene registrato PRICELIST_NOT_PUBLISHED sia in unpublished_pricelist_warnings che in blocking_errors (con severity='blocking' e code stringa formattata). Il gate in quotes.py:449-462 blocca correttamente il change_status 'sent' quando esistono opening_products.blocking_errors non vuoti (o last_compute.blocking_errors). La redazione costi in pricing_hub.py:453-460 azzera unit_cost/line_cost/pricelist_origin_cost/materials_cost e setta cost_redacted=True per utenti senza permessi elevati."
+}
