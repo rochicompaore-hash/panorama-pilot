@@ -287,3 +287,42 @@ Chiama il tool "Deploy" dall'interfaccia Emergent per pubblicare. deployment_age
 - iteration_20: Blocco B+C+D+Contract — 23/23 (post-fix)
 - iteration_21: Fase 2 revisioni prod — 18/18 backend + 10/10 frontend
 - Smoke test finale URL live — 11/11 PASS
+
+## 2026-02 — Fase 4: Utenza Proprietaria + Gating Listini (COMPLETATA)
+
+### Fix 1 — Gating pubblicazione listini (Msg 304)
+- `services/bom_engine_v2._build_lookups_with_origin` con `require_published=True`: solo `ipl_status='active'` usati; draft/archived producono `unpublished_pricelist_warnings` che diventano `blocking_errors` code `PRICELIST_NOT_PUBLISHED` con `suggested_action`
+- `routers/quotes.py:445-462`: blocco `status='sent'` se ci sono `blocking_errors` nei prodotti collegati
+- **Test iteration_23**: gating verificato — active→206.42€, draft→0.0€+blocking
+
+### Fix 2 — Utenza Proprietario tenant_owner (Msg 306)
+- **Email**: pilot@panoramapilot.com (password mai stampata, mai loggata)
+- **Tenant**: PanoramaPilot (id `ae9168f6-d96e-4c5d-bb33-25acbb9a8410`), isolato da Infissi Express
+- **Ruolo**: `tenant_owner` (id `e4a05b01-...`), name `Proprietario`, is_protected=true, is_system=true, **247 permission_keys** (tutto il PERMISSION_CATALOG)
+- Script `backend/scripts/provision_owner.py` idempotente con OWNER_INIT_PASSWORD via env
+- Modello `Role` esteso con `code` e `is_protected` (linee 130-137 in models.py)
+- `must_change_password=true`, `is_superadmin=true`, `is_platform_owner=false`, `is_protected=true`
+- Tenant isolation verificato: PanoramaPilot vede 0 clienti; Infissi vede i suoi 25
+- Nessuna occorrenza di "Burgugnao" nei log backend
+
+### Test — iteration_24
+- **Backend: 22/22 pass (100%)**
+- Zero critical, 2 minor style-only (non bloccanti)
+- Verificato: 1 role attivo, permission_keys count>=200, is_protected=true, dedup soft-delete idempotente, login OK, tenant isolation OK, password non leakata, gating listini funzionante
+
+### Report Owner Provisioning (SENZA PASSWORD)
+```
+email:                pilot@panoramapilot.com
+tenant_id:            ae9168f6-d96e-4c5d-bb33-25acbb9a8410
+tenant_name:          PanoramaPilot
+role_code:            tenant_owner
+role_id:              e4a05b01-2b75-4273-908d-417af991b407
+user_id:              b2286106-3566-492f-bbec-c2940a0c4a01
+società accessibili:  PanoramaPilot (nuovo tenant, isolato)
+stato login:          verificato (200 OK, tutte le sezioni accessibili)
+stato test:           22/22 pass (0 critical, 0 high)
+configurazioni residue:
+  - primo login richiede cambio password (must_change_password=true)
+  - MFA disattivato di default (attivabile da utente)
+  - nessun seed di clienti/preventivi (tenant pulito)
+```
