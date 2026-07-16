@@ -122,3 +122,25 @@ Copertura end-to-end: Lead → Preventivo → Contratto → Rilievo → Produzio
 
 ### Deployment
 Chiama il tool "Deploy" dall'interfaccia Emergent per pubblicare. deployment_agent = PASS su iter precedente.
+
+## 2026-02 — Blocco A: Motore BOM Backend Avanzato (COMPLETATO)
+
+**Scope:** Motore BOM esteso con 20 ricette visuali, sfrido multi-dimensione, consumo proporzionale/barra intera, minimo fatturabile, output row-by-row completo con origine listino.
+
+**Files nuovi/modificati:**
+- `app/services/bom_recipes.py` (nuovo) — catalogo 20 ricette + `compile_recipe(code, params)` → BomComponent partial
+- `app/services/bom_engine_v2.py` (nuovo) — `resolve_bom_full` async con lookup origine listino + preload anagraph + aggregazioni + snapshot hash deterministico
+- `app/services/parametric_engine.py` — esteso `resolve_bom`: `scrap_fixed_mm_per_cut`, `scrap_fixed_per_piece`, `consumption_mode`, `bar_rounding`, `minimum_billable_qty`, `quantity_net`, `quantity_billable`, `waste_qty`, `formula_applied`, `condition_applied`, `warnings[]`, `bars_needed`
+- `app/models_parametric.py` — `BomComponent` con 8 nuovi campi retro-compatibili
+- `app/routers/pricing_hub.py` — 3 endpoint nuovi
+
+**Endpoint:**
+- `GET  /api/pricing-hub/bom-recipes` — catalogo ricette (filtrato per permessi)
+- `POST /api/pricing-hub/bom-recipes/compile` — compila ricetta+parametri → formule AST safe + validation
+- `POST /api/pricing-hub/bom-simulate` — simulatore BOM esteso (input: bom_template_id + dimensioni + listini opzionali)
+
+**Ricette (20):** PERIMETRO_TELAIO, PERIMETRO_ANTA, PERIMETRO_SPECCHIATURA, SUPERFICIE_VETRO, MONTANTE_VERTICALE, TRAVERSO_ORIZZONTALE, SCAMBIO_BATTUTA, RINFORZO_TELAIO, RINFORZO_ANTA, FERMAVETRO, GUARNIZIONE, COMPONENTE_PER_ANTA, COMPONENTE_PER_MODULO, COMPONENTE_A_PEZZO, COMPONENTE_CONDIZIONALE, LAVORAZIONE_PER_SERRAMENTO, LAVORAZIONE_PER_ANTA, LAVORAZIONE_PER_TAGLIO, LAVORAZIONE_PER_SUPERFICIE, FORMULA_LIBERA (requires products.manage)
+
+**Test:** `/app/test_reports/iteration_19.json` — 22/23 PASS + fix snapshot_hash deterministico verificato manualmente → 23/23 effettivi.
+
+**Prossimo blocco:** B — Importer XLS/CSV listini (pandas+openpyxl, mapping colonne, draft/publish/rollback, entità estese).

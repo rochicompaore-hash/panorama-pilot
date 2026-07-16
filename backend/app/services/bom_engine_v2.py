@@ -234,19 +234,20 @@ async def resolve_bom_full(
         agg["cost"] = float(money(Decimal(str(agg["cost"]))))
         agg["price"] = float(money(Decimal(str(agg["price"]))))
 
-    # Snapshot canonico (input) per audit
+    # Snapshot canonico (input) per audit — hash deterministico (no timestamp)
     snapshot = {
         "bom_template_id": bom_template_id,
         "bom_version": bom.get("version"),
-        "profile_system_id": ps.get("_id"),
+        "profile_system_id": str(ps.get("_id")) if ps.get("_id") is not None else None,
         "profile_system_version": ps.get("version"),
         "params": params,
         "sell_pricelist_id": sell_pricelist_id,
         "cost_pricelist_id": cost_pricelist_id,
-        "computed_at": datetime.now(timezone.utc).isoformat(),
     }
     snap_j = json.dumps(snapshot, sort_keys=True, default=str, separators=(",", ":"))
     snapshot_hash = hashlib.sha256(snap_j.encode("utf-8")).hexdigest()
+    # Timestamp aggiunto DOPO l'hash — è audit-only, non entra nella firma
+    snapshot["computed_at"] = datetime.now(timezone.utc).isoformat()
 
     # Formatta errori bloccanti in lista di stringhe (per UI concisa)
     errors_str = [
@@ -259,7 +260,7 @@ async def resolve_bom_full(
         "bom_template_code": bom.get("code"),
         "bom_template_name": bom.get("name"),
         "bom_version": bom.get("version"),
-        "profile_system_id": ps.get("_id"),
+        "profile_system_id": str(ps.get("_id")) if ps.get("_id") is not None else None,
         "profile_system_code": ps.get("code"),
         "profile_system_name": ps.get("name"),
         "sell_pricelist": sell_meta,
