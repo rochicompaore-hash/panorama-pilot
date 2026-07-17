@@ -11,8 +11,8 @@ class Settings:
     PASSWORD_RESET_EXPIRE_MINUTES: int = int(os.environ.get("PASSWORD_RESET_EXPIRE_MINUTES", "30"))
     MAX_FAILED_LOGIN_ATTEMPTS: int = int(os.environ.get("MAX_FAILED_LOGIN_ATTEMPTS", "5"))
     LOGIN_LOCK_MINUTES: int = int(os.environ.get("LOGIN_LOCK_MINUTES", "15"))
-    ADMIN_EMAIL: str = os.environ.get("ADMIN_EMAIL", "admin@infissiexpress.local")
-    ADMIN_PASSWORD: str = os.environ.get("ADMIN_PASSWORD", "Admin!2025")
+    ADMIN_EMAIL: str = os.environ["ADMIN_EMAIL"]
+    ADMIN_PASSWORD: str = os.environ["ADMIN_PASSWORD"]
     ADMIN_COMPANY_NAME: str = os.environ.get("ADMIN_COMPANY_NAME", "Infissi Express SRL")
     EMAIL_PROVIDER: str = os.environ.get("EMAIL_PROVIDER", "mock")
     RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")

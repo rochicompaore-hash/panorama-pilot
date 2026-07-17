@@ -1,0 +1,43 @@
+# Pre-commit configuration for Infissi Express Cloud.
+#
+# Purpose: block accidental commit of passwords, tokens, secrets and API keys
+# in test files or anywhere in the repository, and enforce the eval/exec/compile
+# ban on the whole `backend/app/services/` tree.
+#
+# Bootstrap (run once per clone):
+#     pip install pre-commit
+#     pre-commit install
+#
+# Runs on every `git commit`. Override in emergencies with `SKIP=secret-scan,eval-ban git commit ...`
+# (never in CI).
+
+repos:
+  - repo: local
+    hooks:
+      - id: secret-scan
+        name: Block accidental secrets / passwords / tokens
+        entry: python scripts/scan_secrets.py
+        language: system
+        pass_filenames: true
+        stages: [pre-commit, pre-push]
+        # Scan text-ish files only — scanner has its own extension allowlist
+        types: [text]
+
+      - id: eval-ban
+        name: Ban eval()/exec()/compile() in backend/app/services
+        entry: python scripts/check_no_eval.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+
+  # Generic hygiene (built-in, no external secret providers required)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+        exclude: '^\\.pre-commit-config\\.yaml$'
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+      - id: detect-private-key

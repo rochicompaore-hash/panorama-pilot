@@ -457,7 +457,8 @@ def viewer_token(s, admin_h, tenant_id):
     if not invite_url or "token=" not in invite_url:
         pytest.skip("no invitation url returned")
     token = invite_url.split("token=")[1]
-    pwd = "ViewOnly!2025"
+    from tests._creds import ephemeral_password
+    pwd = ephemeral_password("ViewOnly")
     ra = s.post(f"{BASE_URL}/api/auth/accept-invitation", json={
         "token": token, "password": pwd, "first_name": "TEST", "last_name": "M3Viewer",
     })

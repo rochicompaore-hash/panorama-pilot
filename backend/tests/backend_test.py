@@ -243,7 +243,8 @@ class TestUsersCRUD:
         assert any(u["id"] == STATE["new_user_id"] for u in items2)
 
     def test_accept_invitation_and_login(self):
-        pwd = "NewUserP@ss1"
+        from tests._creds import ephemeral_password
+        pwd = ephemeral_password("NewUser")
         r = requests.post(api("/auth/accept-invitation"),
                           json={"token": STATE["invitation_token"], "password": pwd})
         assert r.status_code == 200, r.text
