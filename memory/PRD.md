@@ -394,3 +394,54 @@ Il tenant era già in stato desiderato dalla nascita (creato da `provision_owner
 - ✅ API/permessi/snapshot/contratti firmati preservati (test 404/400 error paths verdi)
 
 **Files aggiunti/modificati**: 30+ file (vedi `git log --stat 58d0e41..HEAD`).
+
+## Iteration 27 — Opzione A: Catalogo & Simulatore 1-anta (Feb 2026)
+
+**Backend**
+- Ricetta `finestra_1a_5103_12130` in `app/services/recipes/finestra_1a.py` con formule esatte da spec (paragrafi 3-14):
+  - Telaio 5103: 2×(L+S) + 2×(H+S); Rinforzo telaio: 2×(L-108)+2×(H-108); Anta 12130: 2×(L-70+S)+2×(H-70+S); Rinforzo anta: 2×(L-206)+2×(H-206); Fermavetro: 2×(L-186)+2×(H-186); Vetro: (L-206)×(H-206)/1e6 con min 0.50 m²
+  - Test 900×1500 (S=6): telaio 4.824 ml, rinforzo t. 4.368 ml, anta 4.544 ml, rinforzo a. 3.976 ml, fermavetro 4.056 ml, vetro 0.898036 m² × 76 = €68,25
+  - MISSING_*_PRICE codes: FRAME/SASH/FRAME_REINFORCEMENT/SASH_REINFORCEMENT/GLAZING_BEAD/GLASS/GLASS_MINIMUM/HARDWARE/HOURLY_COST/PRODUCTION_TIME/MARGIN/ADDITIONAL_COMPONENTS_COST
+  - Geometry validation: L>206, H>206, L-108>0, H-108>0, L-70+S>0, H-70+S>0, L-186>0, H-186>0
+  - +6% Premium PVC-only (telaio+anta+fermavetro+altri_pvc_share) — NON su rinforzi/vetro/ferramenta/manodopera
+  - Snapshot hash deterministico su risultato
+- `app/models_catalog.py` — ProductComponentAssoc (14 categorie), ProductionConfig, CatalogCodeMapping, ProductSimulateRequest
+- `app/services/catalog_service.py` — get_production_config (merge defaults), load_product, resolve_component_prices (colour-sensitive per PVC, colour-independent per rinforzi acciaio, esclude prezzi ≤0), get_color_is_premium, seed_factory_code_mappings
+- `app/routers/catalog.py` — 9 endpoint sotto `/api/catalog/`: production-config GET/PATCH, code-mappings GET/POST/PATCH, products/{id}/components, /lifecycle (5 stati), /simulate. Visibility gating server-side: costi interni nascosti se non `pricing_admin.view_costs` o `quotes.view_costs`.
+- `app/permissions.py` — 9 nuove permission: catalog.view/manage/publish/import/delete + pricing_admin.view/manage/publish/view_costs
+- `app/models_parametric.py` — `ColorCategory.is_premium` boolean (per +6% PVC)
+- `app/seed_catalog.py` — idempotent:
+  - Factory code mappings: 5103→telaio, 5105→telaio, 12130→anta_standard, 7379→scambio_battuta (is_system=True, tenant_id=None)
+  - ProEvolution seed (7 componenti: 5103+12130+7379+FV-STD+RT-STD+RA-STD+RS-STD)
+  - ProEvolution Restauro seed (identico ma telaio=5105)
+  - Grant catalog.*/pricing_admin.* a Super Admin / Admin Azienda / Proprietario (via `permissions="*"` esistente + ensure keys)
+- Server.py: mount `catalog_admin_router` + `run_catalog_seed()` on startup
+
+**Frontend**
+- `pages/ProductSimulatorPage.jsx` — UI /product-simulator: form L/H/colore/premium/hardware/altri, override manodopera+margine, cut-list table, stato pricing con badge, blocking_errors list, prezzo finale, snapshot hash
+- `layouts/AppLayout.jsx` — nuovo gruppo "Catalogo e listini" con 7 sotto-voci (Catalogo prodotti, Simulatore prodotto, Listini e regole, Listini dettaglio, Importazione XLS/CSV, Sistemi profilo & formule, Engine parametrico avanzato)
+- `App.js` — route `/product-simulator` → ProductSimulatorPage
+
+**Bug corretto (HIGH) durante testing agent**
+- `catalog.py::simulate_product` leggeva `user.get("permission_keys")` che get_current_user NON popola per utenti non-superadmin → tutti i Commerciali ricevevano 403
+- Fix: usa `await get_permission_keys_for_user(user)` — pattern coerente con altri router
+
+**Test finali**
+- `tests/test_finestra_1a_recipe.py` (16): geometria, MISSING_*, Premium PVC-only, margin flow, snapshot determinism, display rounding
+- `tests/test_catalog_area.py` (11): seed products/mappings, prod config, simulate scenarios, lifecycle, no-alteration KPI
+- `tests/test_catalog_area_supplementary.py` (6): visibility gating Commerciale (bug fix verificato), MISSING_ADDITIONAL_COMPONENTS_COST, PATCH+GET production-config, KPI regression
+- Regression: `test_ci_security_guards` (6) + `test_code_quality_regression` (14) + `test_iter25_smoke` (6) tutti verdi
+- **Totale: 58/58 PASS**, scanner segreti clean, eval-ban attivo
+
+**Limitazioni residue (fase 2 — dopo collaudo)**
+- PDF import non implementato (pdfplumber pianificato in fase 2)
+- Ricetta 2 ante non implementata (attende spec puntuale come per l'1-anta)
+- Nessun listino barre seedato per tenant demo: simulate ritorna `incomplete` con MISSING_*_PRICE finché l'operatore non importa un file XLS/CSV valorizzato per i codici 5103/12130/rinforzi/fermavetro
+- Il wizard "duplica/versiona prodotto" mostra solo transizioni di stato via API (draft/validated/active/superseded/archived), non ha UI full-featured
+
+**Stato collaudo domani**
+- Login admin OK
+- Sidebar "Catalogo e listini" visibile e navigabile
+- /product-simulator carica ProEvolution pre-selezionato con L=900/H=1500
+- Ogni simulazione produce cut-list corretta + errori MISSING chiari
+- Per raggiungere `pricing_status=ok` in demo: pre-caricare listino barre via /pricelist-importer con almeno codici 5103, 12130, RT-STD, RA-STD, FV-STD, e opzionalmente 7379 (per 2-ante che comunque non è nella fase 1)

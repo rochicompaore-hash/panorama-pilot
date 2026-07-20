@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.db import get_db
-from app.deps import require_permission, get_client_ip, get_current_user
+from app.deps import require_permission, get_client_ip, get_current_user, get_permission_keys_for_user
 from app.mongo_utils import from_mongo, to_mongo
 from app.services.audit import record_audit
 from app.models_catalog import (
@@ -294,12 +294,13 @@ def _redact_costs(payload: Dict[str, Any]) -> Dict[str, Any]:
 @router.post("/products/{pid}/simulate")
 async def simulate_product(pid: str, body: ProductSimulateRequest, request: Request,
                             user: dict = Depends(get_current_user)):
-    """Run the recipe engine. Everyone with catalog.view can see the result,
-    but internal costs are visible ONLY to users with pricing_admin.view_costs.
+    """Run the recipe engine. Everyone with catalog.view / products.view can see
+    the result, but internal costs are visible ONLY to users with
+    pricing_admin.view_costs (or superadmin/platform_owner).
     """
-    perms = user.get("permission_keys") or []
-    is_super = user.get("is_superadmin") or user.get("is_platform_owner") or "*" in perms
-    if not is_super and "catalog.view" not in perms and "products.view" not in perms:
+    is_super = user.get("is_superadmin") or user.get("is_platform_owner")
+    perms = ["*"] if is_super else await get_permission_keys_for_user(user)
+    if not is_super and "*" not in perms and "catalog.view" not in perms and "products.view" not in perms:
         raise HTTPException(403, "Permesso negato — catalog.view / products.view")
     body.product_id = pid
     inputs = await _load_recipe_inputs(user, body)
@@ -313,7 +314,9 @@ async def simulate_product(pid: str, body: ProductSimulateRequest, request: Requ
     payload["product_id"] = pid
     payload["color_is_premium"] = inputs.is_color_premium
 
-    can_view_costs = is_super or "pricing_admin.view_costs" in perms or "quotes.view_costs" in perms
+    can_view_costs = (is_super or "*" in perms
+                       or "pricing_admin.view_costs" in perms
+                       or "quotes.view_costs" in perms)
     if not can_view_costs:
         payload = _redact_costs(payload)
         payload["_costs_hidden"] = True

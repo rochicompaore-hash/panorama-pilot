@@ -15,7 +15,7 @@ import urllib.parse as up
 import pytest
 import requests
 
-from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD, ephemeral_password
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
@@ -67,7 +67,7 @@ def proevolution_id(admin) -> str:
 def commerciale_session(admin, commerciale_role_id) -> requests.Session:
     """Create a TEST_ Commerciale user, accept invitation, return authenticated session."""
     email = f"test_commerciale_{int(time.time())}@example.com"
-    password = "Comm3rc!ale2025"
+    password = ephemeral_password("Comm")
     r = admin.post(f"{API}/users", json={
         "email": email,
         "first_name": "TEST",
