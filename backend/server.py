@@ -108,6 +108,7 @@ from app.routers.saas_platform import router as saas_platform_router
 from app.routers.management_control import router as management_control_router
 from app.routers.intercompany import router as intercompany_router
 from app.routers.product_catalog import router as product_catalog_router
+from app.routers.catalog import router as catalog_admin_router
 
 # Public / Landing
 from app.routers.public import (
@@ -229,6 +230,7 @@ FINANCE_BI_ROUTERS = [
     treasury_router, legal_entities_router,
     saas_platform_router, management_control_router, intercompany_router,
     product_catalog_router,
+    catalog_admin_router,
 ]
 PUBLIC_ROUTERS = [
     public_admin_router, public_router_open,
@@ -272,6 +274,12 @@ else:
 async def _startup():
     logger.info("Starting Infissi Express Cloud API")
     await run_seed()
+    # Opzione A — catalog seed (idempotent)
+    try:
+        from app.seed_catalog import run_catalog_seed
+        await run_catalog_seed()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Catalog seed failed: %s", exc)
 
 
 @app.on_event("shutdown")

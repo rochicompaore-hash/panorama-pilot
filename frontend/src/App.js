@@ -54,6 +54,7 @@ import QuoteStructurePage from "@/pages/QuoteStructurePage";
 import PricingHubPage from "@/pages/PricingHubPage";
 import GeometryBuilderPage from "@/pages/GeometryBuilderPage";
 import PricelistImporterPage from "@/pages/PricelistImporterPage";
+import ProductSimulatorPage from "@/pages/ProductSimulatorPage";
 import ContractsPage from "@/pages/ContractsPage";
 import ContractViewerPage from "@/pages/ContractViewerPage";
 import AppLayout from "@/layouts/AppLayout";
@@ -145,6 +146,7 @@ function App() {
           <Route path="pricing-hub" element={<PricingHubPage />} />
           <Route path="geometry-builder" element={<GeometryBuilderPage />} />
           <Route path="pricelist-importer" element={<PricelistImporterPage />} />
+          <Route path="product-simulator" element={<ProductSimulatorPage />} />
           <Route path="contracts" element={<ContractsPage />} />
           <Route path="contracts/:id" element={<ContractViewerPage />} />
         </Route>

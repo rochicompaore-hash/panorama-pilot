@@ -84,6 +84,12 @@ FILE_LEVEL_ALLOWLIST: dict[str, List["re.Pattern[str]"]] = {
     "memory/test_credentials.md": [
         _rx(r"Admin!2025"),  # documented seed used only by internal dev tenant
     ],
+    # The negative-path test intentionally embeds fake leaks to verify that the
+    # scanner catches them. Allowlisted here to avoid a self-referential loop.
+    "backend/tests/test_ci_security_guards.py": [
+        _rx(r'password\s*=\s*"Admin!2025"'),
+        _rx(r'api_key\s*=\s*"sk-fakefakefakefakefakefake123"'),
+    ],
     "backend/scripts/provision_owner.py": [],  # scanned normally
 }
 

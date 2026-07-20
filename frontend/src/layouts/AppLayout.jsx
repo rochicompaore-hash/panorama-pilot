@@ -7,7 +7,7 @@ import {
   House, Users, ShieldCheck, Buildings, Hash, Files, ClockCounterClockwise,
   Bell, Devices, EnvelopeSimple, MagnifyingGlass, SignOut, List, X, CaretDown,
   UserCircle, IdentificationCard, ListChecks, CalendarBlank, Target, WhatsappLogo,
-  Kanban, FileText,
+  Kanban, FileText, Play,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,17 +78,24 @@ const NAV = [
     ],
   },
   {
+    group: "catalog",
+    label: "Catalogo e listini",
+    items: [
+      { to: "/product-catalog", label: "Catalogo prodotti", icon: FileText, perm: "products.view" },
+      { to: "/product-simulator", label: "Simulatore prodotto", icon: Play, perm: "products.view" },
+      { to: "/pricing-hub", label: "Listini e regole di calcolo", icon: Hash, perm: "pricelists.view" },
+      { to: "/pricelists", label: "Listini prodotto (dettaglio)", icon: Hash, perm: "pricelists.view" },
+      { to: "/pricelist-importer", label: "Importazione listini (XLS/CSV)", icon: Hash, perm: "pricelists.manage" },
+      { to: "/parametric/admin", label: "Sistemi profilo & formule", icon: FileText, perm: "products.manage" },
+      { to: "/parametric", label: "Engine parametrico (avanzato)", icon: FileText, perm: "products.manage" },
+    ],
+  },
+  {
     group: "tech_config",
     label: "Configurazione tecnica",
     items: [
-      { to: "/product-catalog", label: "Catalogo prodotti", icon: FileText, perm: "products.view" },
-      { to: "/pricing-hub", label: "Listini e regole di calcolo", icon: Hash, perm: "pricelists.view" },
       { to: "/geometry-builder", label: "Configuratore geometrico", icon: FileText, perm: "quotes.view" },
-      { to: "/pricelist-importer", label: "Importazione listini (XLS/CSV)", icon: Hash, perm: "pricelists.manage" },
       { to: "/contracts", label: "Contratti", icon: FileText, perm: "contracts.view" },
-      { to: "/pricelists", label: "Listini prodotto (dettaglio)", icon: Hash, perm: "pricelists.view" },
-      { to: "/parametric", label: "Engine parametrico (avanzato)", icon: FileText, perm: "products.manage" },
-      { to: "/parametric/admin", label: "Sistemi profilo & formule", icon: FileText, perm: "products.manage" },
       { to: "/site-conditions", label: "Test questionario cantiere", icon: FileText, perm: "quotes.view" },
     ],
   },

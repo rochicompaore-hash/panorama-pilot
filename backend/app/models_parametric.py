@@ -181,6 +181,8 @@ class ColorCategory(BaseDoc):
     notes: Optional[str] = None
     is_demo: bool = False
     active: bool = True
+    # Opzione A — colore Premium: attiva +6% PVC-only nel motore parametrico
+    is_premium: bool = False
 
 
 class ColorCategoryCreate(BaseModel):
@@ -207,6 +209,7 @@ class ColorCategoryUpdate(BaseModel):
     requires_approval: Optional[bool] = None
     notes: Optional[str] = None
     active: Optional[bool] = None
+    is_premium: Optional[bool] = None
 
 
 class Color(BaseDoc):

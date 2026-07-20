@@ -101,6 +101,16 @@ PERMISSION_CATALOG = [
     # Products
     ("products.view", "Prodotti", "view", "Visualizza catalogo prodotti"),
     ("products.manage", "Prodotti", "edit", "Gestisce catalogo prodotti"),
+    # Catalog admin (Opzione A — Catalogo e listini)
+    ("catalog.view", "Catalogo", "view", "Visualizza area Catalogo e listini"),
+    ("catalog.manage", "Catalogo", "edit", "Gestisce prodotti, componenti e mapping codici"),
+    ("catalog.publish", "Catalogo", "approve", "Pubblica versioni prodotto (draft→active)"),
+    ("catalog.import", "Catalogo", "create", "Importa file listino nella nuova area catalogo"),
+    ("catalog.delete", "Catalogo", "delete", "Archivia prodotti e mapping"),
+    ("pricing_admin.view", "Pricing Admin", "view", "Visualizza configurazione produzione (costo orario, tempo, margine)"),
+    ("pricing_admin.manage", "Pricing Admin", "edit", "Gestisce configurazione produzione"),
+    ("pricing_admin.publish", "Pricing Admin", "approve", "Pubblica configurazione produzione"),
+    ("pricing_admin.view_costs", "Pricing Admin", "view_financials", "Visualizza costi interni (materiali, manodopera, margine) nel simulatore"),
     # Contracts
     ("contracts.view", "Contratti", "view", "Visualizza contratti"),
     ("contracts.create", "Contratti", "create", "Crea contratti"),
