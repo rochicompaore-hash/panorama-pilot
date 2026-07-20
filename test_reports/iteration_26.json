@@ -1,0 +1,49 @@
+{
+  "summary": "Iterazione 26 — Collaudo Opzione A (Catalogo & Simulatore prodotto finestra_1a). CI suite richiesta = 52/52 PASS (test_finestra_1a_recipe.py 16, test_catalog_area.py 11, test_ci_security_guards.py 5, test_code_quality_regression.py 14, test_iter25_smoke.py 6). Aggiunta nuova suite tests/test_catalog_area_supplementary.py con 6 test end-to-end sui punti non coperti dalla suite originale (7 componenti su PROEVOLUTION, MISSING_ADDITIONAL_COMPONENTS_COST, visibility gating Commerciale, roundtrip PATCH/GET production-config, KPI regression, admin-vede-tutto): 5/6 PASS + 1 FAIL che espone un BUG BLOCCANTE. Frontend /product-simulator verificato manualmente via Playwright: layout OK, Prodotto pre-popolato 'ProEvolution (PROEVOLUTION)', L=900/H=1500 pre-riempiti, click Simula genera pricing_status='incomplete' con badge 'Prezzi/parametri mancanti' e 5 MISSING_* leggibili in UI; cut-list mostrata anche in stato incomplete (telaio 4.824, rinforzo_telaio 4.368, anta_12130 4.544, rinforzo_anta 3.976, fermavetro 4.056, vetro reale 0.898036 m²). Sidebar contiene il gruppo 'Catalogo e listini' con tutti i 7 link previsti (product-catalog, product-simulator, pricing-hub, pricelists, pricelist-importer, parametric/admin, parametric).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/catalog/products/{id}/simulate",
+        "issue": "Visibility gating rotto per utenti non-super. L'endpoint legge `user.get('permission_keys')` (catalog.py:300) ma `get_current_user` in app/deps.py NON popola quel campo per utenti standard: viene calcolato solo on-demand da `get_permission_keys_for_user`. Risultato: qualsiasi utente non superadmin/platform_owner (incluso il ruolo 'Commerciale' che ha `products.view`) riceve 403 'Permesso negato — catalog.view / products.view'. Il gating dei costi interni per Commerciale è quindi NON verificabile: l'utente non arriva mai al payload. Fix: sostituire `perms = user.get('permission_keys') or []` con `perms = await get_permission_keys_for_user(user)` (già import-abile da app.deps). Riprodotto in tests/test_catalog_area_supplementary.py::test_commerciale_role_cannot_see_internal_costs (403 invece di 200).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_finestra_1a_recipe.py",
+    "/app/backend/tests/test_catalog_area.py",
+    "/app/backend/tests/test_catalog_area_supplementary.py",
+    "/app/test_reports/pytest/iteration_26.xml",
+    "/app/test_reports/pytest/iteration_26_supp.xml"
+  ],
+  "action_items": [
+    "FIX HIGH: in app/routers/catalog.py:300 (endpoint /simulate) sostituire `perms = user.get('permission_keys') or []` con `perms = await get_permission_keys_for_user(user)` (o applicare require_any_permission('catalog.view','products.view')). Senza questa fix qualunque venditore/commerciale ha 403 sul simulatore, e il visibility gating dei costi interni non è mai osservabile in produzione.",
+    "OPZIONALE: aggiungere un test end-to-end che simuli tenant B (o usa un fixture su collezione products isolata) per verificare 404 su product_id di un altro tenant. Al momento test_catalog_area.py non copre il tenant-isolation esplicito perché serve invito lato admin di un secondo tenant (non triviale nel setup attuale)."
+  ],
+  "critical_code_review_comments": [
+    "app/routers/catalog.py:294-322 — l'unico endpoint che NON usa require_permission è /simulate, e il controllo permessi manuale al suo interno si basa su un campo (permission_keys) che get_current_user non setta. Coprire questa strada con una helper unica evita di ripetere il bug in futuro.",
+    "app/services/recipes/finestra_1a.py — engine geometrico correttissimo, tutti i 16 test unitari coprono formule + edge cases + snapshot hash + margin + premium PVC-only. Nessun eval/exec, nessun fallback silenzioso: il design è solido.",
+    "app/routers/catalog.py:_redact_costs mantiene sale_price, sale_price_before_discount, discount, blocking_errors — corretto per il Commerciale (una volta che il gating è raggiungibile).",
+    "Frontend ProductSimulatorPage.jsx: UX pulita, data-testid consistenti, gestione stato loading/error corretta. Nessuna regressione UI osservata."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_catalog_area_supplementary.py (NEW - 6 test aggiuntivi HTTP end-to-end)",
+    "/app/test_reports/iteration_26.json"
+  ],
+  "success_rate": {
+    "backend": "57/58 = 98.3% (52/52 CI + 5/6 supplementary)",
+    "frontend": "100% (product simulator page + sidebar verificati)"
+  },
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (via tests/_creds.py). Test user 'Commerciale' creato dinamicamente via /api/users invitation flow (email: test_commerciale_<ts>@example.com, password: Comm3rc!ale2025) — teardown DELETE user.",
+  "seed_data_creation": "Il fixture Commerciale crea 1 nuovo utente per test-run che viene soft-deletato in teardown. Nessun'altra mutazione DB persistente. patch a production_config lascia hourly_cost=30/prod_time=30/margin=40 (comportamento atteso, richiesto dalla suite CI).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "1) La fix del bug visibility gating è banale (2 righe): sostituire la lettura del campo non popolato con l'await della helper esistente. 2) Dopo la fix, il test test_commerciale_role_cannot_see_internal_costs deve tornare PASS e diventa la conferma end-to-end del gating (fields redacted + _costs_hidden=true). 3) Il tenant-isolation test manca: se il main agent vuole coprirlo, serve un helper fixture che crei un tenant B via /api/onboarding o inserisca direttamente una company + super_admin B via seed script. 4) Formule finestra_1a validate rigorosamente contro spec (16 test pure-python): non toccare. 5) 900×1500 con overrides admin restituisce sempre incomplete perché non c'è pricelist seedata — questa è la user-story attesa per domani; il collaudo dovrà seedare i listini 5103/12130/7379 prima della demo per raggiungere pricing_status='ok'.",
+  "rca_of_the_issue": "get_current_user (app/deps.py:28) restituisce il documento utente senza calcolare permission_keys (nessuna join sulle roles). L'unico ramo in cui l'endpoint /simulate risolve i permessi correttamente è per superadmin (short-circuit al primo if). Per tutti gli altri, `user.get('permission_keys')` è None, il fallback `or []` produce lista vuota, e la guardia `\"catalog.view\" not in perms and \"products.view\" not in perms` scatta sempre → 403. Riproduzione: creare utente Commerciale, POST /api/catalog/products/{PROEVOLUTION_ID}/simulate → 403. Fix: `perms = await get_permission_keys_for_user(user)` (già presente in app.deps, importato in altri router). Nessuna altra chiamata a `user.get('permission_keys')` è problematica: il resto del router usa Depends(require_permission(...)) che risolve i permessi correttamente."
+}
