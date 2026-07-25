@@ -160,6 +160,9 @@ async def production_status():
         otp_status = "configuration_required" if is_prod_like() else "dev_only"
     return {
         "app_env": settings.APP_ENV,
+        "release_stage": settings.RELEASE_STAGE,
+        "demo_mode": settings.DEMO_SEED_ENABLED,
+        "test_data_enabled": settings.TEST_DATA_ENABLED,
         "is_prod_like": is_prod_like(),
         "otp": {
             "debug_enabled": settings.OTP_DEBUG_ENABLED,

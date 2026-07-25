@@ -226,36 +226,46 @@ async def run_seed():
     # Seed default pipeline (M2)
     from app.routers.pipelines import seed_default_pipeline
     await seed_default_pipeline(company_id)
-    # Seed pricing defaults (M3.2)
+    # Gate demo data behind DEMO_SEED_ENABLED (release_stage=first_operational_release → False)
+    from app.config import is_demo_mode
+    demo = is_demo_mode()
+    logger.info("Demo seed mode: %s (release_stage=%s)", demo, settings.RELEASE_STAGE)
+    # Seed pricing defaults (M3.2) — OPERATIONAL (currency, tax rates, categories)
     from app.seed_pricing import run_pricing_seed
     await run_pricing_seed(company_id)
-    # Seed PDF templates + clauses (M3.3.2)
+    # Seed PDF templates + clauses (M3.3.2) — OPERATIONAL (templates, no demo data)
     from app.seed_pdf import run_pdf_seed
     await run_pdf_seed(company_id)
-    # Seed Parametric Engine demo data (M6.PAR) — sistemi, profili, colori, BOM, matrici
+    # Seed Parametric Engine demo data — DEMO only
+    if demo:
+        try:
+            from app.seed_parametric import seed_parametric_demo
+            pdemo = await seed_parametric_demo(company_id)
+            logger.info("Parametric demo seed: %s", pdemo.get("ok"))
+        except Exception as e:
+            logger.warning("Parametric demo seed issue (non-fatal): %s", e)
+    else:
+        logger.info("Parametric demo seed SKIPPED (demo_seed_enabled=false)")
+    # Seed M7 extensions — modules/plans (OPERATIONAL) vs product_catalog+management_demo (DEMO)
     try:
-        from app.seed_parametric import seed_parametric_demo
-        pdemo = await seed_parametric_demo(company_id)
-        logger.info("Parametric demo seed: %s", pdemo.get("ok"))
-    except Exception as e:
-        logger.warning("Parametric demo seed issue (non-fatal): %s", e)
-    # Seed M7 extensions — multi-company, SaaS, product catalog, management control
-    try:
-        from app.seed_extensions import (
-            seed_multi_company_and_saas, seed_product_catalog, seed_management_demo,
-        )
+        from app.seed_extensions import seed_multi_company_and_saas
+        # multi-company + SaaS modules/plans are OPERATIONAL config (users need them to subscribe)
         await seed_multi_company_and_saas(company_id)
-        await seed_product_catalog(company_id)
-        await seed_management_demo(company_id)
-        logger.info("M7 extensions seed OK (multi-company, SaaS, product catalog)")
+        if demo:
+            from app.seed_extensions import seed_product_catalog, seed_management_demo
+            await seed_product_catalog(company_id)
+            await seed_management_demo(company_id)
+            logger.info("M7 extensions seed OK (demo data included)")
+        else:
+            logger.info("M7 extensions: only SaaS modules seeded, DEMO data skipped")
     except Exception as e:
         logger.warning("M7 extensions seed issue (non-fatal): %s", e)
-    # Platform Owner (globale, sopra Super Admin del tenant)
+    # Platform Owner (globale, sopra Super Admin del tenant) — OPERATIONAL
     from app.platform_owner import run_platform_owner_seed
     po = await run_platform_owner_seed()
     logger.info("Platform Owner seed: user_id=%s already_active=%s inv=%s",
                 po.get("user_id"), po.get("already_active"), po.get("invitation_token_id"))
-    # Tenant Admin (Infissi Express) — via invito
+    # Tenant Admin (Infissi Express) — via invito — OPERATIONAL (default tenant user)
     from app.tenant_admin_seed import ensure_tenant_admin_invite
     ta = await ensure_tenant_admin_invite(company_id)
     logger.info("Tenant Admin seed: user_id=%s already_active=%s inv=%s",
@@ -267,4 +277,4 @@ async def run_seed():
     except Exception as e:
         logger.warning("Index creation issue (non-fatal): %s", e)
     await write_test_credentials()
-    logger.info("Seed completed. Company=%s", company_id)
+    logger.info("Seed completed. Company=%s demo=%s", company_id, demo)

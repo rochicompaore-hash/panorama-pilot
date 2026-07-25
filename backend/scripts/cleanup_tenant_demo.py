@@ -56,6 +56,18 @@ PRESERVE_ALWAYS = {
     "sequences",    # numerazioni progressive (config)
     "permissions",  # catalogo permessi (globale)
     "clause_templates", "pdf_templates",  # template documentali
+    # First operational release — preserve tutto ciò che è OPERATIONAL (non demo):
+    "products",                # ProEvolution + ProEvolution Restauro (seed_catalog)
+    "catalog_code_mappings",   # mapping 5103/5105/12130/7379
+    "production_config",       # configurazione produzione tenant
+    "color_categories",        # anagrafica colori
+    "glass_types",             # anagrafica vetri
+    "hardware_kits",           # anagrafica kit ferramenta
+    "profile_systems",         # sistemi profilo
+    "profiles",                # anagrafica profili
+    "bom_templates",           # ricette BOM
+    "dimension_rule_sets",     # regole dimensionali approvate
+    "price_rules_v2",          # regole prezzo attive
 }
 
 
@@ -93,6 +105,8 @@ async def main():
     total_deleted = 0
 
     for coll in OPERATIONAL_COLLECTIONS:
+        if coll in PRESERVE_ALWAYS:
+            continue  # skip operational config collections
         try:
             count = await db[coll].count_documents({"tenant_id": TENANT_ID})
         except Exception:

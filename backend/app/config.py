@@ -54,6 +54,11 @@ class Settings:
     # Signature
     SIGNATURE_EVIDENCE_ISSUER: str = os.environ.get("SIGNATURE_EVIDENCE_ISSUER", "Infissi Express Cloud")
 
+    # Release stage — controls demo data seeding
+    RELEASE_STAGE: str = os.environ.get("RELEASE_STAGE", "development")  # development | first_operational_release | production
+    DEMO_SEED_ENABLED: bool = os.environ.get("DEMO_SEED_ENABLED", "true").lower() == "true"
+    TEST_DATA_ENABLED: bool = os.environ.get("TEST_DATA_ENABLED", "true").lower() == "true"
+
 settings = Settings()
 
 def is_dev_or_test() -> bool:
@@ -62,3 +67,10 @@ def is_dev_or_test() -> bool:
 
 def is_prod_like() -> bool:
     return settings.APP_ENV in ("staging", "stage", "production", "prod")
+
+
+def is_demo_mode() -> bool:
+    """True only if demo data seeding is explicitly enabled AND stage allows it."""
+    if settings.RELEASE_STAGE in ("first_operational_release", "production", "prod"):
+        return False
+    return settings.DEMO_SEED_ENABLED
