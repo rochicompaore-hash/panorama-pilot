@@ -122,6 +122,19 @@ class ProductSimulateRequest(BaseModel):
     override_hourly_cost: Optional[float] = None
     override_production_time_min: Optional[float] = None
 
+    # --- commercial_perimeter (NEW default) ---
+    pricing_mode: Optional[str] = None  # "commercial_perimeter" (default) | "technical_cut_list"
+    window_type: Literal["apribile", "fissa"] = "apribile"
+    number_of_sashes: int = 1
+    hardware_not_required: bool = False   # solo per fissa
+    glass_code: Optional[str] = None      # riferimento vetro selezionato
+    # Servizi (opzionale, mai autofill 0)
+    installation_cost: Optional[float] = None
+    installation_declared_zero: bool = False
+    transport_cost: float = 0.0
+    disposal_cost: float = 0.0
+    accessory_cost: float = 0.0
+
 
 class ProductSimulateBlockingError(BaseModel):
     code: str

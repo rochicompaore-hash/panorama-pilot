@@ -114,14 +114,16 @@ def test_simulate_reports_missing_prices_when_no_pricelist(admin_session, proevo
 
 
 def test_simulate_geometry_computed_even_when_incomplete(admin_session, proevolution_id):
+    """technical_cut_list mode: cut-list preserva i vecchi valori per la produzione."""
     payload = {
         "width_mm": 900, "height_mm": 1500, "weld_allowance_mm": 6,
         "color_code": "BIANCO", "other_components_declared_zero": True,
+        "pricing_mode": "technical_cut_list",
+        "quote_line_type": "finestra_1a",
     }
     r = admin_session.post(f"{API}/catalog/products/{proevolution_id}/simulate", json=payload, timeout=15)
     assert r.status_code == 200
     body = r.json()
-    # cut_list must be present even in incomplete state so admins can preview
     ml = body["ml_consumption"]
     assert ml["telaio_5103"] == 4.824
     assert ml["rinforzo_telaio"] == 4.368
@@ -135,6 +137,7 @@ def test_simulate_invalid_geometry_blocks(admin_session, proevolution_id):
     payload = {
         "width_mm": 100, "height_mm": 100, "color_code": "BIANCO",
         "other_components_declared_zero": True,
+        "pricing_mode": "technical_cut_list", "quote_line_type": "finestra_1a",
     }
     r = admin_session.post(f"{API}/catalog/products/{proevolution_id}/simulate", json=payload, timeout=10)
     assert r.status_code == 200
@@ -188,10 +191,11 @@ def test_lifecycle_transition_requires_permission(admin_session, proevolution_id
 
 
 def test_simulation_endpoint_snapshot_hash_present_when_ok(admin_session, proevolution_id):
-    """Provide enough overrides to reach 'ok' status and verify snapshot_hash."""
+    """technical_cut_list mode: with prices missing but overrides provided for labour."""
     payload = {
         "width_mm": 900, "height_mm": 1500, "color_code": "BIANCO",
         "hardware_kit_price": 12.0, "other_components_declared_zero": True,
+        "pricing_mode": "technical_cut_list", "quote_line_type": "finestra_1a",
         # Overrides bypass production_config lookups
         "override_hourly_cost": 30, "override_production_time_min": 30,
         "override_margin_pct": 40,

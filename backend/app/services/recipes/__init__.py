@@ -17,8 +17,28 @@ from app.services.recipes.finestra_1a import (
     FinestraAInput,
     RECIPE_CODE as FINESTRA_1A_CODE,
 )
+from app.services.recipes.commercial_perimeter import (
+    compute_perimeter,
+    PerimeterInput,
+    PerimeterResult,
+    RECIPE_CODE as COMMERCIAL_PERIMETER_CODE,
+)
+from app.services.recipes.glass_engine import (
+    resolve_glass_recipe, compute_glass_dimensions, seed_factory_glass_recipes,
+)
+
+# Dispatch table: pricing_mode → (engine, display_dict fn)
+PRICING_MODES = {
+    "commercial_perimeter": COMMERCIAL_PERIMETER_CODE,
+    "technical_cut_list": FINESTRA_1A_CODE,
+}
+DEFAULT_PRICING_MODE = "commercial_perimeter"
 
 __all__ = [
     "compute_finestra_1a", "FinestraAResult", "FinestraAInput",
     "FINESTRA_1A_CODE",
+    "compute_perimeter", "PerimeterInput", "PerimeterResult",
+    "COMMERCIAL_PERIMETER_CODE",
+    "resolve_glass_recipe", "compute_glass_dimensions", "seed_factory_glass_recipes",
+    "PRICING_MODES", "DEFAULT_PRICING_MODE",
 ]

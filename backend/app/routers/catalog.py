@@ -294,25 +294,43 @@ def _redact_costs(payload: Dict[str, Any]) -> Dict[str, Any]:
 @router.post("/products/{pid}/simulate")
 async def simulate_product(pid: str, body: ProductSimulateRequest, request: Request,
                             user: dict = Depends(get_current_user)):
-    """Run the recipe engine. Everyone with catalog.view / products.view can see
-    the result, but internal costs are visible ONLY to users with
-    pricing_admin.view_costs (or superadmin/platform_owner).
+    """Run the recipe engine. pricing_mode dispatches between:
+      - commercial_perimeter (default, new preventivatore)
+      - technical_cut_list (retro-compat: motore 1-anta 5103+12130)
+
+    Costi interni visibili solo con pricing_admin.view_costs / quotes.view_costs.
     """
     is_super = user.get("is_superadmin") or user.get("is_platform_owner")
     perms = ["*"] if is_super else await get_permission_keys_for_user(user)
     if not is_super and "*" not in perms and "catalog.view" not in perms and "products.view" not in perms:
         raise HTTPException(403, "Permesso negato — catalog.view / products.view")
     body.product_id = pid
-    inputs = await _load_recipe_inputs(user, body)
 
-    # Only finestra_1a recipe supported in this iteration
-    if body.quote_line_type != "finestra_1a":
-        raise HTTPException(400, f"Ricetta {body.quote_line_type} non ancora implementata")
+    # Resolve pricing_mode — default from product.default_pricing_mode → global default
+    from app.services.recipes import PRICING_MODES, DEFAULT_PRICING_MODE
+    from app.services.catalog_service import load_product
+    product = await load_product(user["tenant_id"], product_id=pid)
+    if not product:
+        raise HTTPException(404, "Prodotto non trovato")
+    mode = (body.pricing_mode
+            or product.get("default_pricing_mode")
+            or DEFAULT_PRICING_MODE)
+    if mode not in PRICING_MODES:
+        raise HTTPException(400, f"pricing_mode non supportato: {mode}. Ammessi: {list(PRICING_MODES.keys())}")
 
-    result = compute_finestra_1a(inputs)
-    payload = _display_finestra_1a(result)
+    if mode == "commercial_perimeter":
+        from app.services.perimeter_assembler import run_perimeter_simulation
+        payload = await run_perimeter_simulation(user["tenant_id"], body)
+    else:
+        # technical_cut_list — usa il vecchio motore 1-anta (produzione/preventivo tecnico)
+        if body.quote_line_type != "finestra_1a":
+            raise HTTPException(400, f"Ricetta technical {body.quote_line_type} non ancora implementata")
+        inputs = await _load_recipe_inputs(user, body)
+        result = compute_finestra_1a(inputs)
+        payload = _display_finestra_1a(result)
+
     payload["product_id"] = pid
-    payload["color_is_premium"] = inputs.is_color_premium
+    payload["pricing_mode"] = mode
 
     can_view_costs = (is_super or "*" in perms
                        or "pricing_admin.view_costs" in perms

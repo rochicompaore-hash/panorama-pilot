@@ -121,11 +121,11 @@ async def _seed_products_for_tenant(tenant_id: str) -> int:
             "tenant_id": tenant_id, "key": p["key"], "deleted_at": None,
         })
         if existing:
-            # Refresh components + lifecycle_status idempotently, but leave the
-            # existing name/description if the operator has customised them.
+            # Refresh components + lifecycle_status + default_pricing_mode idempotently.
             await db.products.update_one({"_id": existing["_id"]}, {"$set": {
                 "components": p["components"],
                 "lifecycle_status": p.get("lifecycle_status", "active"),
+                "default_pricing_mode": p.get("default_pricing_mode", "commercial_perimeter"),
                 "profile_system": p.get("profile_system"),
                 "compatible_type_infissi": p.get("compatible_type_infissi", []),
                 "updated_at": now, "updated_by": "system:catalog_seed",
@@ -138,6 +138,7 @@ async def _seed_products_for_tenant(tenant_id: str) -> int:
             "category": p["category"], "description": p["description"],
             "components": p["components"],
             "lifecycle_status": p.get("lifecycle_status", "draft"),
+            "default_pricing_mode": p.get("default_pricing_mode", "commercial_perimeter"),
             "profile_system": p.get("profile_system"),
             "compatible_type_infissi": p.get("compatible_type_infissi", []),
             "base_price": 0.0, "base_type": "sqm",
@@ -158,6 +159,12 @@ async def run_catalog_seed() -> None:
     inserted_mappings = await seed_factory_code_mappings()
     if inserted_mappings:
         logger.info("Seeded %d factory code mappings", inserted_mappings)
+
+    # Factory glass recipes (ProEvolution/Restauro 1-anta + 2-ante)
+    from app.services.recipes.glass_engine import seed_factory_glass_recipes
+    inserted_glass = await seed_factory_glass_recipes()
+    if inserted_glass:
+        logger.info("Seeded %d factory glass recipes", inserted_glass)
 
     await _ensure_permissions()
 
