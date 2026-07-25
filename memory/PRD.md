@@ -445,3 +445,52 @@ Il tenant era già in stato desiderato dalla nascita (creato da `provision_owner
 - /product-simulator carica ProEvolution pre-selezionato con L=900/H=1500
 - Ogni simulazione produce cut-list corretta + errori MISSING chiari
 - Per raggiungere `pricing_status=ok` in demo: pre-caricare listino barre via /pricelist-importer con almeno codici 5103, 12130, RT-STD, RA-STD, FV-STD, e opzionalmente 7379 (per 2-ante che comunque non è nella fase 1)
+
+## Iteration 28 — SMTP Email System SiteGround (Feb 2026)
+
+### Scope
+Implementazione servizio SMTP production-ready per SiteGround (`gnldm1111.siteground.biz:465`, SSL, user `pilot@panoramapilot.com`).
+
+### Backend
+- **`app/services/email_service.py`**: `enqueue_email()` con SMTP via `aiosmtplib` (SSL/STARTTLS), delivery-mode redirect, idempotency check, retry worker in background (backoff 1m/5m/15m, max 3 tentativi), status: queued/sending/sent/failed/retrying/bounced/test_intercepted/configuration_required.
+- **`app/services/email_config.py`**: `MailConfig` dataclass; `get_public_config()` mai espone password.
+- **`app/services/email_dns.py`**: `check_domain()` SPF/DKIM/DMARC via `dnspython`.
+- **`app/models_email.py`**: `EmailLogV2` esteso (tenant_id, original_to, delivery_mode, attempt_count, next_retry_at, idempotency_key, payload_hash, stored_html/text), `EmailTemplateDoc`, `TestEmailRequest`.
+- **`app/routers/email_settings.py`**: `/api/email-settings` (GET config, POST /test rate-limit 5/5min, GET /dns-check, template CRUD).
+- **`app/routers/email_logs.py`** (esteso): tenant scope, filtri (status/template/to), counts_by_status, `POST /{id}/retry`.
+- **`app/seed_email_templates.py`**: 11 template canonici seminati come sistema idempotente.
+- **`app/services/email.py`** (compat): wrapper backward-compatible per `send_email()` legacy — delega a `enqueue_email`.
+- **Permessi**: `email.view_settings`, `email.manage_settings`, `email.send_test`, `email.view_logs`, `email.retry`, `email.templates.manage`.
+
+### Frontend
+- **`pages/EmailSettingsPage.jsx`**: 4 tab (Configurazione, Invio di test, Verifica DNS, Template) con editor Jinja2 + anteprima HTML live + reset override tenant.
+- **`pages/EmailLogsPage.jsx`** (riscritto): filtri stato/destinatario, counts_by_status cliccabili, dialog dettaglio con anteprima HTML/text, retry inline.
+- Menu sidebar: "Impostazioni email" + "Registro email".
+
+### Env variabili aggiunte
+`MAIL_HOST`, `MAIL_PORT=465`, `MAIL_SECURITY=ssl`, `MAIL_USER`, `MAIL_FROM`, `MAIL_FROM_NAME`, `MAIL_REPLY_TO`, `MAIL_DELIVERY_MODE=test`, `MAIL_TEST_REDIRECT_TO=pilot@panoramapilot.com`, `MAIL_IMAP_HOST/PORT/SECURITY` (predisposte, non implementate).
+
+### Sicurezza
+- **Password**: SOLO da `os.environ.get("MAIL_PASSWORD")`. Mai loggata. Se manca → status `configuration_required` con messaggio `SMTP_NOT_CONFIGURED`.
+- **Protezione preview**: tutti gli invii reindirizzati a `pilot@panoramapilot.com`, oggetto con prefisso `[TEST - Destinatario originale: ...]`, `original_to` preservato nel log.
+- **Isolamento tenant**: `email_logs` scoped per tenant_id (bypass solo per superadmin/platform_owner).
+- **Idempotency**: se `idempotency_key` esiste con status=sent/test_intercepted, ritorna log esistente senza reinvio.
+- **Rate limit**: 5 test-email ogni 5 minuti per utente (in-memory, ok per single-instance).
+- **Password redaction**: se cfg.smtp_password appare nell'eccezione SMTP, viene sostituita con `***REDACTED***`.
+
+### Test — iteration_28.json
+- **Backend**: 45/45 PASS (10 test_email_service + 9 test_email_extra + 26 regressione)
+- **Zero critical/high**, 1 minor cosmetico (rate-limit in-memory)
+- **Regressione**: 73/73 su commercial_perimeter, finestra_1a, catalog, ci_security_guards, code_quality_regression, iter25_smoke
+
+### Deploy checklist (post MAIL_PASSWORD)
+1. Aggiungere `MAIL_PASSWORD` in **Emergent → Profile → Secrets** con la password SMTP di `pilot@panoramapilot.com`.
+2. Restart backend (o attende reload automatico).
+3. Verificare `GET /api/email-settings` → `password_configured=true`, `is_configured=true`, `provider_name=siteground_smtp`.
+4. In "Impostazioni email → Invio di test" mandare test USER_INVITATION → deve arrivare a `pilot@panoramapilot.com` con oggetto `[TEST - ...]`.
+5. Attivare LIVE mode solo dopo verifica cambiando `MAIL_DELIVERY_MODE=live` in produzione (mai in preview).
+
+### Prossimo (P1)
+- Sprint 2 Catalogo: UI Ferramenta (Kit), UI Montaggio e posa
+- Sprint 3 Catalogo: UI Costi accessori (16 categorie)
+- Formule vetro 3-ante e 4-ante (bloccato: attende specifiche tecniche)
