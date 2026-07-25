@@ -1,0 +1,36 @@
+{
+  "summary": "Iter28 — Full backend verification of Infissi Express Cloud SMTP email system (SiteGround, MAIL_PASSWORD volutamente assente). Eseguiti 10 test in tests/test_email_service.py + 9 test aggiuntivi in tests/test_email_extra_iter28.py + 26 test di regressione (ci_security_guards, code_quality_regression, iter25_smoke). Totale 45/45 passati. Verificati: no password leak, 11 template canonici, configuration_required behaviour, delivery redirect a pilot@panoramapilot.com con subject prefixato, DNS check, rate limit 5/5min, idempotency, tenant filter, template CRUD (GET/PATCH/reset con version bump), log detail (stored_html/text senza valori password), retry endpoint (200 con permission admin), retro-compat forgot-password (200 senza crash), reseed idempotente (11 system template, 0 nuovi al secondo run), assenza traceback nei log del retry worker. Il sistema si comporta correttamente in modalità sicura: intercetta, registra, non invia SMTP reale finché MAIL_PASSWORD non è impostata.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/email-settings/test", "issue": "In-memory rate-limit state persiste tra sessioni pytest — al primo run dopo un rate-limit test precedente si può ricevere 429 sul test SMTP_NOT_CONFIGURED. Mitigato dal restart backend prima del run. Nessun impatto funzionale."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_email_service.py",
+    "/app/backend/tests/test_email_extra_iter28.py",
+    "/app/test_reports/pytest/pytest_email_iter28.xml",
+    "/app/test_reports/pytest/pytest_iter28_full.xml"
+  ],
+  "action_items": [
+    "(opzionale, non bloccante) Considerare storage rate-limit su Redis o su db.email_rate_limit con TTL, per evitare interferenze fra istanze/test runs.",
+    "(cosmetico) Il log 'seed - WARNING - Index creation issue (non-fatal): tenant_id_1_name_1' ricorre a ogni restart — non impatta email, ma vale la pena verificare se l'indice legacy va rimosso o rinominato."
+  ],
+  "critical_code_review_comments": [
+    "email.py wrapper è ben implementato: cattura eccezioni per non rompere caller legacy — corretto (comment 'send_email must never crash the caller').",
+    "email_logs router redige correttamente: la list-view non espone stored_html/text, solo la detail view — buona minimizzazione dati.",
+    "PATCH /templates/{code} incrementa correttamente la versione e crea override tenant. Reset è soft-delete (deleted_at) — coerente col resto del codebase.",
+    "Nessun leak: password non compare mai nei response di /email-settings, /email-logs, /email-logs/{id}. Menzione della *chiave* MAIL_PASSWORD nel messaggio d'errore SMTP_NOT_CONFIGURED è intenzionale e sicura (nome variabile, non valore)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_email_extra_iter28.py (nuovo — 9 test aggiuntivi)"
+  ],
+  "success_rate": {"backend": "100% (45/45)", "frontend": "n/a (backend-only)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (da tests/_creds.py)",
+  "seed_data_creation": "Nessun seed permanente. Il test reseed usa run_email_templates_seed() che è già idempotente. I test PATCH template creano/rimuovono override tenant nella stessa run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Il sistema email è stabile e in modalità sicura. Se in futuro verrà aggiunta MAIL_PASSWORD negli Emergent Secrets, i test dovranno essere aggiornati: (a) il test test_test_send_smtp_not_configured_and_redirect già tollera status='test_intercepted' oppure 'sent'; (b) potrebbe attivarsi invio reale a pilot@panoramapilot.com (delivery_mode=test). Il rate-limit è in-memory: restart backend all'inizio del test session per stato pulito. I test extra iter28 dipendono da almeno 1 email log esistente per il test retry — se il DB è vuoto, viene skippato correttamente.",
+  "rca of the issue": "Nessun bug identificato. Unico transient failure iniziale: test_test_send_smtp_not_configured_and_redirect ha ricevuto 429 al primo run perché il contatore rate-limit in-memory era ancora saturo da una sessione precedente. Riproduzione: rilanciare pytest due volte consecutive senza restart. Mitigazione applicata: 'sudo supervisorctl restart backend' prima del run. Fix consigliato (non bloccante): spostare rate-limit su store con TTL (Redis o Mongo TTL index)."
+}
