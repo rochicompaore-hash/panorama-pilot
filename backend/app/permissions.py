@@ -311,6 +311,13 @@ PERMISSION_CATALOG = [
     ("formulas.publish", "Formule", "approve", "Pubblica formule"),
     ("custom_configurations.create", "Configurazioni personalizzate", "create", "Crea serramenti fuori standard"),
     ("price_lists.import", "Import listini", "edit", "Importa listini XLS/CSV"),
+    # Email service (SMTP SiteGround)
+    ("email.view_settings", "Email", "view", "Visualizza configurazione SMTP (senza password)"),
+    ("email.manage_settings", "Email", "edit", "Gestisce configurazione SMTP e template"),
+    ("email.send_test", "Email", "edit", "Invia email di test SMTP"),
+    ("email.view_logs", "Email", "view", "Visualizza log email tenant"),
+    ("email.retry", "Email", "edit", "Reinvia email fallite"),
+    ("email.templates.manage", "Email", "edit", "Gestisce template email personalizzati"),
 ]
 
 # Predefined roles with permissions
@@ -396,6 +403,7 @@ PREDEFINED_ROLES = {
             "dashboard.view", "notifications.view", "search.global",
             "attachments.view", "attachments.create", "attachments.download",
             "financials.view", "margins.view", "audit.view", "workflow.export",
+            "email.view_settings", "email.view_logs", "email.retry",
         ],
     },
     "cliente": {

@@ -17,6 +17,7 @@ import AuditPage from "@/pages/AuditPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import SessionsPage from "@/pages/SessionsPage";
 import EmailLogsPage from "@/pages/EmailLogsPage";
+import EmailSettingsPage from "@/pages/EmailSettingsPage";
 import SearchPage from "@/pages/SearchPage";
 import LeadsPage from "@/pages/LeadsPage";
 import LeadDetailPage from "@/pages/LeadDetailPage";
@@ -119,6 +120,7 @@ function App() {
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="email-logs" element={<EmailLogsPage />} />
+          <Route path="email-settings" element={<EmailSettingsPage />} />
           <Route path="search" element={<SearchPage />} />
           {/* M4..M17 — Operational ERP modules */}
           <Route path="surveys" element={<SurveysPage />} />

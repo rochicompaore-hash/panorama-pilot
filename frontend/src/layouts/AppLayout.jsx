@@ -121,7 +121,8 @@ const NAV = [
     items: [
       { to: "/audit", i18n: "nav.audit", icon: ClockCounterClockwise, perm: "audit.view" },
       { to: "/sessions", i18n: "nav.sessions", icon: Devices, perm: null },
-      { to: "/email-logs", i18n: "nav.email_logs", icon: EnvelopeSimple, perm: "audit.view" },
+      { to: "/email-settings", label: "Impostazioni email", icon: EnvelopeSimple, perm: "email.view_settings" },
+      { to: "/email-logs", i18n: "nav.email_logs", icon: EnvelopeSimple, perm: "email.view_logs" },
       { to: "/whatsapp-logs", i18n: "nav.whatsapp_logs", icon: WhatsappLogo, perm: "audit.view" },
     ],
   },

@@ -109,6 +109,7 @@ from app.routers.management_control import router as management_control_router
 from app.routers.intercompany import router as intercompany_router
 from app.routers.product_catalog import router as product_catalog_router
 from app.routers.catalog import router as catalog_admin_router
+from app.routers.email_settings import router as email_settings_router
 
 # Public / Landing
 from app.routers.public import (
@@ -153,7 +154,9 @@ async def production_status():
     from app.config import is_prod_like
     from app.services.signature_provider import list_providers as _lp
 
-    email_configured = bool(settings.RESEND_API_KEY) and settings.EMAIL_PROVIDER != "mock"
+    from app.services.email_config import get_mail_config as _emc
+    _mail_cfg = _emc()
+    email_configured = _mail_cfg.is_configured
     s3_configured = settings.STORAGE_PROVIDER == "s3" and bool(settings.S3_BUCKET)
     otp_status = "safe"
     if settings.OTP_DEBUG_ENABLED:
@@ -172,10 +175,12 @@ async def production_status():
             "status": otp_status,
         },
         "email": {
-            "provider": settings.EMAIL_PROVIDER,
+            "provider": _mail_cfg.provider_name,
             "configured": email_configured,
             "status": "configured" if email_configured else "configuration_required",
-            "from": settings.EMAIL_FROM if email_configured else None,
+            "from": _mail_cfg.mail_from if email_configured else None,
+            "delivery_mode": _mail_cfg.delivery_mode,
+            "test_redirect_to": _mail_cfg.test_redirect_to,
         },
         "storage": {
             "provider": settings.STORAGE_PROVIDER,
@@ -203,6 +208,7 @@ FOUNDATION_ROUTERS = [
     auth_router, users_router, roles_router, permissions_router, company_router,
     audit_router, notifications_router, attachments_router, sequences_router,
     search_router, sessions_router, dashboard_router, email_logs_router,
+    email_settings_router,
     onboarding_router, debug_router,
 ]
 CRM_ROUTERS = [
@@ -283,8 +289,25 @@ async def _startup():
         await run_catalog_seed()
     except Exception as exc:  # noqa: BLE001
         logger.exception("Catalog seed failed: %s", exc)
+    # Email templates seed + retry worker
+    try:
+        from app.seed_email_templates import run_email_templates_seed
+        seed_report = await run_email_templates_seed()
+        logger.info("email templates seed: %s", seed_report)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Email templates seed failed: %s", exc)
+    try:
+        from app.services.email_service import start_retry_worker
+        start_retry_worker()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Email retry worker start failed: %s", exc)
 
 
 @app.on_event("shutdown")
 async def _shutdown():
+    try:
+        from app.services.email_service import stop_retry_worker
+        stop_retry_worker()
+    except Exception:  # noqa: BLE001
+        pass
     await close_db()

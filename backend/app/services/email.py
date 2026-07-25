@@ -1,102 +1,55 @@
-"""EmailProvider abstract + Mock (dev) + Resend (prod stub).
+"""Compatibility wrapper for the legacy send_email API.
 
-Emails NEVER block main flow: send() catches all exceptions and logs to email_logs.
+Preserves the existing call sites:
+- send_email(to, subject, template, html, text)
+- send_email(to=..., subject=..., template=..., body=..., ...)  (landing.py)
+- render_invitation(company_name, invite_url)
+- render_password_reset(reset_url)
+
+Delegates to services/email_service.py (new SMTP + retry + tenant + idempotency).
+No new call sites should use this wrapper; use email_service.enqueue_email instead.
 """
 from __future__ import annotations
 import logging
-from datetime import datetime, timezone
-from typing import Optional
-from app.config import settings
-from app.db import get_db
-from app.models import EmailLog, new_id
+from typing import Optional, Any
 
-logger = logging.getLogger("email")
+from app.services.email_service import enqueue_email
+
+logger = logging.getLogger("email_compat")
 
 
-class EmailProvider:
-    name = "abstract"
-
-    async def _deliver(self, to: str, subject: str, html: str, text: str) -> None:
-        raise NotImplementedError
-
-
-class MockEmailProvider(EmailProvider):
-    name = "mock"
-
-    async def _deliver(self, to: str, subject: str, html: str, text: str) -> None:
-        logger.info("========== [MOCK EMAIL] ==========")
-        logger.info("To: %s", to)
-        logger.info("Subject: %s", subject)
-        logger.info("Body:\n%s", text)
-        logger.info("==================================")
-
-
-class ResendEmailProvider(EmailProvider):
-    name = "resend"
-
-    async def _deliver(self, to: str, subject: str, html: str, text: str) -> None:
-        # Real Resend integration to be enabled before production
-        # via resend python SDK. Placeholder to keep interface stable.
-        if not settings.RESEND_API_KEY:
-            raise RuntimeError("RESEND_API_KEY not configured")
-        try:
-            import resend  # type: ignore
-        except ImportError as e:
-            raise RuntimeError("resend package not installed") from e
-        resend.api_key = settings.RESEND_API_KEY
-        resend.Emails.send({
-            "from": f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>",
-            "to": [to],
-            "subject": subject,
-            "html": html,
-            "text": text,
-        })
-
-
-def _provider() -> EmailProvider:
-    if settings.EMAIL_PROVIDER == "resend":
-        return ResendEmailProvider()
-    return MockEmailProvider()
-
-
-async def send_email(to: str, subject: str, template: str, html: str, text: str) -> str:
-    """Send an email via configured provider. Never raises. Returns log id."""
-    db = get_db()
-    log = EmailLog(
-        id=new_id(),
-        to=to,
-        subject=subject,
-        template=template,
-        status="queued",
-        provider=settings.EMAIL_PROVIDER,
-    )
-    doc = _to_mongo(log.model_dump(by_alias=True))
-    await db.email_logs.insert_one(doc)
-    prov = _provider()
+async def send_email(
+    to: str,
+    subject: Optional[str] = None,
+    template: str = "legacy",
+    html: Optional[str] = None,
+    text: Optional[str] = None,
+    body: Optional[str] = None,       # legacy landing.py signature
+    tenant_id: Optional[str] = None,
+    idempotency_key: Optional[str] = None,
+    **_ignored: Any,
+) -> str:
+    """Backward-compatible wrapper. Returns log_id (or empty string on hard failure)."""
+    # Legacy landing.py passes `body=...` instead of `text=...`
+    if text is None and body is not None:
+        text = body
     try:
-        await prov._deliver(to=to, subject=subject, html=html, text=text)
-        await db.email_logs.update_one(
-            {"_id": log.id},
-            {"$set": {"status": "sent", "sent_at": datetime.now(timezone.utc).isoformat()}},
+        result = await enqueue_email(
+            to=to, subject=subject or "(no subject)", template=template,
+            html=html, text=text,
+            tenant_id=tenant_id, idempotency_key=idempotency_key,
         )
-    except Exception as e:  # noqa: BLE001
-        logger.exception("Email delivery failed to %s", to)
-        await db.email_logs.update_one(
-            {"_id": log.id},
-            {"$set": {"status": "failed", "error": str(e)[:500]}},
-        )
-    return log.id
+        return result.get("id") or result.get("_id") or ""
+    except Exception:  # noqa: BLE001 — send_email must never crash the caller
+        logger.exception("send_email failed for to=%s template=%s", to, template)
+        return ""
 
 
-def _to_mongo(d: dict) -> dict:
-    for k, v in list(d.items()):
-        if isinstance(v, datetime):
-            d[k] = v.isoformat()
-    return d
-
-
-# Template builders (kept simple; production versions would use Jinja/MJML)
 def render_invitation(company_name: str, invite_url: str) -> tuple[str, str, str]:
+    """Legacy renderer — returns (subject, html, text) via the USER_INVITATION template.
+    Kept for callers that pre-render then pass to send_email(html=, text=).
+    New callers should pass template='USER_INVITATION' + context to send_email directly.
+    """
     subject = f"Invito a {company_name} — Infissi Express Cloud"
     text = (
         f"Sei stato invitato ad accedere a {company_name} su Infissi Express Cloud.\n\n"
