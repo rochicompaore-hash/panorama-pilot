@@ -1,153 +1,204 @@
-# Panorama Pilot — UX & Product Architecture v2
+# Panorama Pilot — UX & Product Architecture v2.1
 
 **Autore**: Design partner  
-**Versione**: 2.0 — Reset architetturale  
-**Data**: Feb 2026  
-**Stato**: DRAFT — In attesa di approvazione del Product Owner  
-**Ambito**: definizione dell'esperienza utente completa PRIMA di qualunque nuova implementazione  
-**Regola vincolante**: nessun codice viene modificato finché questo documento non è approvato.
+**Versione**: 2.1 — Recepimento feedback strutturale Product Owner  
+**Data revisione**: Feb 2026  
+**Stato**: DRAFT v2.1 — In attesa di approvazione esplicita  
+**Regola vincolante**: nessun codice, nessun file `design_guidelines.md`, nessuna Fase 1 finché il documento non è approvato.
+
+---
+
+## Changelog v2.0 → v2.1
+
+**Sezioni modificate**:
+- §1 · Filosofia — **modificato P6** (rimossa retorica "numero grande = verità"), **aggiunto P7** ("Ogni informazione si inserisce una sola volta"), **aggiunta Regola Architetturale** (fonte autorevole unica)
+- §2 · Utenti & ruoli — **estese le personas** da 6 a 11 (aggiunti Tecnico Rilevatore, Responsabile Tecnico, Responsabile Produzione, Operatore Produzione, Posatore/Caposquadra), **matrice permessi completa** riscritta con 11 righe
+- §4 · Customer Journey — **journey commerciale ridisegnato** rimuovendo il rilievo dal preventivo, **journey del Rilevatore** aggiunto, **journey del Posatore** aggiunto, **journey del Cliente** esteso
+- §5 · Mappa schermate — **aggiunte schermate operative** per Rilievo, Produzione, Posa
+- §6 · Navigazione — **menu commerciale aggiornato** (Attività al posto di Notifiche), **menu specifico per ruolo** dettagliato in §13
+- §7 · Wireframes — **wizard preventivo riportato a 6 step** (non 7), con Step 3 unificato configurazione+prezzo, rilievo tecnico rimosso dal preventivo
+- §7.5 · Firma — **requisiti espansi** (token non prevedibile, scadenza, revoca, single-document, audit trail), **OTP → estensione futura**, **rimossa dicitura "firma elettronica avanzata"**
+- §8 · Flussi operativi — **state machine completa** Vendita → Rilievo → Produzione → Posa → Assistenza, **regole cambio stato**, **condizioni bloccanti produzione**
+- §9 · Principi UX — **Legge 2 riformulata** in coerenza col nuovo P6
+- §10 · Regole progettazione — **font UI cambiato da Instrument Sans a Inter**, Serif solo per titoli/editoriale, mai in form/tabelle
+- §12 · Design tokens — **estesi** con testo primario/secondario, bordi, superfici, hover, focus, successo, avviso, errore, info, disabled
+
+**Nuove sezioni**:
+- §13 · Menu specifico per ruolo (11 ruoli)
+- §14 · Matrice Dato → Fonte autorevole → Moduli lettori
+- §15 · Misure indicative vs misure definitive
+- §16 · Gestione errori bloccanti nel preventivo
+- §17 · Comportamento dei preventivi legacy
+- §18 · Criteri di accessibilità
+
+**Sezioni invariate rispetto a v2.0**:
+- §0 (Executive summary — solo aggiornati riferimenti step wizard)
+- §3 (Casi d'uso — testo invariato, solo terminologia allineata)
+- §11 (Componenti standard — inalterato)
+
+**Conferma cambio codice**: **NESSUN file di codice modificato durante la stesura di v2.1**. Solo `/app/memory/UX_PRODUCT_ARCHITECTURE_V2.md` è stato aggiornato. Nessun `design_guidelines.md` creato. Nessuna Fase 1 avviata.
 
 ---
 
 ## 0 · Executive Summary
 
-Panorama Pilot v1 è stato costruito **per pagine** (CRUD + tabelle + form). Ogni funzione ha ricevuto una route dedicata. Il risultato: 64 route frontend, 3 pagine diverse per fare lo stesso preventivo, un motore di calcolo perfetto ma sconnesso dal flusso operativo, una firma canvas non utilizzabile da smartphone.
+Panorama Pilot v1 è stato costruito **per pagine**. 64 route, 3 pagine diverse per lo stesso preventivo, un motore di calcolo perfetto sconnesso dal flusso, una firma canvas inutilizzabile da smartphone.
 
-Panorama Pilot v2 sarà costruito **per processo**. Un solo motore, un solo flusso, un solo modo di fare le cose. Il commerciale non deve mai chiedersi "in quale pagina vado?", perché la piattaforma lo accompagna lungo il percorso naturale della vendita di serramenti:
+Panorama Pilot v2 si costruisce **per processo**. Un motore, un editor, un flusso. Il commerciale non si chiede mai "in quale pagina vado?". La piattaforma lo accompagna lungo il percorso naturale della vendita e post-vendita di serramenti:
 
-> **Lead → Cliente → Preventivo → Contratto → Firma → Produzione → Consegna → Assistenza**
+> **Lead → Cliente → Preventivo → Contratto → Rilievo tecnico → Produzione → Posa → Assistenza**
 
-Ispirazione: la linearità di **DocuSign**, la pipeline di **Pipedrive**, la velocità di **Linear**, la chiarezza numerica di **Stripe**, la contextuality di **HubSpot**, la keyboard-first culture di **Figma**. Non copiare. Applicare i principi al mondo serramenti.
+Il preventivo lavora su **misure indicative** dichiarate dal commerciale in casa cliente. Il rilievo tecnico, effettuato SOLO dopo firma contratto da parte di un rilevatore autorizzato, produce le **misure definitive** che sbloccano la produzione. Nessuna commessa può entrare in lista di taglio senza rilievo approvato.
 
-Il commerciale userà v2 in due contesti principali: (1) in ufficio davanti al desktop, (2) **a casa del cliente con lo smartphone in mano**. Il design deve funzionare in entrambi, con le stesse funzionalità.
+Ispirazione: linearità di **DocuSign**, pipeline di **Pipedrive**, velocità di **Linear**, chiarezza numerica di **Stripe**, contextuality di **HubSpot**, keyboard-first di **Figma**. Non copiare — applicare i principi al mondo serramenti italiano.
 
 ---
 
 ## 1 · Filosofia del prodotto
 
-### 1.1 Cosa NON siamo
-- Non siamo un CRM generico. Salesforce lo fa meglio.
-- Non siamo un sistema di fatturazione. Fatture in Cloud lo fa meglio.
-- Non siamo un configuratore CAD. AutoCAD lo fa meglio.
-
-### 1.2 Cosa SIAMO
-Siamo l'unico posto dove **un commerciale italiano di serramenti** completa in massimo 20 minuti il percorso "voglio un preventivo per una finestra" → "contratto firmato dal cliente". Tutto il resto della piattaforma esiste solo per supportare questo percorso.
-
-### 1.3 I sei principi fondanti
+### 1.1 I sette principi fondanti
 
 **P1 · Un solo modo di fare le cose**  
-Se ci sono due percorsi per creare un preventivo, uno dei due è sbagliato. Un motore, un editor, un flusso.
+Se ci sono due percorsi per creare un preventivo, uno è sbagliato. Un motore, un editor, un flusso.
 
 **P2 · Il motore calcola, l'utente configura**  
-Il commerciale sceglie prodotto, misure, colore, vetro. Il prezzo appare. Non lo digita mai. Se il motore non sa calcolare (dato mancante) lo dice chiaramente, non mette zero.
+Il commerciale sceglie prodotto, misure, colore, vetro. Il prezzo appare. Non lo digita mai. Se il motore non sa calcolare (dato mancante), lo dice chiaramente — non mette zero.
 
 **P3 · La velocità è una feature**  
 Command palette `Cmd+K` ovunque. Scorciatoie da tastiera. Nessun modal per operazioni frequenti. Ricerca fulminea.
 
 **P4 · Mobile-first per il commerciale**  
-Il commerciale è nel salotto del cliente. Deve poter creare, firmare e inviare il contratto dal telefono senza friction. Se una feature funziona meglio su desktop che su mobile, è progettata male.
+Il commerciale è nel salotto del cliente. Deve creare, firmare e inviare da telefono senza friction. Se una feature funziona meglio su desktop che su mobile, è progettata male.
 
 **P5 · Il contesto vive con te**  
-Quando lavori su un preventivo, vedi il cliente. Quando lavori sul cliente, vedi lo storico. Nessun click per "tornare indietro a vedere chi è". Pannello destro sempre attivo con il contesto rilevante (pattern HubSpot).
+Quando lavori su un preventivo vedi il cliente. Quando lavori sul cliente vedi lo storico. Nessun click per "chi è". Pannello destro con contesto rilevante (pattern HubSpot).
 
-**P6 · Il numero grande è la verità**  
-Il prezzo finale del preventivo è il pezzo di informazione più importante di quella schermata. Deve essere il più grande. Il resto è supporto (pattern Stripe).
+**P6 · Risultato economico immediatamente leggibile — senza sovrastare errori, dati mancanti o stati critici** *(riformulato)*  
+Nelle schermate commerciali, il prezzo/totale è visibile immediatamente. Se però esistono errori bloccanti, dati mancanti, o stati critici (es. `MISSING_GLASS_PRICE`, listino scaduto, cliente senza P.IVA per fattura B2B), questi hanno **precedenza visiva** sul risultato economico. Il prezzo non deve mai nascondere una condizione che impedirebbe la vendita o la produzione.
 
-### 1.4 Antipattern che elimineremo
-- Tabelle con 15 colonne
+**P7 · Ogni informazione si inserisce una sola volta** *(nuovo)*  
+Ogni dato viene inserito **una sola volta** nel punto di raccolta più naturale e riutilizzato automaticamente in tutti i moduli successivi lungo il flusso:
+
+> **CRM → Preventivo → Contratto → Rilievo → Produzione → Posa → Assistenza**
+
+Il commerciale non ridigita l'indirizzo del cliente nel contratto. Il rilevatore non ridigita le misure indicative — le riceve dal preventivo e le sovrascrive con quelle definitive. Il produzione non ridigita colori/vetri/ferramenta — li legge dal contratto approvato. Il posatore non ridigita l'indirizzo — lo riceve dalla commessa.
+
+### 1.2 Regola architetturale — Fonte autorevole unica
+
+> **Ogni dato deve avere una sola fonte autorevole. Gli altri moduli lo leggono ma non lo duplicano.**
+
+Questa regola è **non negoziabile**. Il dettaglio della matrice Dato → Fonte → Lettori è in §14. Conseguenze pratiche:
+
+- Un indirizzo cliente si modifica una sola volta, sull'anagrafica cliente. Preventivi e contratti già emessi conservano uno **snapshot immutabile** del dato al momento dell'emissione, ma i nuovi preventivi leggono sempre la fonte autorevole aggiornata.
+- Un prezzo di listino si modifica una sola volta, sul listino. I preventivi già inviati non cambiano (snapshot); i nuovi preventivi usano il listino aggiornato.
+- Le misure indicative vivono sul preventivo. Le misure definitive vivono sul rilievo. Nessuna copia bidirezionale: la produzione **legge sempre e solo il rilievo**.
+- I contatti (email, telefono) vivono sull'anagrafica. Le comunicazioni (email inviate, WhatsApp) vivono sui log — che referenziano il contatto autorevole tramite id.
+
+### 1.3 Antipattern eliminati
+- Tabelle a 15 colonne
 - Modal dentro modal
 - "Sei sicuro?" per operazioni non distruttive
-- Salvataggio manuale (deve essere autosave con indicatore discreto)
-- Terminologia tecnica nell'interfaccia commerciale ("BOM", "recipe", "snapshot" → nascosti)
-- Configurazioni prima di poter iniziare a lavorare (onboarding = 3 domande, non 20)
+- Salvataggio manuale (autosave silenzioso con indicatore)
+- Terminologia tecnica (`BOM`, `recipe`, `snapshot`, `aggregate`) esposta al commerciale
+- Configurazioni obbligatorie prima di poter iniziare a lavorare
+- **Ridigitazione di dati già presenti** (violazione P7)
+- Fonti concorrenti dello stesso dato (violazione Regola Architetturale)
 
 ---
 
 ## 2 · Utenti & ruoli
 
-### 2.1 Personas primarie
+### 2.1 Personas operative (11 ruoli identificati)
 
-**A · Marco — Commerciale (persona primaria, 80% dell'uso)**
-- 45 anni, ex-installatore diventato venditore
-- Non è nato con lo smartphone in mano ma lo usa quotidianamente
-- Passa 60% del tempo in trasferta, 40% in ufficio
-- Odia i software complicati, ama i tool che gli fanno vincere velocità
-- Metrica di successo: quanti preventivi manda al giorno, quanti si chiudono
-- KPI dolorosi: tempo tra sopralluogo e invio preventivo, tasso di ripensamenti "aspetta ho sbagliato il prezzo"
+**A · Marco — Commerciale** (persona primaria, ~65% dell'uso)  
+45 anni, ex-installatore. Passa 60% in trasferta, 40% ufficio. Usa smartphone in casa cliente. Metrica: preventivi/giorno, tasso di chiusura.
 
-**B · Laura — Ufficio (amministrazione, back office)**
-- 38 anni, si occupa di listini, contratti, contabilità, coordinamento posa
-- Usa il desktop, doppio monitor
-- Ha bisogno di viste dense, tabelle filtrabili, export Excel
-- Deve poter correggere errori del commerciale senza rifare tutto
-- KPI: tempo dall'accettazione preventivo alla consegna materiale
+**B · Laura — Back Office**  
+38 anni. Amministrazione ordini, contratti, fatturazione, coordinamento posa. Doppio monitor. Ha bisogno di tabelle dense filtrabili, export Excel. Metrica: tempo accettazione → consegna materiali.
 
-**C · Roberto — Titolare / responsabile commerciale**
-- 55 anni, vede tutto e decide tutto
-- Non ha tempo per esplorare il software
-- Vuole 4 numeri in dashboard e la possibilità di andare in profondità con un click
-- KPI: fatturato mese, margine medio, tempo medio ciclo vendita
+**C · Sara — Amministratore configurazione** *(distinta da back office)*  
+40 anni. Gestisce listini, formule, catalogo, template email/PDF, permessi, integrazioni. Non entra nel flusso commerciale.
 
-**D · Anna — Tecnico produzione**
-- 32 anni, decide se un preventivo è tecnicamente fattibile
-- Riceve le commesse, gestisce la lista di taglio, coordina il montaggio
-- Vive nella schermata "Produzione" — non entra quasi mai nel CRM
+**D · Roberto — Titolare / Responsabile commerciale**  
+55 anni. Vede tutto, decide tutto. Metrica: fatturato/mese, margine medio, ciclo vendita medio.
 
-**E · Emergent SaaS Owner (proprietario piattaforma)**
-- Vede tutti i tenant, gestisce pricing SaaS, onboarding nuovi clienti
-- Persona secondaria, usa un'area dedicata
+**E · Giulio — Tecnico Rilevatore** *(nuovo)*  
+50 anni. Va in cantiere con laser meter dopo firma contratto. Rileva misure definitive, scatta foto, segnala difformità (es. spalletta storta, controtelaio da sostituire), approva rilievo tecnico o richiede modifica contratto se emerge scostamento significativo.
 
-**F · Cliente finale (Sig. Rossi)**
-- Non installa nulla, non fa login
-- Riceve un link, apre il preventivo/contratto, firma dal telefono
-- Non deve aver bisogno di aiuto per completare il flusso
+Può:  
+- consultare la commessa (dati contratto, misure indicative, prodotti)  
+- inserire le misure definitive per ogni vano  
+- caricare fotografie prima intervento  
+- segnalare difformità con note strutturate  
+- approvare il rilievo tecnico  
 
-### 2.2 Matrice ruolo → permessi essenziali
+Non può:  
+- modificare prezzi  
+- modificare sconti  
+- vedere margini  
+- modificare listini  
+- vedere altre commesse non a lui assegnate  
 
-| Ruolo | Vede prezzi vendita | Vede costi | Modifica prezzo manualmente | Firma contratti | Gestisce listini | Gestisce utenti |
-|---|---|---|---|---|---|---|
-| Commerciale | ✅ | ❌ | ❌ (solo con `override_price`) | ❌ | ❌ | ❌ |
-| Commerciale senior | ✅ | ❌ | ✅ con audit | ❌ | ❌ | ❌ |
-| Back office | ✅ | ✅ margine | ✅ con audit | ❌ | ❌ | ❌ |
-| Titolare | ✅ | ✅ tutto | ✅ | ✅ | ✅ | ✅ |
-| Tecnico produzione | ❌ | ✅ costi materiali | ❌ | ❌ | ❌ (solo lettura tecnica) | ❌ |
-| Platform Owner | Cross-tenant | Cross-tenant | ❌ | ❌ | ✅ template | ✅ tenant admin |
+**F · Anna — Responsabile Tecnico** *(nuovo, distinto da produzione)*  
+42 anni. Approva tecnicamente le commesse dopo rilievo, controlla distinta base, autorizza lista di taglio, gestisce qualità e non conformità. Ponte tra tecnico rilevatore e produzione.
 
-### 2.3 Superficie ridotta per ruolo
+Gestisce:  
+- approvazione tecnica post-rilievo  
+- distinta base finale (BOM)  
+- lista di taglio  
+- controllo materiali disponibili  
+- programmazione tecnica  
+- qualità  
+- non conformità e loro chiusura  
 
-Il segreto per un'app veloce è **mostrare solo quello che serve al ruolo**. In v1 tutti vedono tutto e questo è ingestibile.
+**G · Franco — Responsabile Produzione** *(nuovo)*  
+48 anni. Programma la produzione, assegna operatori, coordina reparto taglio/saldatura/assemblaggio, monitora avanzamento commesse.
 
-**Commerciale vede nel menu (7 voci):**
-1. Dashboard (KPI personali)
-2. Lead
-3. Clienti
-4. Preventivi
-5. Contratti
-6. Calendario
-7. Notifiche
+**H · Pietro — Operatore Produzione** *(nuovo)*  
+30 anni. Esegue una fase operativa (taglio, ferramenta, vetraggio). Vede solo il lavoro assegnato + istruzioni di lavorazione + spunta completamento.
 
-**Back office aggiunge (4 voci):**
-8. Produzione (commesse)
-9. Fatturazione
-10. Pagamenti
-11. Assistenza
+**I · Salvo — Posatore / Caposquadra** *(nuovo)*  
+35 anni. Va in cantiere per l'installazione. Usa quasi esclusivamente lo smartphone.
 
-**Titolare vede TUTTO** (accede a sezione "Configurazione" contenente il resto).
+Può:  
+- vedere solo i lavori assegnati (giornalieri/settimanali)  
+- consultare indirizzo cantiere e contatti cliente  
+- vedere i materiali previsti nella commessa  
+- caricare foto prima e dopo intervento  
+- compilare verbale di posa  
+- raccogliere firma cliente su verbale  
+- aprire ticket di assistenza per difformità/rotture  
 
-**Sezione Configurazione** (accessibile via icona ingranaggio in header, non nel menu principale):
-- Anagrafica azienda
-- Utenti & ruoli
-- Catalogo prodotti (admin)
-- Listini
-- Formule di calcolo
-- Ferramenta
-- Montaggio & posa
-- Costi accessori
-- Template email
-- Firma elettronica
-- Integrazioni
-- Audit log
-- Legacy (preventivi vecchio motore — read-only)
+Non può vedere:  
+- margini, costi industriali, dati economici  
+- altre commesse  
+- prezzi vendita  
+
+**J · Sig. Rossi — Cliente finale**  
+Non installa nulla, non fa login. Riceve link, apre preventivo/contratto, firma dal telefono, riceve PDF firmato, riceve aggiornamenti stato.
+
+**K · Emergent Platform Owner**  
+Vede tutti i tenant, gestisce pricing SaaS, onboarding nuovi clienti. Area dedicata `/platform/*`.
+
+### 2.2 Matrice completa dei permessi (11 ruoli × dimensioni chiave)
+
+| Ruolo | Vede prezzi vendita | Vede costi/margini | Modifica prezzo unitario | Sconto commerciale | Firma contratti (interna) | Modifica listini | Rileva misure definitive | Approva tecnicamente | Gestisce produzione | Compila verbale posa | Gestisce utenti |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Commerciale | ✅ | ❌ | ❌ | ✅ entro max % | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Commerciale senior | ✅ | ❌ | ✅ con audit | ✅ oltre max | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Back Office | ✅ | ✅ margine | ✅ con audit | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Amministratore config | ✅ | ✅ tutto | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Titolare | ✅ | ✅ tutto | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Tecnico Rilevatore | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Responsabile Tecnico | ❌ | ✅ costi materiali | ❌ | ❌ | ❌ | ❌ (solo lettura) | ❌ | ✅ | parziale | ❌ | ❌ |
+| Responsabile Produzione | ❌ | ✅ costi materiali | ❌ | ❌ | ❌ | ❌ (solo lettura) | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Operatore Produzione | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ solo fase assegnata | ❌ | ❌ |
+| Posatore / Caposquadra | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Cliente | ❌ (vede solo suo prev/contratto) | ❌ | ❌ | ❌ | ✅ firma | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Platform Owner | Cross-tenant | Cross-tenant | ❌ | ❌ | ❌ | ✅ template globali | ❌ | ❌ | ❌ | ❌ | ✅ tenant admin |
+
+### 2.3 Isolamento tenant
+Tutti i ruoli operativi (A–J) operano dentro un singolo tenant. Il **Platform Owner** è l'unico ruolo cross-tenant. Ogni query backend applica filtro `tenant_id` in modo automatico tramite deps FastAPI.
 
 ---
 
@@ -156,41 +207,48 @@ Il segreto per un'app veloce è **mostrare solo quello che serve al ruolo**. In 
 ### 3.1 Storie utente (in ordine di importanza)
 
 **S1 · "Voglio inviare un preventivo al Sig. Rossi in 5 minuti dallo smartphone"**  
-Il commerciale è nel salotto del cliente. Ha rilevato le misure con il metro laser. Apre l'app dal telefono, sceglie il cliente, aggiunge un vano, mette larghezza/altezza/colore/vetro. Il prezzo si calcola. Duplica il vano per la stanza gemella. Invia il PDF via email dal cliente stesso, con il cliente che guarda lo schermo. Chiude la vendita a caldo.
+Il commerciale è nel salotto del cliente. Ha rilevato misure indicative col metro laser. Apre l'app, sceglie cliente, aggiunge vano, mette L/H/colore/vetro. Prezzo si calcola. Duplica per stanza gemella. Invia PDF via email davanti al cliente.
 
-**S2 · "Voglio trasformare un preventivo accettato in contratto firmato via link"**  
-Il cliente ha risposto "OK procediamo". Il commerciale apre il preventivo dal telefono, tocca "Genera contratto". Sceglie condizioni pagamento standard (già preimpostate). Invia link firma via email/WhatsApp. Il cliente riceve, apre il link sul suo telefono, legge, firma con il dito, conferma. Il commerciale riceve notifica push "Contratto firmato" entro 3 minuti.
+**S2 · "Voglio trasformare preventivo accettato in contratto firmato via link"**  
+Il cliente conferma. Il commerciale apre preventivo, tocca "Genera contratto". Sceglie condizioni pagamento standard. Invia link firma. Il cliente firma dal telefono. Notifica push al commerciale entro 3 minuti.
 
-**S3 · "Sto guardando un lead — voglio sapere tutto sul cliente e cosa fare ora"**  
-Il commerciale apre un lead. Vede subito: chi è, cosa ha chiesto, ultima interazione, prossima azione consigliata. Un pulsante primario "Programma sopralluogo" o "Crea preventivo" già suggerito dal sistema in base allo stato del lead.
+**S3 · "Sto guardando un lead — voglio sapere tutto e cosa fare ora"**  
+Apre lead, vede chi è, cosa ha chiesto, ultima interazione, prossima azione consigliata. CTA primaria già suggerita in base allo stato.
 
-**S4 · "Ho ricevuto un errore sul prezzo — voglio capire perché"**  
-Il commerciale ha configurato un vano che risulta con status "incomplete". Non gli si dice solo "errore". Gli si dice: **"Manca il prezzo del vetro 33.1/16/33.1 per il colore Bianco RAL 9016. Chiedi a Laura di aggiornare il listino."** Con un pulsante "Notifica Laura" che manda ticket interno.
+**S4 · "Ho ricevuto errore prezzo — voglio capire perché"**  
+Il vano risulta `pricing_status=incomplete`. Errore parlante: *"Manca prezzo vetro 33.1/16/33.1 colore Bianco RAL 9016. Chiedi all'amministratore di aggiornare il listino."* Pulsante "Notifica amministratore" apre ticket.
 
-**S5 · "Voglio rivedere quanto guadagnamo su un preventivo"**  
-Il titolare apre un preventivo. Il commerciale non vede il margine. Il titolare invece vede in un pannello dedicato: costo materiali, costo manodopera, costo posa, margine assoluto, margine %. Con visualizzazione a torta.
+**S5 · "Voglio duplicare preventivo di 3 mesi fa"**  
+Duplicazione con un click. Misure preservate, prezzi RICALCOLATI dal listino attuale. Se qualcosa non è più disponibile, avviso.
 
-**S6 · "Voglio duplicare un preventivo di 3 mesi fa per fare un cliente simile"**  
-Duplicazione con un click. Cliente vuoto, misure preservate, prezzi RICALCOLATI dal listino attuale (mai congelati). Se qualcosa non è più disponibile, avviso.
+**S6 · "Il contratto è firmato — chi va a fare il rilievo?"** *(nuovo)*  
+Il sistema assegna automaticamente il rilievo al rilevatore configurato per l'area geografica. Notifica push a Giulio con dettagli commessa e link mappa cantiere.
 
-**S7 · "Come amministratore voglio aggiornare il listino telaio 5103 da 8€/ml a 8,50€/ml"**  
-Vado in Configurazione → Listini → Cerco "5103" → modifica → salvo. Il sistema crea nuova versione, chiede: "Applicare al prossimo preventivo o retroattivamente?". Retroattività **mai automatica** su preventivi già inviati/firmati.
+**S7 · "Sono a casa Rossi per il rilievo — le misure sono diverse"** *(nuovo)*  
+Giulio apre app, vede commessa, inserisce misure definitive per ogni vano. Se scostamento supera soglia (es. >5%) sistema alza flag e chiede "Confermi scostamento? Serve rifare preventivo o è accettabile?".
 
-**S8 · "Cliente vuole cambiare colore su preventivo già inviato"**  
-Il commerciale duplica il preventivo (nuova revisione), cambia il colore. Nuovo prezzo. Manda al cliente sotto forma di "Revisione 2 del preventivo Q-2026-000123".
+**S8 · "Amministratore aggiorna listino telaio 5103 da 8€/ml a 8,50€/ml"**  
+Sara va in Configurazione → Listini → cerca 5103 → modifica → salva. Sistema crea nuova versione. Chiede: "Applicare da quando?". Retroattività **mai automatica** su preventivi inviati/firmati.
 
-**S9 · "Voglio vedere lo stato di tutte le commesse in produzione"**  
-Vista Kanban: Da programmare / In produzione / Pronte / In consegna / Installate.
+**S9 · "Cliente vuole cambiare colore su preventivo già inviato"**  
+Duplicazione preventivo (revisione 2), cambio colore, nuovo prezzo. Invia come "Revisione 2 del preventivo Q-2026-000123".
 
-**S10 · "Sto cercando un cliente ma non ricordo il nome esatto"**  
-`Cmd+K` → digito "rossi" → vedo lista cliente/lead/preventivo/contratto → click e ci sono.
+**S10 · "Voglio vedere stato commesse in produzione"**  
+Vista Kanban: Rilievo → Approvazione tecnica → Ordine materiali → In produzione → Pronto consegna → Installato.
 
-### 3.2 Anti-storie (cosa NON dovrà mai succedere)
-- Il commerciale che digita a mano un prezzo perché "così è più veloce"
-- Il commerciale che invia un preventivo con "prezzo 0€" perché il vetro non era in listino
-- Il cliente che riceve una firma richiesta e non capisce come firmare
-- Il titolare che ha 4 preventivi con stesso numero perché il commerciale ha duplicato male
-- L'amministratore che modifica un listino e cambia i prezzi su contratti già firmati
+**S11 · "Posatore in cantiere per installazione"** *(nuovo)*  
+Salvo apre app, vede lavori del giorno, tap sul primo. Vede indirizzo, contatti, materiali previsti. Foto pre-intervento. Installa. Foto post-intervento. Compila verbale (checklist). Cliente firma verbale su schermo. Chiude intervento.
+
+**S12 · "Cerco un cliente ma non ricordo il nome"**  
+`Cmd+K` → "rossi" → lista risultati → click.
+
+### 3.2 Anti-storie (cosa non deve mai succedere)
+- Commerciale che digita a mano prezzo
+- Preventivo con vano a €0
+- Cliente che riceve richiesta firma e non capisce come firmare
+- Produzione che parte senza rilievo tecnico approvato
+- Rilevatore che vede prezzi/margini
+- Posatore che vede altre commesse
 
 ---
 
@@ -199,137 +257,143 @@ Vista Kanban: Da programmare / In produzione / Pronte / In consegna / Installate
 ### 4.1 Journey del Commerciale (Marco)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  T0 · Lead                                                              │
-│  Fonte: sito web / passaparola / campagna / spontaneo                   │
-│  Marco vede notifica push "Nuovo lead: Sig. Rossi, cambio 5 finestre"   │
-│  → Apre lead: vede richiesta, contatto, mappa località                  │
-│  → Un click: "Programma sopralluogo"                                    │
-│  → Suggerimento automatico: martedì mattina (agenda libera)             │
-└──────────────────────────────┬──────────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│  T1 · Sopralluogo                                                       │
-│  Marco arriva a casa Rossi                                              │
-│  Apre l'app dal telefono                                                │
-│  → Il lead si è già trasformato in Cliente (con un click al T0)         │
-│  → Vede scheda cliente + suggerimento "Crea preventivo"                 │
-│  → Tap "Nuovo preventivo"                                               │
-└──────────────────────────────┬──────────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│  T2 · Configurazione preventivo (wizard 7 step)                         │
-│  STEP 1 · Cliente        (già preselezionato, salta)                   │
-│  STEP 2 · Vani           (aggiunge 5 vani rapidamente)                 │
-│  STEP 3 · Configurazione (per ogni vano: prodotto, L, H, ante, colore, │
-│                           vetro, ferramenta, accessori, montaggio)     │
-│  STEP 4 · Prezzo auto    (vede subito totale finestra + totale generale)│
-│  STEP 5 · Riepilogo      (schema visivo + lista + duplica/modifica)    │
-│  STEP 6 · Totale         (imponibile, IVA, sconto, montaggio, servizi) │
-│  STEP 7 · PDF + Invia    (anteprima → invia via email o WhatsApp)      │
-│  Tempo target: 8-12 minuti                                              │
-└──────────────────────────────┬──────────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│  T3 · Follow-up                                                         │
-│  Il preventivo va in stato "Inviato"                                   │
-│  Sistema crea task automatico: "Ricorda: chiama Sig. Rossi tra 3 giorni"│
-│  Marco vede notifica il giorno T+3                                     │
-│  Chiama → cliente conferma → tap "Preventivo accettato"                │
-└──────────────────────────────┬──────────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│  T4 · Contratto                                                         │
-│  Bottone primario: "Genera contratto"                                   │
-│  Precompila tutto dal preventivo (nessun re-input dati)                │
-│  Condizioni pagamento: template scelti dal menu                        │
-│  Anteprima PDF integrale                                                │
-│  Tap "Invia link firma" → link va al cliente via email + WhatsApp     │
-└──────────────────────────────┬──────────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│  T5 · Firma cliente                                                     │
-│  Cliente riceve link                                                    │
-│  Apre da smartphone                                                     │
-│  Legge contratto (rendering PDF inline, no download obbligatorio)     │
-│  Checkbox: "Ho letto e accetto termini e condizioni"                  │
-│  Firma disegnata a dito su canvas mobile-first                        │
-│  Conferma → riceve email con PDF firmato + copia in CC alla società   │
-│  Marco riceve notifica push in tempo reale                            │
-└──────────────────────────────┬──────────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│  T6 · Handoff a Produzione                                              │
-│  Marco vede: "✓ Contratto firmato"                                     │
-│  Il contratto diventa automaticamente una "Commessa di produzione"     │
-│  Anna (produzione) riceve notifica                                     │
-│  Marco esce dal flusso — la sua vendita è chiusa                       │
-│  Sistema calcola provvigione automatica                                │
-└─────────────────────────────────────────────────────────────────────────┘
+T0 · Lead (fonte: sito / passaparola / campagna)
+   → Notifica push "Nuovo lead: Sig. Rossi, cambio 5 finestre"
+   → Marco apre lead, un click "Programma sopralluogo"
+
+T1 · Sopralluogo commerciale
+   → Marco in casa cliente, rileva misure indicative col metro laser
+   → Lead → Cliente (un click)
+   → Nuovo preventivo (wizard 6 step)
+
+T2 · Configurazione preventivo (misure indicative)
+   → 6 step, prezzo real-time, PDF, invio email/WhatsApp
+   → Tempo target: 8-12 minuti
+
+T3 · Follow-up
+   → Task automatico "chiama Sig. Rossi tra 3 giorni"
+   → Cliente conferma → "Preventivo accettato"
+
+T4 · Contratto
+   → "Genera contratto" precompila tutto (P7)
+   → Anteprima PDF integrale
+   → "Invia link firma" via email + WhatsApp
+
+T5 · Firma cliente (rotta pubblica /sign/:token)
+   → Cliente firma dallo smartphone
+   → Marco riceve notifica push in tempo reale
+   → Contratto → stato "firmato" (terminale, immutabile)
+
+T6 · Handoff a Rilevatore
+   → Marco esce dal flusso — la sua vendita è chiusa
+   → Sistema assegna commessa a rilevatore area geografica
+   → Provvigione calcolata automaticamente
 ```
 
-**Metriche journey Commerciale**:
-- Tempo Lead → Sopralluogo: ≤ 3 giorni (obiettivo)
-- Tempo Sopralluogo → Preventivo inviato: ≤ 30 minuti
-- Tempo Contratto → Firma cliente: ≤ 48 ore
-- % preventivi inviati che vanno in firma: ≥ 45%
-
-### 4.2 Journey dell'Amministrazione (Laura)
+### 4.2 Journey del Tecnico Rilevatore (Giulio) *(nuovo)*
 
 ```
-Preventivi in coda "In attesa validazione" (opzionale)
-  ↓
-Contratti firmati oggi
-  ↓ tap
-Verifica dati fatturazione cliente (P.IVA, indirizzo, PEC)
-  ↓
-Segna "Pronto per ordine materiale"
-  ↓
-Sistema genera Ordine di Fornitura dai listini
-  ↓
-Invia ai fornitori (email precompilata)
-  ↓
-Traccia stato consegna materiali
-  ↓
-Quando tutto arrivato: cambia stato commessa in "Pronto per produzione"
-  ↓
-Anna prende in carico (T6 del journey commerciale)
+T0 · Notifica assegnazione
+   → Push "Nuova commessa da rilevare: Sig. Rossi, 5 vani"
+   → Data suggerita in base a agenda
+
+T1 · Programmazione visita
+   → Giulio apre commessa, conferma appuntamento con cliente
+   → Sistema invia conferma automatica a cliente (email + WhatsApp)
+
+T2 · Rilievo in cantiere (mobile)
+   → Apre commessa, vede misure indicative dal preventivo
+   → Per ogni vano: inserisce misure definitive L_def, H_def
+   → Sistema calcola scostamento vs misure indicative
+   → Se scostamento > soglia: chiede conferma esplicita + nota
+   → Scatta foto pre-intervento per ogni vano
+   → Segnala difformità (es. spalletta storta) con note strutturate
+
+T3 · Approvazione rilievo
+   → Se scostamento sotto soglia: "Approva rilievo" → commessa passa a Responsabile Tecnico
+   → Se scostamento significativo o difformità gravi: "Richiedi variante contratto"
+     → Commerciale notificato, deve preparare revisione contratto o rinegoziazione
+     → Commessa in stato "in attesa variante"
+
+T4 · Chiusura
+   → Rilievo approvato → Giulio esce dal flusso
+   → Commessa passa a Responsabile Tecnico (Anna)
 ```
 
-Laura NON entra mai in un preventivo per modificarlo. Se serve modifica, il commerciale crea una revisione.
+### 4.3 Journey del Responsabile Tecnico (Anna) *(nuovo)*
 
-### 4.3 Journey del Cliente (Sig. Rossi)
+```
+Riceve commessa con rilievo approvato
+   ↓
+Verifica distinta base finale (calcolata da misure definitive)
+   ↓
+Controlla disponibilità materiali
+   ↓
+Autorizza lista di taglio → produzione può programmare
+   ↓
+Monitora avanzamento produzione
+   ↓
+Chiude non conformità se emergono
+   ↓
+Approva commessa "pronta per consegna"
+```
 
-**Punto di contatto 1**: riceve email  
-Oggetto: "Preventivo Q-2026-000123 — Panorama Pilot"  
-Corpo: HTML con logo azienda, saluto personalizzato, "Clicca qui per vedere il tuo preventivo"
+### 4.4 Journey del Posatore (Salvo) *(nuovo)*
 
-**Punto di contatto 2**: apre link  
-Landing pagina pubblica `/p/{token}` — no login richiesto  
-Sopra: nome azienda + logo + "Preventivo per Sig. Rossi"  
-Anteprima PDF inline (WeasyPrint rendering)  
-CTA: "Ho domande" (apre WhatsApp/email al commerciale) + "Accetta preventivo" (opzionale, o via risposta email)
+```
+T0 · Programma settimanale
+   → Salvo apre app lunedì mattina
+   → Vede 5 lavori assegnati settimana
+   → Tap primo lavoro
 
-**Punto di contatto 3**: riceve email "Contratto pronto per firma"  
-Corpo: "Sig. Rossi, il suo contratto è pronto. Firmi qui in 30 secondi."  
-Un unico pulsante: "Firma contratto"
+T1 · Preparazione (dal telefono)
+   → Vede indirizzo, contatti cliente, materiali previsti
+   → Naviga con Google Maps (link diretto)
 
-**Punto di contatto 4**: pagina firma `/sign/{token}`  
-Layout mobile-first:
-- Header: "Contratto #CON-2026-000045 · Panorama Pilot"
-- Scroll: contratto completo leggibile
-- Sticky bottom: box firma
-- Checkbox: "Ho letto e accetto termini, condizioni e informativa privacy"
-- Canvas grande: "Firma qui con il dito o pennino"
-- Pulsanti: "Cancella firma" · "Conferma firma"
-- Nome + data auto-compilati (modificabili)
+T2 · In cantiere
+   → Foto pre-intervento (checklist obbligatoria per ogni vano)
+   → Segnala eventuali problemi (controtelaio ammalorato, ecc.)
 
-**Punto di contatto 5**: post-firma  
-Pagina di conferma "Grazie! Il PDF firmato è stato inviato al tuo indirizzo email"  
-Il PDF arriva entro 60 secondi con firma incorporata, timestamp, hash
+T3 · Installazione
+   → Se serve chiama Responsabile Tecnico via app (link diretto)
+   → Materiali spuntati man mano
 
-**Punto di contatto 6**: eventuali comunicazioni successive  
-Email di aggiornamento stato produzione ("La sua commessa è in produzione, consegna prevista 15/03/2026")
+T4 · Chiusura intervento
+   → Foto post-intervento
+   → Verbale di posa (checklist: pulizia, funzionamento, sigillature, ecc.)
+   → Cliente firma verbale sul telefono di Salvo
+   → Commessa → "installata"
+
+T5 · Assistenza (se serve)
+   → Se cliente chiama entro X giorni per problemi
+   → Salvo può aprire ticket di assistenza dal detail commessa
+```
+
+### 4.5 Journey dell'Amministrazione (Laura)
+
+Laura opera sul back office post-firma:
+
+```
+Contratti firmati oggi (dashboard)
+   → verifica dati fatturazione (P.IVA, PEC, indirizzo)
+   → segna "pronto per ordine materiale"
+   → sistema genera Ordini Fornitori dai listini
+   → invia richieste ai fornitori (email precompilata)
+   → traccia consegna materiali
+   → quando tutto in magazzino → commessa "pronto produzione"
+```
+
+Laura NON modifica preventivi altrui. Se serve modifica, richiede revisione al commerciale (P7 rispettato: unica fonte del prezzo è il preventivo del commerciale).
+
+### 4.6 Journey del Cliente (Sig. Rossi)
+
+**Punto 1**: email preventivo → link → apre PDF inline, "Ho domande" o "Accetta"  
+**Punto 2**: email contratto pronto → un pulsante "Firma contratto"  
+**Punto 3**: `/sign/:token` mobile-first — legge, checkbox consenso, firma dito, conferma  
+**Punto 4**: post-firma → conferma su schermo + PDF firmato via email  
+**Punto 5**: email conferma appuntamento rilievo  
+**Punto 6**: (eventuale) email conferma appuntamento posa  
+**Punto 7**: email chiusura intervento con verbale allegato
 
 ---
 
@@ -338,71 +402,81 @@ Email di aggiornamento stato produzione ("La sua commessa è in produzione, cons
 ### 5.1 Schermate PUBBLICHE (no login)
 | Route | Nome | Ruolo | Priorità |
 |---|---|---|---|
-| `/` | Landing marketing (vetrina B2B panoramapilot.com) | pubblico | P1 |
+| `/` | Landing marketing | pubblico | P1 |
 | `/login` | Login | tutti | P0 |
-| `/forgot-password` | Recupero password | tutti | P0 |
+| `/forgot-password`, `/reset-password` | Recupero password | tutti | P0 |
 | `/accept-invitation` | Accettazione invito | nuovi utenti | P0 |
-| `/p/:token` | Preventivo pubblico (view+accept) | cliente finale | P0 |
-| `/sign/:token` | **Pagina firma NUOVA (mobile-first)** | cliente finale | P0 |
-| `/onboarding` | Onboarding tenant (3 step) | admin nuovo | P1 |
+| `/p/:token` | Preventivo pubblico (view+accept) | cliente | P0 |
+| `/sign/:token` | Firma contratto mobile-first | cliente | P0 |
+| `/onboarding` | Onboarding tenant | admin nuovo | P1 |
 
-### 5.2 Schermate COMMERCIALE (menu principale)
-| Route | Nome | Note |
-|---|---|---|
-| `/dashboard` | Home commerciale con KPI personali + task del giorno | P0 |
-| `/leads` | Lead list + kanban | P0 |
-| `/leads/:id` | Lead detail | P0 |
-| `/customers` | Clienti list | P0 |
-| `/customers/:id` | Cliente detail (con storico preventivi, contratti, note) | P0 |
-| `/quotes` | Preventivi list (con filtri) | P0 |
-| `/quotes/new` | **Nuovo wizard preventivo** (path unico) | P0 |
-| `/quotes/:id` | **Preventivo editor** (stesso wizard in modalità edit) | P0 |
-| `/contracts` | Contratti list | P0 |
-| `/contracts/:id` | Contract detail + invia firma | P0 |
-| `/calendar` | Calendario appuntamenti | P1 |
-| `/notifications` | Centro notifiche | P1 |
+### 5.2 Schermate COMMERCIALE (menu principale) — 7 voci
+| Route | Nome |
+|---|---|
+| `/dashboard` | Home commerciale |
+| `/leads`, `/leads/:id` | Lead |
+| `/customers`, `/customers/:id` | Clienti |
+| `/quotes`, `/quotes/new`, `/quotes/:id` | Preventivi (wizard 6 step) |
+| `/contracts`, `/contracts/:id` | Contratti |
+| `/calendar` | Calendario |
+| `/activities` | Attività *(nuovo, unifica task/promemoria/follow-up)* |
 
 ### 5.3 Schermate BACK OFFICE
-| Route | Nome | Note |
-|---|---|---|
-| `/production` | Kanban commesse in produzione | P1 |
-| `/production/:id` | Commessa detail | P1 |
-| `/billing` | Fatturazione (fatture da emettere/emesse) | P1 |
-| `/payments` | Piani pagamento clienti + solleciti | P1 |
-| `/service` | Ticket assistenza post-vendita | P2 |
+| Route | Nome |
+|---|---|
+| `/production` | Kanban commesse |
+| `/production/:id` | Commessa detail |
+| `/billing` | Fatturazione |
+| `/payments` | Piani pagamento + solleciti |
+| `/service` | Ticket assistenza |
 
-### 5.4 Sezione CONFIGURAZIONE (icona ingranaggio in header)
-Accesso: solo con permessi admin
-| Route | Nome | Note |
-|---|---|---|
-| `/settings/company` | Anagrafica azienda | P0 |
-| `/settings/users` | Utenti & ruoli | P0 |
-| `/settings/catalog` | Catalogo prodotti | P0 |
-| `/settings/pricelists` | Listini componenti | P0 |
-| `/settings/glass` | Listino vetri | P0 |
-| `/settings/hardware` | Kit ferramenta | P1 |
-| `/settings/installation` | Regole montaggio & posa | P1 |
-| `/settings/accessories` | Costi accessori (16 categorie) | P1 |
-| `/settings/formulas` | Formule di calcolo | P1 |
-| `/settings/import` | Import listini (CSV/XLS/XLSX) | P0 |
-| `/settings/email` | SMTP + template email | P0 |
-| `/settings/clauses` | Clausole contrattuali | P1 |
-| `/settings/templates` | Template PDF preventivo/contratto | P1 |
-| `/settings/legal-entities` | Ragioni sociali multiple | P2 |
-| `/settings/integrations` | Integrazioni esterne | P2 |
-| `/settings/audit` | Log di audit | P1 |
-| `/settings/legacy` | Preventivi legacy (read-only) | P1 |
+### 5.4 Schermate TECNICO RILEVATORE *(nuovo)*
+| Route | Nome |
+|---|---|
+| `/survey/assigned` | Rilievi assegnati |
+| `/survey/:commessaId` | Rilievo di dettaglio (misure def., foto, difformità) |
 
-### 5.5 Schermate PLATFORM OWNER (Emergent)
-| Route | Nome | Note |
-|---|---|---|
-| `/platform/tenants` | Tenants list | P2 |
-| `/platform/pricing` | Piani SaaS | P2 |
-| `/platform/health` | Stato piattaforma | P2 |
+### 5.5 Schermate PRODUZIONE (Responsabile Tecnico, Responsabile Produzione, Operatore) *(nuovo)*
+| Route | Nome |
+|---|---|
+| `/production/tech-approval` | Approvazione tecnica commesse |
+| `/production/schedule` | Programmazione produzione |
+| `/production/operator` | Vista operatore (fasi assegnate) |
+| `/production/qc` | Controllo qualità e non conformità |
 
-**Totale route utente commerciale visibili: 7** (era 25+ in v1)  
-**Totale route utente back office visibili: 11**  
-**Totale route admin (via Configurazione): 17**
+### 5.6 Schermate POSATORE *(nuovo)*
+| Route | Nome |
+|---|---|
+| `/install/assigned` | Lavori assegnati (giornalieri/settimanali) |
+| `/install/:commessaId` | Cantiere: foto, verbale, firma cliente |
+
+### 5.7 Sezione CONFIGURAZIONE (icona ⚙️ in header, solo admin)
+| Route | Nome |
+|---|---|
+| `/settings/company` | Anagrafica azienda |
+| `/settings/users` | Utenti & ruoli |
+| `/settings/catalog` | Catalogo prodotti |
+| `/settings/pricelists` | Listini componenti |
+| `/settings/glass` | Listino vetri |
+| `/settings/hardware` | Kit ferramenta |
+| `/settings/installation` | Regole montaggio |
+| `/settings/accessories` | Costi accessori (16 categorie) |
+| `/settings/formulas` | Formule di calcolo |
+| `/settings/import` | Import listini |
+| `/settings/email` | SMTP + template email |
+| `/settings/clauses` | Clausole contrattuali |
+| `/settings/templates` | Template PDF |
+| `/settings/legal-entities` | Ragioni sociali multiple |
+| `/settings/integrations` | Integrazioni |
+| `/settings/audit` | Audit log |
+| `/settings/legacy` | Preventivi/contratti legacy (read-only) |
+
+### 5.8 Sezione PLATFORM OWNER
+| Route | Nome |
+|---|---|
+| `/platform/tenants` | Tenants |
+| `/platform/pricing` | Piani SaaS |
+| `/platform/health` | Stato piattaforma |
 
 ---
 
@@ -412,27 +486,27 @@ Accesso: solo con permessi admin
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  🏠 [Panorama Pilot logo]    [Cmd+K Cerca...]   🔔  ⚙️  👤 Marco Rossi   │
+│ 🏠 [Panorama Pilot]   [Cmd+K Cerca...]      🔔  ⚙️  👤 Marco Rossi        │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ ┌─────────────┐  ┌──────────────────────────────────────────────────────┐│
 │ │ ▸ Dashboard │  │                                                      ││
 │ │ ▸ Lead      │  │                                                      ││
-│ │ ▸ Clienti   │  │              MAIN CONTENT AREA                       ││
+│ │ ▸ Clienti   │  │              MAIN CONTENT                            ││
 │ │ ▸ Preventivi│  │                                                      ││
 │ │ ▸ Contratti │  │                                                      ││
 │ │ ▸ Calendario│  │                                                      ││
-│ │ ▸ Notifiche │  │                                                      ││
+│ │ ▸ Attività  │  │                                                      ││
 │ │             │  │                                                      ││
 │ │ [+ Nuovo ▾] │  │                                                      ││
-│ │             │  │                                                      ││
 │ └─────────────┘  └──────────────────────────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Sidebar sinistra: 220px, fissa, icone Phosphor + label
-- Pulsante "**+ Nuovo**" in fondo alla sidebar → dropdown con: Nuovo lead, Nuovo cliente, Nuovo preventivo, Nuovo contratto
-- Header: 56px, con Cmd+K prominente al centro (pattern Linear/Stripe)
-- Icona ⚙️ in header apre `/settings/...` come pannello slide-in (non full navigation)
+- Sidebar 220px fissa
+- Pulsante "+ Nuovo" in fondo → dropdown creazione rapida
+- Header 56px, `Cmd+K` prominente al centro
+- Icona 🔔 apre pannello notifiche (drawer slide-in)
+- Icona ⚙️ apre `/settings/*` (drawer laterale full-height per ammin.)
 
 ### 6.2 Chrome mobile (<768px)
 
@@ -441,647 +515,918 @@ Accesso: solo con permessi admin
 │ ☰   Panorama Pilot      🔔   │
 ├──────────────────────────────┤
 │                              │
-│                              │
 │      MAIN CONTENT            │
 │                              │
-│                              │
 ├──────────────────────────────┤
-│  🏠  💼  📄  📁  ⋯          │  ← Bottom nav (Dash/Lead/Prev/Contr/Altro)
+│  🏠  💼  📄  📁  ⋯          │  Bottom nav 5 icone
 └──────────────────────────────┘
 ```
 
-- Hamburger apre drawer laterale con menu completo
-- Bottom nav con 5 icone: le 5 azioni più frequenti del commerciale
-- FAB (floating action button) "+" in basso a destra su schermate Preventivi/Contratti
+Il menu Attività appare come sesta voce nel drawer laterale su mobile.
 
-### 6.3 Command Palette (Cmd+K / Ctrl+K)
+### 6.3 Notifiche: separate da Attività *(chiarito)*
 
-Ispirazione: Linear, Stripe, Figma, Notion
+- **Notifiche** = eventi istantanei (nuovo lead, contratto firmato, alert AI CFO). Vivono nell'icona 🔔 in header e in un centro notifiche `/notifications/center` (accessibile dalla campanella, non nel menu principale).
+- **Attività** = azioni operative da svolgere. Raccoglie:
+  - Follow-up commerciali (chiama tra N giorni)
+  - Chiamate programmate
+  - Appuntamenti (sopralluoghi, firma, rilievi, posa)
+  - Preventivi incompleti (bozze aperte da >7 giorni)
+  - Contratti da inviare (accettati ma non inviati)
+  - Pagamenti da ricordare (solleciti)
+  - Attività scadute (task overdue)
+  - Promemoria custom
 
-```
-┌─────────────────────────────────────────────────────┐
-│  🔍  Cerca clienti, preventivi, comandi...          │
-├─────────────────────────────────────────────────────┤
-│  AZIONI                                             │
-│    + Nuovo preventivo                     ⌘N        │
-│    + Nuovo cliente                        ⌘⇧N       │
-│    ↻ Ricalcola preventivo corrente        ⌘R        │
-│    ✉ Invia preventivo                     ⌘⏎        │
-│                                                     │
-│  CLIENTI RECENTI                                    │
-│    ○ Sig. Rossi Mario — Via Roma 12                 │
-│    ○ Beta Costruzioni SRL                           │
-│                                                     │
-│  PREVENTIVI RECENTI                                 │
-│    Q-2026-000123 — Rossi Mario — €12.400            │
-│                                                     │
-│  IMPOSTAZIONI                                       │
-│    ⚙ Listini                                        │
-│    ⚙ Utenti                                         │
-└─────────────────────────────────────────────────────┘
-```
+Vista Attività: **timeline con giorno di riferimento** + filtri "Oggi / Domani / Settimana / Scadute". Ogni riga ha CTA diretta ("Chiama", "Apri preventivo", "Invia contratto", "Segna come fatta"). Ispirazione: Superhuman todos + Linear cycle view.
 
-Diventa il modo primario di navigare per utenti esperti.
+### 6.4 Command Palette (Cmd+K)
+
+Come descritto in v2.0. Diventa il modo primario per utenti esperti.
 
 ---
 
 ## 7 · Wireframe testuali delle schermate chiave
 
 ### 7.1 Dashboard commerciale
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│  Buongiorno Marco 👋                                                   │
-│  Oggi è mercoledì 15 febbraio 2026                                     │
-├────────────────────────────────────────────────────────────────────────┤
-│  KPI ROW (4 card grandi orizzontali)                                   │
-│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐              │
-│  │ Preventivi│ │ In firma  │ │ Fatturato │ │  Task     │              │
-│  │  del mese │ │           │ │  del mese │ │  di oggi  │              │
-│  │           │ │           │ │           │ │           │              │
-│  │    12     │ │     3     │ │  €48.200  │ │     4     │              │
-│  │   ↑ 20%   │ │           │ │   ↑ 12%   │ │           │              │
-│  └───────────┘ └───────────┘ └───────────┘ └───────────┘              │
-├────────────────────────────────────────────────────────────────────────┤
-│  TASK DEL GIORNO                                                       │
-│  ○ 09:30 · Sopralluogo Sig. Rossi (Via Roma 12)         [Vai]         │
-│  ○ 11:00 · Follow-up Beta Costruzioni                    [Vai]         │
-│  ○ 15:00 · Firma contratto Sig. Verdi                    [Vai]         │
-│  ○ 17:00 · Chiamata post-vendita Sig. Bianchi            [Vai]         │
-├────────────────────────────────────────────────────────────────────────┤
-│  PIPELINE PREVENTIVI (mini kanban orizzontale)                         │
-│  Bozza (2)  →  Inviato (5)  →  Accettato (3)  →  In firma (1)         │
-├────────────────────────────────────────────────────────────────────────┤
-│  NOTIFICHE RECENTI                                                     │
-│  • 2h fa — Sig. Rossi ha aperto il preventivo Q-000123                 │
-│  • 5h fa — Contratto CON-000045 firmato da Sig. Verdi                  │
-│  • Ieri — Nuovo lead da sito: Alfa SRL                                 │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-**Principi applicati**: numeri grandi (Stripe), task actionable con CTA laterale (Linear), pipeline visiva compatta (Pipedrive).
+Come v2.0 — KPI row + Task del giorno + Pipeline preventivi + Notifiche recenti.
 
 ### 7.2 Lista Preventivi
+Come v2.0. Aggiunta: filtro "solo con misure indicative" (in attesa di rilievo) per commerciali senior.
+
+### 7.3 Wizard Nuovo Preventivo — **6 STEP** *(riformulato)*
+
+Layout base con `<WizardStepper>`:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│  Preventivi                                              [+ Nuovo]     │
+│  ← Preventivi    Q-000126 · Bozza · Auto-saved 3s fa                  │
 ├────────────────────────────────────────────────────────────────────────┤
-│  [Tutti] [Bozza] [Inviato] [Accettato] [In firma] [Rifiutato]         │
-│  🔍 Cerca cliente, numero...                        Filtri ▾  Export ▾ │
-├────────────────────────────────────────────────────────────────────────┤
-│  N°           Cliente          Data      Stato       Totale     Az.   │
-│  Q-000125     Rossi M.         14 feb    ● Inviato   €12.400    ⋯     │
-│  Q-000124     Beta SRL         13 feb    ● Bozza     €8.900     ⋯     │
-│  Q-000123     Verdi G.         12 feb    ● Accettato €22.100    ⋯     │
-│  ...                                                                   │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-Riga cliccabile = apre editor. Menu `⋯`: Duplica, Invia via email, Genera contratto (se accettato), Elimina bozza.
-
-### 7.3 Wizard Nuovo Preventivo — Layout comune (ispirato DocuSign)
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│  ← Preventivi          Q-000126 · Bozza · Auto-saved 3s fa           │
-├────────────────────────────────────────────────────────────────────────┤
-│                                                                        │
-│    ①  ②  ③  ④  ⑤  ⑥  ⑦   ← step indicator con checkmark          │
-│    Cli Van Cfg Prz Rip Tot Inv                                        │
-│                                                                        │
+│    ①  ②  ③  ④  ⑤  ⑥        ← step indicator                          │
+│    Cli Van Cfg Rie Eco Doc                                             │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │                  [CONTENUTO STEP CORRENTE]                             │
 │                                                                        │
 ├────────────────────────────────────────────────────────────────────────┤
-│  ← Indietro                            [Salva bozza]      Avanti →    │
+│  ← Indietro                        [Salva bozza]      Avanti →        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-Autosave silenzioso ogni 3s. Nessun pulsante "Salva" per lo step corrente.
+Autosave silenzioso ogni 3s. Nessun pulsante "Salva" per step corrente.
 
-### 7.3.1 STEP 1 · Cliente
+#### STEP 1 · Cliente e contesto
 
 ```
-Chi è il cliente per questo preventivo?
+Cliente e contesto
 
   🔍 Cerca cliente esistente...
-  
   oppure crea nuovo cliente:
-  
   ○ Persona fisica    ○ Azienda
-  
   [Nome / Ragione sociale]
   [Email]      [Telefono]
-  [Indirizzo]  [Cap] [Città] [Provincia]
-  [P.IVA]      [Codice fiscale]
-  
-  [+ Aggiungi indirizzo di posa (se diverso)]
+  [Indirizzo residenza]
+
+  Indirizzo installazione:
+  ☐ Uguale a indirizzo residenza
+  [Via]  [Cap]  [Città]  [Provincia]
+
+  Origine lead:
+  [Web / Passaparola / Campagna / Cliente esistente / Altro ▾]
+
+  Commerciale responsabile:
+  [Marco Rossi ▾]  ← default utente corrente, modificabile solo se admin
+
+  Note preventivo (interne, non visibili al cliente):
+  [                                                          ]
 ```
 
-### 7.3.2 STEP 2 · Vani
+Dati letti dall'anagrafica cliente esistente vengono precompilati (P7). Nessuna ridigitazione.
+
+#### STEP 2 · Ambienti e vani
 
 ```
-Aggiungi i vani da preventivare.
+Organizza i vani per ambiente.
 
   ┌─────────────────────────────────────────────────┐
-  │  Cucina · Finestra                              │
-  │  1 anta · 900×1500 · Bianco                     │
-  │  ⚙ Configura    ✎ Modifica    📄 Duplica    🗑  │
+  │  📁 Cucina                          [+ Vano]   │
+  │    • Finestra 1 anta · 900×1500 · Bianco       │
+  │    • Portafinestra 2 ante · 1400×2200 · Grigio │
   └─────────────────────────────────────────────────┘
-  
+
   ┌─────────────────────────────────────────────────┐
-  │  Camera matrimoniale · Portafinestra            │
-  │  Configurazione incompleta                      │
-  │  ⚙ Completa configurazione                      │
+  │  📁 Camera matrimoniale             [+ Vano]   │
+  │    • Finestra 1 anta · 900×1500                │
   └─────────────────────────────────────────────────┘
-  
-  [+ Aggiungi vano]
-  
-  Suggerimenti: [+ Cucina] [+ Bagno] [+ Camera] [+ Salotto]
+
+  [+ Aggiungi ambiente]
+  Suggerimenti: [+ Cucina] [+ Bagno] [+ Camera] [+ Soggiorno]
+
+  Azioni per vano: Duplica · Elimina · Sposta in altro ambiente · Riordina (drag)
 ```
 
-### 7.3.3 STEP 3 · Configurazione vano (pannello dedicato per singolo vano)
+#### STEP 3 · Configurazione vano — **Configurazione E prezzo insieme** *(unificato)*
+
+Layout split-screen desktop, tab su mobile:
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│  Cucina · Vano 1                                                       │
-├────────────────────────────────────────────────────────────────────────┤
-│  [3.1] Prodotto                                                        │
-│    ○ ProEvolution        ○ ProEvolution Restauro                       │
-│                                                                        │
-│  [3.2] Tipologia                                                       │
-│    ○ Finestra   ○ Portafinestra   ○ Fisso   ○ Scorrevole              │
-│                                                                        │
-│  [3.3] Ante e apertura                                                 │
-│    Numero ante:  ⚪ 1  ⚪ 2  ⚪ 3  ⚪ 4                                  │
-│    Apertura: [Anta ribalta ▾]                                          │
-│                                                                        │
-│  [3.4] Dimensioni                                                      │
-│    Larghezza [900] mm      Altezza [1500] mm                          │
-│                                                                        │
-│  [3.5] Colore                                                          │
-│    Interno: [Bianco RAL 9016 ▾]                                        │
-│    Esterno: [Bianco RAL 9016 ▾]                                        │
-│    ☐ Premium (+6%)                                                     │
-│                                                                        │
-│  [3.6] Vetro                                                           │
-│    [Doppio 33.1/16/33.1 (76 €/mq) ▾]                                  │
-│                                                                        │
-│  [3.7] Ferramenta                                                      │
-│    [Kit standard 1 anta ▾]                                             │
-│                                                                        │
-│  [3.8] Accessori (opzionali)                                           │
-│    ☐ Zanzariera  ☐ Cassonetto  ☐ Controtelaio  ☐ Coprifili           │
-│                                                                        │
-│  [3.9] Montaggio                                                       │
-│    ☐ Sì, includere montaggio                                           │
-│    ☐ Include smontaggio infisso esistente                              │
-│                                                                        │
-├────────────────────────────────────────────────────────────────────────┤
-│  💰 Prezzo vano calcolato                                              │
-│                                                                        │
-│                            €  1.240,00                                 │
-│                                                                        │
-│  [ⓘ Vedi dettaglio calcolo]  ← visibile solo con permesso              │
-├────────────────────────────────────────────────────────────────────────┤
-│  ← Indietro (vani)                       [Salva vano e continua]      │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────┬───────────────────────────────────┐
+│  CONFIGURAZIONE                     │  DISEGNO + PREZZO                 │
+│                                     │                                   │
+│  Serie:                             │  ┌──────────────────────────┐    │
+│  ○ ProEvolution                     │  │                          │    │
+│  ○ ProEvolution Restauro            │  │   Schema SVG del vano    │    │
+│                                     │  │   (aggiornato live)      │    │
+│  Tipologia:                         │  │                          │    │
+│  ○ Finestra                         │  └──────────────────────────┘    │
+│  ○ Portafinestra                    │                                   │
+│  ○ Fisso                            │                                   │
+│  ○ Scorrevole                       │  💰 Prezzo vano (live)            │
+│                                     │                                   │
+│  Apertura:                          │           € 1.240,00              │
+│  [Anta ribalta ▾]                   │                                   │
+│                                     │  Supplementi:                     │
+│  Numero ante:  1  2  3  4           │  • Premium PVC       + €  74,40   │
+│                                     │  • Vetro selezione   + € 108,00   │
+│  Dimensioni:                        │                                   │
+│  L [900] mm     H [1500] mm         │  ⚠️ Errori / dati mancanti:       │
+│                                     │  (nessuno — pronto per salvare)   │
+│  Colori:                            │                                   │
+│  Interno [Bianco RAL 9016 ▾]        │  [ⓘ Dettaglio calcolo] ← permesso │
+│  Esterno [Bianco RAL 9016 ▾]        │                                   │
+│  ☐ Premium (+6%)                    │                                   │
+│                                     │                                   │
+│  Vetro: [33.1/16/33.1 ▾]            │                                   │
+│  Ferramenta: [Kit standard ▾]       │                                   │
+│  Accessori: ☐ Zanzariera ☐ Cass.    │                                   │
+│  Montaggio: ☐ Sì ☐ Smontaggio       │                                   │
+│                                     │                                   │
+└─────────────────────────────────────┴───────────────────────────────────┘
 ```
 
-Il prezzo si aggiorna live (debounce 400ms) ogni volta che cambi un input. Se qualcosa manca:
+**Sono contemporaneamente visibili in questo step**:
+- Disegno del vano (SVG live)
+- Prezzo automatico (aggiornato con debounce 400ms)
+- Supplementi (rincaro Premium PVC, upgrade vetro, ecc.)
+- Errori bloccanti (`MISSING_*`)
+- Dati mancanti (avviso "seleziona un vetro" ecc.)
+
+Il tasto **"Salva vano e continua"** è **disabilitato** finché `pricing_status ≠ ok`.
+
+#### STEP 4 · Riepilogo vani
 
 ```
-⚠️ Prezzo incompleto
-Manca il prezzo del componente [Fermavetro FV-STD, colore Bianco].
-Chiedi all'amministratore di aggiornare il listino.
-[Notifica amministratore]
+Riepilogo vani configurati
+
+  ┌─────────────────────────────────────────────────┐
+  │  Cucina · Finestra 1 anta                       │
+  │  900×1500 · Bianco · Doppio vetro               │
+  │  1x                                    € 1.240  │
+  │  [✎ Modifica] [📄 Duplica] [🗑 Elimina]         │
+  └─────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────┐
+  │  Cucina · Portafinestra 2 ante                  │
+  │  1400×2200 · Grigio · Triplo vetro              │
+  │  1x                                    € 2.840  │
+  │  [✎] [📄] [🗑]                                  │
+  └─────────────────────────────────────────────────┘
+
+  Totale vani:                              € 4.080
 ```
 
-Il pulsante "Salva vano e continua" è **disabilitato** finché il prezzo non è completo (evita preventivi con vani a €0).
-
-### 7.3.4 STEP 4 · Prezzo automatico (recap per titolare/back office)
+#### STEP 5 · Condizioni economiche
 
 ```
-Prezzo automatico calcolato dal motore commerciale
+Condizioni economiche
 
-  Vano 1 · Cucina                                          €  1.240,00
-  Vano 2 · Camera                                          €  1.480,00
-  Vano 3 · Bagno                                           €    890,00
-  ─────────────────────────────────────────────────────────────────────
-  Subtotale vani                                          €  3.610,00
-  Montaggio                                                €    450,00
-  Trasporto                                                €    120,00
-  ─────────────────────────────────────────────────────────────────────
-  Imponibile                                              €  4.180,00
-  IVA 22%                                                  €    919,60
-  ═════════════════════════════════════════════════════════════════════
-  TOTALE                                                  €  5.099,60
+  Imponibile:                              € 4.080,00
+  Sconto commerciale: [ 5 %]              − €   204,00
+  Trasporto e servizi:                     + €   120,00
+  Montaggio:                               + €   450,00
+  ─────────────────────────────────────────────────────
+  Imponibile finale:                        € 4.446,00
+  IVA 22%:                                  € 978,12
+  ═════════════════════════════════════════════════════
+  TOTALE:                                   € 5.424,12
+
+  Pagamento:
+  ○ Acconto 30% + Saldo alla consegna
+  ○ Acconto 50% + Saldo consegna
+  ● Acconto 30% + 60% pre-consegna + 10% installazione
+  ○ Finanziamento (contatta amministrazione)
+  ○ Personalizzato: acconto [30]% saldo [70]%
+
+  Validità preventivo: [30 giorni ▾]
+  Tempi di consegna: [45 giorni lavorativi]
 ```
 
-Nel STEP 4 il commerciale può applicare uno **sconto commerciale globale** (max % da permesso), il quale ridurrà l'imponibile ma NON i costi.
-
-### 7.3.5 STEP 5 · Riepilogo vani (visivo)
-
-Ogni vano con schema SVG stilizzato + specs + prezzo. Duplica/modifica/elimina.
-
-### 7.3.6 STEP 6 · Totale e condizioni
-
-Condizioni di pagamento (dropdown template), tempi di consegna, note libere.
-
-### 7.3.7 STEP 7 · Invio
+#### STEP 6 · Documento e azioni
 
 ```
-Il tuo preventivo è pronto!
+Documento e azioni
 
   [📄 Anteprima PDF]  [📥 Scarica PDF]
 
-  Invia a:
+  Condividi con il cliente:
   ○ Email: cliente@example.com    ✎
   ○ WhatsApp: +39 333 1234567     ✎
+  ○ Link condivisibile (copia)
 
   [✉ Invia preventivo]
 
-  Al momento dell'invio:
-  • il preventivo diventerà "Inviato"
-  • verrà creato un task di follow-up per il 18 febbraio
-  • il cliente riceverà un link web + PDF allegato
+  Azioni successive (dopo accettazione):
+  [Genera contratto] [Richiedi firma]
 ```
 
-### 7.4 Editor Contratto (mobile-first)
+**Il rilievo tecnico NON è uno step del preventivo.** Come specificato in §7.4.
+
+### 7.4 Flusso completo Vendita → Rilievo → Produzione → Posa *(nuovo)*
 
 ```
-┌─────────────────────────────────────┐
-│  ← Contratto CON-000045             │
-│  Stato: Bozza                       │
-├─────────────────────────────────────┤
-│  Cliente                            │
-│  Sig. Rossi Mario                   │
-│  Via Roma 12, Milano                │
-├─────────────────────────────────────┤
-│  Riferimento preventivo             │
-│  Q-2026-000123 · €5.099,60          │
-│  [Vedi preventivo]                  │
-├─────────────────────────────────────┤
-│  Condizioni pagamento               │
-│  [Standard 30/60/10 ▾]              │
-│                                     │
-│  Tempi di consegna                  │
-│  [45 giorni lavorativi]             │
-│                                     │
-│  Clausole                           │
-│  ☑ Garanzia 10 anni                 │
-│  ☑ Assicurazione trasporto          │
-│  ☐ Servizio manutenzione            │
-├─────────────────────────────────────┤
-│  [Anteprima contratto]              │
-│  [Invia link firma al cliente]      │
-└─────────────────────────────────────┘
+Preventivo (misure INDICATIVE dichiarate dal commerciale)
+     ↓ accettazione cliente
+Contratto (misure INDICATIVE ereditate dal preventivo)
+     ↓ firma cliente
+Rilievo tecnico (misure DEFINITIVE — sovrascrivono le indicative sulla commessa)
+     ↓ approvazione rilevatore
+Approvazione tecnica (Responsabile Tecnico)
+     ↓ autorizzazione lista di taglio
+Programmazione produzione
+     ↓
+Produzione (taglio → assemblaggio → vetraggio → controllo qualità)
+     ↓ commessa "pronta consegna"
+Consegna materiali in cantiere
+     ↓
+Posa (installazione + verbale + firma cliente)
+     ↓
+Assistenza (eventuali ticket post-vendita)
 ```
 
-### 7.5 Pagina firma (`/sign/{token}`) — mobile-first
+### 7.5 Pagina firma (`/sign/{token}`) — mobile-first *(requisiti espansi)*
 
-```
-┌─────────────────────────────────────┐
-│  Panorama Pilot                     │
-│  Contratto CON-000045               │
-├─────────────────────────────────────┤
-│  [ === PDF contract inline === ]    │
-│  [                                ] │
-│  [   scroll per leggere            ]│
-│  [                                ] │
-│  [ (embedded PDF viewer)          ] │
-│  [                                ] │
-├─────────────────────────────────────┤
-│  ☐ Ho letto e accetto termini e     │
-│    condizioni e informativa privacy │
-├─────────────────────────────────────┤
-│  Firmi qui ↓                        │
-│  ┌─────────────────────────────┐    │
-│  │                             │    │
-│  │    (canvas grande touch)    │    │
-│  │                             │    │
-│  └─────────────────────────────┘    │
-│                                     │
-│  [Cancella]                         │
-│                                     │
-│  Nome firmatario:                   │
-│  [Rossi Mario____________]          │
-│                                     │
-│  [🔒 CONFERMA FIRMA]                │
-└─────────────────────────────────────┘
-```
+**Requisiti tecnici e legali**:
 
-Il pulsante "Conferma firma" è disabilitato finché:
-- Checkbox consenso spuntato
-- Canvas non vuoto (verifica pixel non-white > soglia)
-- Nome inserito
+- **Token non prevedibile** — generato da CSPRNG (min 128 bit entropia), non enumerabile
+- **Scadenza token** — default 7 giorni dall'emissione, configurabile
+- **Revoca token** — un amministratore può revocare un token da back office; token revocato produce pagina "Link non più valido"
+- **Collegamento a un solo documento** — un token vale per un solo contratto (`contract_id`). Non riutilizzabile per altri documenti
+- **Consenso esplicito** — checkbox obbligatoria "Ho letto e accetto termini, condizioni e informativa privacy ex GDPR"
+- **Nome del firmatario** — input obbligatorio, precompilato dall'anagrafica cliente, modificabile
+- **Firma disegnata** — canvas responsive con supporto **touch + mouse + pennino** (pointer events)
+- **Timestamp** — istante ISO 8601 UTC, catturato server-side al momento della conferma
+- **IP** — indirizzo IP client catturato server-side
+- **User Agent** — stringa UA browser catturata server-side
+- **Hash documento** — SHA-256 del PDF originale al momento della firma, incluso nel record firma
+- **Audit trail** — record immutabile in `signature_events` con tutti i metadati sopra + eventuali retry/errori
 
-Post-conferma: schermo pieno con "✓ Firma completata" + info hash + "PDF firmato in arrivo via email".
+**Layout mobile-first** (già descritto in v2.0 §7.5).
+
+**Nota terminologica**: questa implementazione realizza una **firma elettronica semplice** ex eIDAS (Reg. UE 910/2014, art. 3, punto 10). NON è una firma elettronica avanzata né qualificata. La progettazione di una firma avanzata o qualificata (con OTP SMS/email/SPID + certificato) è **estensione futura** fuori scope di questa versione, e sarà progettata in un documento dedicato secondo i requisiti normativi applicabili.
 
 ---
 
-## 8 · Flussi operativi (state machines)
+## 8 · Flussi operativi (state machines completi)
 
 ### 8.1 Ciclo preventivo
 
 ```
-[bozza] → send → [inviato] → accept → [accettato] → generate_contract → (contract)
-                    ↓ reject                ↓ reject
-                [rifiutato]              [rifiutato]
-                    ↓ replace                ↓
-                [nuova revisione]      [nuova revisione]
-
-[inviato] → expire → [scaduto]
-[bozza] → delete → 🗑
+[bozza] --send--> [inviato]
+                     ├── accept --> [accettato] --generate_contract--> (contratto)
+                     ├── reject --> [rifiutato] --replace--> [bozza revisione N+1]
+                     └── expire --> [scaduto] --replace--> [bozza revisione N+1]
+[bozza] --delete--> 🗑
 ```
 
 ### 8.2 Ciclo contratto
 
 ```
-[bozza] → ready_for_signature → [pronto per firma]
-              → send_to_customer → [sent]
-                   → customer_views → [viewed]
-                        → customer_signs → [firmato] (state terminale)
-                        → customer_rejects → [rifiutato] → new revision
-                        → expires (default 7 giorni) → [scaduto]
+[bozza] --ready--> [pronto_firma]
+                       └── send_to_customer --> [sent]
+                            ├── customer_views --> [viewed]
+                            │    ├── customer_signs --> [firmato]  ← TERMINALE
+                            │    ├── customer_rejects --> [rifiutato] --replace--> new revision
+                            │    └── expires (7gg) --> [scaduto]
+                            └── revoke_by_admin --> [revocato]
 ```
 
-Firma = state terminale. Modifiche successive → nuova revisione (nuovo id, riferimento a padre).
+**`firmato`** è stato **terminale immutabile**. Modifiche successive → nuova revisione con riferimento al padre.
 
-### 8.3 Ciclo commessa produzione
-
-```
-[firmato] → auto → [pronto per ordini] → order_materials → [materiali_ordinati]
-   → materials_arrived → [pronto produzione] → produce → [in_produzione]
-   → produced → [pronto_consegna] → install → [installato] (terminale)
-```
-
-### 8.4 Flusso assistenza
+### 8.3 Ciclo rilievo tecnico *(nuovo)*
 
 ```
-Ticket aperto → [triage] → assign → [assegnato] → resolve → [risolto]
-                    ↓ reject → [chiuso senza intervento]
+[in_attesa_assegnazione] --assign--> [assegnato_al_rilevatore]
+    └── survey_scheduled --> [appuntamento_fissato]
+         └── survey_completed --> [rilievo_completato]
+              ├── approved --> [rilievo_approvato] --> (approvazione_tecnica)
+              └── request_variant --> [in_attesa_variante_contratto]
+                    └── commerciale prepara revisione contratto
+                         └── nuovo contratto firmato --> [rilievo_completato] (loop)
 ```
+
+### 8.4 Ciclo commessa produzione *(nuovo)*
+
+```
+[rilievo_approvato]
+   └── tech_approve --> [approvazione_tecnica_completata]
+        └── authorize_cut_list --> [lista_taglio_autorizzata]
+             └── order_materials --> [materiali_ordinati]
+                  └── materials_arrived --> [pronto_produzione]
+                       └── schedule --> [in_produzione]
+                            ├── phase_cutting --> [in_taglio]
+                            ├── phase_hardware --> [in_ferramenta]
+                            ├── phase_glazing --> [in_vetraggio]
+                            └── phase_qc --> [in_controllo_qualita]
+                                 ├── qc_ok --> [pronto_consegna]
+                                 └── qc_ko --> [non_conformita_aperta] --resolve--> loop
+```
+
+### 8.5 Ciclo posa *(nuovo)*
+
+```
+[pronto_consegna]
+   └── delivery_scheduled --> [consegna_programmata]
+        └── delivery_done --> [consegnato_in_cantiere]
+             └── installation_start --> [in_installazione]
+                  ├── installation_complete + verbale_firmato --> [installato]  ← TERMINALE
+                  └── installation_issue --> [problema_posa] --resolve--> loop
+```
+
+### 8.6 Ciclo assistenza *(nuovo)*
+
+```
+[ticket_aperto] --triage--> [in_triage]
+    ├── assign --> [assegnato] --resolve--> [risolto]  ← TERMINALE
+    ├── reject --> [chiuso_senza_intervento]  ← TERMINALE
+    └── escalate --> [escalation] --resolve--> [risolto]
+```
+
+### 8.7 Regole di cambio stato commesse (invariants)
+
+- **Da bozza a inviato (preventivo)**: richiede `pricing_status=ok` su TUTTI i vani. Zero vani a €0.
+- **Da accettato a contratto**: richiede accettazione esplicita (checkbox back office + firma email cliente o telefono con nota audit).
+- **Da contratto a firmato**: solo tramite pagina `/sign/:token` con checkbox consenso, canvas non vuoto, nome firmatario, IP, UA, hash documento catturati.
+- **Da firmato a rilievo assegnato**: automatico entro 15 minuti dalla firma.
+- **Da rilievo approvato a produzione**: richiede approvazione esplicita Responsabile Tecnico. Il sistema NON promuove automaticamente.
+- **Da produzione a consegna**: richiede QC positivo su tutti i vani della commessa.
+- **Da consegna a installato**: richiede verbale posa firmato dal cliente.
+
+### 8.8 Condizioni che BLOCCANO la produzione *(nuovo)*
+
+Una commessa **non può** entrare in stato "in_produzione" se anche una sola di queste condizioni è vera:
+
+| Blocco | Descrizione |
+|---|---|
+| `MISSING_SURVEY` | Nessun rilievo tecnico approvato |
+| `SURVEY_VARIANCE_UNACKNOWLEDGED` | Scostamento misure indicative → definitive > soglia e non c'è nota di accettazione |
+| `MISSING_TECH_APPROVAL` | Responsabile tecnico non ha approvato |
+| `MISSING_MATERIALS` | Materiali non ancora arrivati in magazzino (fornitori non hanno consegnato) |
+| `MISSING_BOM` | Distinta base non ricalcolata dalle misure definitive |
+| `PAYMENT_OVERDUE` | Acconto contrattuale non incassato (regola opzionale, on/off da configurazione) |
+| `OPEN_QC_ISSUES` | Ci sono non conformità aperte sulla commessa |
+| `LEGAL_HOLD` | Blocco manuale amministratore (es. contestazione cliente) |
+
+Il sistema mostra sempre il **motivo esplicito del blocco** e a chi rivolgersi per sbloccare (P6 rispettato).
 
 ---
 
 ## 9 · Principi UX (le 10 leggi Panorama Pilot)
 
 **Legge 1 · Un solo pulsante primario per schermata**  
-Al massimo una CTA primaria (colorata, prominente). Le altre azioni sono secondarie (outline) o menu.
+Massimo una CTA primaria. Le altre sono secondarie (outline) o menu.
 
-**Legge 2 · Il numero grande è la verità**  
-Su ogni schermata di preventivo/contratto/fattura, il totale è il testo più grande. Tipografia H1 42-56px.
+**Legge 2 · Risultato economico immediatamente leggibile — ma cede la scena a errori e stati critici** *(riformulato)*  
+Il totale è visibile senza scrolling. Se però esistono errori bloccanti (`MISSING_*`), dati mancanti o stati critici, sono visualmente prioritari sul totale (banner rosso sopra, prezzo grigio finché non risolti).
 
 **Legge 3 · Zero click sprecati**  
-Se un dato è deducibile dal contesto (data odierna, cliente selezionato, listino attivo), è precompilato. Il tab funziona sempre nell'ordine naturale.
+Dati deducibili dal contesto sono precompilati (data odierna, cliente selezionato, listino attivo, commerciale corrente).
 
 **Legge 4 · Errori parlano umano**  
-Mai "Error 500" al commerciale. Sempre: "Il vetro X non è disponibile per il colore Y. Chiedi a Laura di aggiornare il listino."
+Mai codici tecnici al commerciale. Sempre: *"Manca prezzo vetro X per colore Y. Chiedi all'amministratore di aggiornare listino."*
 
 **Legge 5 · Autosave silenzioso**  
-Ogni azione viene salvata. Nessun "Salva". Piccolo indicatore "Salvato 3s fa" in alto.
+Ogni azione salvata automaticamente. Nessun "Salva". Indicatore "Salvato Ns fa" discreto in header.
 
-**Legge 6 · Mobile-first per il commerciale**  
-Ogni pattern è progettato prima per mobile. Il desktop è una versione arricchita.
+**Legge 6 · Mobile-first per il commerciale, il rilevatore, il posatore**  
+Tutti i pattern operativi da campo (P4).
 
 **Legge 7 · Il contesto è cliente-centrico**  
-Ogni schermata operativa mostra il cliente in alto/laterale, non richiede navigazione per "sapere chi è".
+Ogni schermata operativa mostra il cliente in alto/laterale. Zero click "chi è".
 
-**Legge 8 · Nessun jargon tecnico visibile al commerciale**  
-Mai "BOM", "recipe", "snapshot", "aggregate", "provisioning". Sempre: "distinta materiali", "listino applicato", "versione bloccata", "totale calcolato".
+**Legge 8 · Nessun jargon tecnico visibile agli utenti operativi**  
+Terminologia parlante ai commerciali/rilevatori/posatori. Terminologia tecnica solo in area configurazione.
 
 **Legge 9 · Empty state è educativo**  
-Ogni tabella vuota mostra: illustrazione + una frase chiara + CTA per iniziare. Mai un vuoto muto.
+Tabelle vuote mostrano illustrazione + frase chiara + CTA. Mai vuoto muto.
 
 **Legge 10 · Undo prima di conferma**  
-Ogni azione critica (invio preventivo, cancellazione, cambio stato) è annullabile per 10 secondi tramite toast "Azione eseguita — Annulla". Confirm dialog solo quando davvero irreversibile.
+Azioni critiche annullabili per 10s via toast. Confirm dialog solo quando davvero irreversibile.
 
 ---
 
 ## 10 · Regole di progettazione
 
-### 10.1 Tipografia
-- Display: **font sans-serif italiana carattere neutro** (default: Instrument Sans + Instrument Serif per accenti editoriali)
+### 10.1 Tipografia *(aggiornato)*
+
+- **Titoli editoriali** (H1 landing, hero, sezioni marketing): `Instrument Serif, Georgia, serif`
+- **Interfaccia operativa** (form, tabelle, wizard, menu, labels, body): `Inter, system-ui, sans-serif`
+- **Dati tecnici** (prezzi, codici prodotto, id, hash, snapshot): `IBM Plex Mono, ui-monospace, monospace`
+
+**Regola inviolabile**: il font **serif NON viene mai usato in form, tabelle, wizard, aree operative**. Solo per titoli editoriali, hero, landing marketing.
+
+**Sizing**:
+- H1 editoriale (serif): 42–56px
+- H1 operativo (sans): 28–32px
+- H2: 20–24px
+- H3: 16–18px
 - Body: 15px desktop, 14px mobile
-- Monospace (numeri): **IBM Plex Mono** — per prezzi, codici, id
-- H1: 42-56px  |  H2: 24-32px  |  H3: 18-20px
+- Small: 13px
+- Micro: 11px
+- Line-height body: 1.55
 
-### 10.2 Colori
-- **Primary** (azioni positive): nero profondo `#0A0A0B` (contrasto massimo, no palette blu banale)
-- **Accent** (evidenziazione): rosso mattone `#B33A2A` (matcha con contesto italiano professionale)
-- **Success**: verde salvia `#4A7C59` (non il verde acido)
-- **Warning**: ocra `#B87333`
-- **Danger**: rosso profondo `#8B1E1E`
-- **Neutrals**: greyscale con tinting caldo (non pure grey)
-- **Background**: bianco crema `#FAFAF8` (non pure white — riduce eye strain)
-
-Regola: mai gradienti. Mai emoji nell'interfaccia (solo icone Phosphor).
+### 10.2 Colori (base — dettaglio token in §12)
+- Nero profondo primario, accento rosso mattone, background crema off-white, verde salvia per successo, ocra per avvisi
+- Zero gradienti
+- Nessun emoji nell'interfaccia (solo icone Phosphor)
 
 ### 10.3 Spacing e layout
 - Grid 4px base
 - Card padding: 24px desktop, 16px mobile
 - Container max-width: 1280px
-- Line-height body: 1.55
 
 ### 10.4 Motion
 - Transizioni: 150-200ms cubic-bezier(0.4, 0, 0.2, 1)
-- Page transitions: fade + subtle slide 8px
 - Skeleton loaders (non spinner)
-- Toast: slide da bottom su mobile, top-right su desktop
-- Autosave indicator: fade pulse
+- Toast slide da bottom (mobile) / top-right (desktop)
 
-### 10.5 Immagini e iconografia
-- Icone: **Phosphor Icons** (già installate)
-- Illustrations empty state: **line art minimale** (no illustrazioni cartoon)
-- Foto stock: mai. Solo immagini di prodotti realmente configurabili nel catalogo.
+### 10.5 Iconografia e immagini
+- Phosphor Icons come libreria unica
+- Line art minimale per empty state
+- Nessuna foto stock
 
-### 10.6 Accessibility
-- Contrast ratio WCAG AA minimo su tutti i testi
-- Focus visible su tutti gli elementi interattivi
-- Aria-label su icone senza testo
-- Tab order logico
-- Screen reader friendly su form
-
-### 10.7 Data density
-- Tabelle: max 8 colonne visibili. Il resto in dropdown "⋯".
-- Row height: 48px desktop, 56px mobile (touch-friendly).
-- Sticky header. Sticky first column su mobile con horizontal scroll.
+### 10.6 Data density
+- Tabelle: max 8 colonne visibili
+- Row height: 48px desktop, 56px mobile
+- Sticky header, sticky first column su mobile
 
 ---
 
 ## 11 · Componenti standard
 
-### 11.1 Design system existing (shadcn/ui)
-Rimane la base. Non reinventare.
-
-### 11.2 Componenti custom da introdurre in v2
-| Componente | Uso | Ispirazione |
-|---|---|---|
-| `<CommandPalette />` | Cmd+K globale | Linear/Stripe |
-| `<WizardStepper />` | Wizard 7 step preventivo | DocuSign |
-| `<PricingCard />` | Card prezzo grande con breakdown collassabile | Stripe |
-| `<VanoConfigurator />` | Form guidato config vano | Pipedrive deal editor |
-| `<SignaturePad />` | Canvas firma touch/mouse/pen | DocuSign |
-| `<KanbanBoard />` | Board preventivi/produzione | Pipedrive/Monday |
-| `<ContextPanel />` | Pannello destro cliente context | HubSpot |
-| `<InlinePDFViewer />` | Anteprima PDF integrata | Stripe invoice |
-| `<AutoSaveIndicator />` | "Salvato 3s fa" nell'header | Notion/Figma |
-| `<StatusPill />` | Badge stato colorato | Linear |
-| `<QuickAdd />` | + dropdown creazione veloce | Pipedrive |
-| `<UndoToast />` | Toast con annulla temporizzato | Gmail |
-
-### 11.3 Convenzioni componenti
-- Nome file: `PascalCase.jsx`
-- Data-testid su ogni elemento interattivo
-- Props tipizzate (JSDoc o TS futuro)
-- Zero uso di className inline massiccio — solo Tailwind utilities
+Base: shadcn/ui. Nuovi componenti custom v2 (invariato rispetto v2.0):
+`<CommandPalette>` `<WizardStepper>` `<PricingCard>` `<VanoConfigurator>` `<SignaturePad>` `<KanbanBoard>` `<ContextPanel>` `<InlinePDFViewer>` `<AutoSaveIndicator>` `<StatusPill>` `<QuickAdd>` `<UndoToast>` — più `<SurveyForm>` per rilievo, `<PostaVerbale>` per verbale posa, `<CommessaKanban>` per produzione.
 
 ---
 
-## 12 · Design system (tokens)
+## 12 · Design system tokens *(estesi)*
 
+### 12.1 Font families
 ```css
-/* Sample tokens — da consolidare in design_guidelines.md */
---ppilot-color-bg:              #FAFAF8;
---ppilot-color-surface:         #FFFFFF;
---ppilot-color-primary:         #0A0A0B;
---ppilot-color-primary-hover:   #1F1F22;
---ppilot-color-accent:          #B33A2A;
---ppilot-color-success:         #4A7C59;
---ppilot-color-warning:         #B87333;
---ppilot-color-danger:          #8B1E1E;
---ppilot-color-border:          #E5E5E0;
---ppilot-color-muted:           #F4F4F0;
---ppilot-color-text:            #18181B;
---ppilot-color-text-muted:      #71717A;
-
---ppilot-radius-sm:             2px;
---ppilot-radius-md:             6px;
---ppilot-radius-lg:             12px;
-
---ppilot-font-display:          "Instrument Serif", Georgia, serif;
---ppilot-font-body:             "Instrument Sans", -apple-system, sans-serif;
---ppilot-font-mono:             "IBM Plex Mono", ui-monospace, monospace;
-
---ppilot-shadow-sm:             0 1px 2px rgba(0,0,0,.05);
---ppilot-shadow-md:             0 4px 12px rgba(0,0,0,.08);
+--ppilot-font-display:  "Instrument Serif", Georgia, serif;      /* solo titoli editoriali */
+--ppilot-font-body:     "Inter", system-ui, sans-serif;           /* interfaccia operativa */
+--ppilot-font-mono:     "IBM Plex Mono", ui-monospace, monospace; /* dati tecnici */
 ```
 
-Da consolidare in `/app/design_guidelines.md` con esempi di composizione (button variants, form field states, ecc.).
+### 12.2 Color tokens (completi)
+```css
+/* Superfici */
+--ppilot-surface-base:          #FAFAF8;   /* background pagina */
+--ppilot-surface-elevated:      #FFFFFF;   /* card, modal */
+--ppilot-surface-muted:         #F4F4F0;   /* card secondaria, muted */
+--ppilot-surface-inverse:       #0A0A0B;   /* footer scuro, hero notturno */
+
+/* Testo */
+--ppilot-text-primary:          #18181B;   /* titoli, testo principale */
+--ppilot-text-secondary:        #52525B;   /* label, descrizioni */
+--ppilot-text-muted:            #71717A;   /* helper, disabled label */
+--ppilot-text-inverse:          #FAFAF8;   /* testo su fondo scuro */
+--ppilot-text-link:             #0A0A0B;   /* link (sottolineato) */
+
+/* Bordi */
+--ppilot-border-subtle:         #EDEDE8;   /* separatori sottili */
+--ppilot-border-default:        #E4E4E0;   /* input, card */
+--ppilot-border-strong:         #A1A1AA;   /* focus, hover bordi */
+--ppilot-border-inverse:        #27272A;
+
+/* Azioni */
+--ppilot-action-primary:        #0A0A0B;   /* pulsante primario */
+--ppilot-action-primary-hover:  #1F1F22;
+--ppilot-action-primary-active: #2A2A2E;
+--ppilot-action-secondary:      #FFFFFF;   /* pulsante secondario (bordo primary) */
+
+/* Stati */
+--ppilot-state-success:         #4A7C59;   /* verde salvia */
+--ppilot-state-success-bg:      #E8F0EA;
+--ppilot-state-warning:         #B87333;   /* ocra */
+--ppilot-state-warning-bg:      #F7ECDA;
+--ppilot-state-danger:          #8B1E1E;   /* rosso profondo */
+--ppilot-state-danger-bg:       #F8E2E2;
+--ppilot-state-info:            #2F5C88;   /* blu neutro professionale */
+--ppilot-state-info-bg:         #E3EAF2;
+--ppilot-state-disabled-bg:     #F4F4F0;   /* fondo disabled */
+--ppilot-state-disabled-text:   #A1A1AA;   /* testo disabled */
+
+/* Focus (visibile su tutti gli elementi interattivi) */
+--ppilot-focus-ring:            #2F5C88;
+--ppilot-focus-ring-offset:     #FAFAF8;
+
+/* Hover generico (aree cliccabili) */
+--ppilot-hover-overlay:         rgba(0,0,0,.04);
+
+/* Accent editoriale */
+--ppilot-accent:                #B33A2A;
+```
+
+### 12.3 Radius e shadows
+```css
+--ppilot-radius-sm:  2px;
+--ppilot-radius-md:  6px;
+--ppilot-radius-lg:  12px;
+
+--ppilot-shadow-sm:  0 1px 2px rgba(0,0,0,.05);
+--ppilot-shadow-md:  0 4px 12px rgba(0,0,0,.08);
+--ppilot-shadow-lg:  0 12px 24px rgba(0,0,0,.10);
+```
+
+### 12.4 Spacing scale
+```css
+--ppilot-space-1:  4px;
+--ppilot-space-2:  8px;
+--ppilot-space-3:  12px;
+--ppilot-space-4:  16px;
+--ppilot-space-5:  24px;
+--ppilot-space-6:  32px;
+--ppilot-space-7:  48px;
+--ppilot-space-8:  64px;
+```
 
 ---
 
-## 13 · Roadmap
+## 13 · Menu specifico per ruolo *(nuovo)*
+
+Ogni ruolo ha **il proprio menu principale**. La sezione Configurazione (⚙️) è disponibile solo a chi ha permessi admin.
+
+### 13.1 Commerciale (menu principale — 7 voci)
+Dashboard · Lead · Clienti · Preventivi · Contratti · Calendario · **Attività**
+
+### 13.2 Commerciale Senior
+Aggiunge: **Report vendite** (KPI personali estesi, provvigioni maturate)
+
+### 13.3 Back Office
+Dashboard · Contratti da elaborare · Ordini fornitori · Fatturazione · Pagamenti · Attività · Cerca
+
+### 13.4 Amministratore configurazione
+Solo la sezione Configurazione (⚙️). Nessun menu operativo — accesso completo a settings.
+
+### 13.5 Titolare
+Vede **tutto** — combinazione di Commerciale + Back Office + Configurazione. Il menu può essere personalizzato tramite "pin/unpin" delle voci più usate.
+
+### 13.6 Tecnico Rilevatore (menu — 4 voci)
+Dashboard rilevatore · Rilievi assegnati · Storico rilievi · Calendario
+
+### 13.7 Responsabile Tecnico (menu — 5 voci)
+Dashboard tecnico · Approvazioni in coda · Distinte base · Non conformità · Calendario
+
+### 13.8 Responsabile Produzione (menu — 5 voci)
+Dashboard produzione · Programmazione (Kanban) · Operatori · Non conformità · Calendario
+
+### 13.9 Operatore Produzione (menu — 2 voci)
+Fasi assegnate (oggi) · Storico personale
+
+### 13.10 Posatore / Caposquadra (menu — 4 voci)
+Lavori del giorno · Settimana · Verbali completati · Ticket aperti
+
+### 13.11 Cliente
+Nessun menu — sessione monodocumento su rotta pubblica (`/p/:token` o `/sign/:token`).
+
+### 13.12 Platform Owner (Emergent)
+Area separata `/platform/*` con: Tenants · Piani SaaS · Health · Fatturazione SaaS · Log cross-tenant.
+
+---
+
+## 14 · Matrice Dato → Fonte autorevole → Moduli lettori *(nuovo)*
+
+Ogni dato ha **una sola fonte autorevole** (Regola Architetturale §1.2). Gli altri moduli lo leggono per `id` — mai lo duplicano.
+
+| Dato | Fonte autorevole | Moduli lettori | Note snapshot |
+|---|---|---|---|
+| Anagrafica cliente (nome, email, tel, indirizzi) | `customers` | Preventivi, Contratti, Commesse, Fatture, Ticket assistenza | I preventivi/contratti/fatture emessi salvano uno **snapshot immutabile** dei campi anagrafici al momento dell'emissione. Modifiche successive al cliente non alterano documenti già emessi. |
+| Prodotto (nome, codice, componenti associate) | `products` (catalogo) | Preventivi, Contratti, Rilievi, Distinte base | Snapshot in `pricing_snapshot` su ogni riga preventivo. |
+| Listino componenti (telaio/anta/vetro/…) | `pricelists` + `pricelist_items` | Motore commerciale (compute), Preventivi | Snapshot in `pricing_snapshot` per ogni preventivo inviato. Versionamento listino: nuovo listino = nuova versione, mai overwrite. |
+| Formule di calcolo (perimetro, vetro, ecc.) | `formulas` | Motore commerciale, Motore tecnico | Snapshot formula + versione nel `pricing_snapshot`. |
+| Kit ferramenta | `hardware_kits` | Preventivi (selezione), Motore commerciale | Snapshot prezzo ferramenta nel pricing_snapshot. |
+| Costi montaggio | `installation_rules` | Preventivi, Contratti | Snapshot regola montaggio nel pricing_snapshot. |
+| Costi accessori | `accessories` | Preventivi, Contratti | Snapshot voci accessorie nel pricing_snapshot. |
+| Misure indicative | `quotes.openings[].dimensions` (preventivo) | Contratto (eredita), Rilevatore (parte da qui) | Preservate storicamente sul preventivo. Non modificabili dopo firma contratto (ma sovrascrivibili dal rilievo). |
+| Misure definitive | `surveys.openings[].dimensions_final` (rilievo tecnico) | Produzione (unica fonte per BOM finale), Posa | La produzione **NON legge mai** le misure indicative — solo definitive. Nessuna copia. |
+| Foto rilievo | `surveys.photos` | Produzione (verifica), Posa (riferimento) | Fonte unica: rilievo. |
+| Foto posa | `installations.photos` | Ticket assistenza (allegati) | Fonte unica: verbale posa. |
+| Firma cliente su contratto | `contract_signatures` (immutabile) | Contratto PDF (rendering), Audit | Immutabile. Include IP, UA, hash documento, timestamp. |
+| Firma cliente su verbale posa | `installation_signatures` (immutabile) | Verbale PDF, Audit | Immutabile. |
+| Contratto firmato (documento) | `contracts.signed_pdf_ref` | Rilievo (link riferimento), Produzione, Fatturazione | Snapshot completo + hash SHA-256. |
+| Log email inviate | `email_logs` | UI email logs, audit | Log immutabile. Non è fonte di stato — è log. |
+| Ticket assistenza | `service_tickets` | Posatore (apertura), Back Office (gestione) | Fonte unica. |
+| Provvigioni maturate | `commissions` (calcolate) | Report commerciali, contabilità | Calcolate da contratti firmati — mai digitate a mano. |
+
+**Regole invariabili derivate**:
+- **Nessuna doppia scrittura**: se un dato ha fonte X, moduli Y non lo scrivono. Al massimo scrivono un evento (log) che referenzia X.
+- **Snapshot ≠ duplicazione**: uno snapshot storico immutabile all'interno di un documento emesso NON è duplicazione — è congelamento dello stato per riproducibilità.
+- **Aggiornamenti retroattivi vietati**: modificare la fonte autorevole non deve mai cambiare documenti già emessi.
+
+---
+
+## 15 · Misure indicative vs misure definitive *(nuovo)*
+
+### 15.1 Definizioni
+
+**Misure indicative**  
+Dichiarate dal **commerciale** durante il sopralluogo commerciale, con metro laser o metro tradizionale. Servono a produrre un **preventivo economicamente attendibile**. NON sono valide per la produzione. Possono essere approssimate (arrotondate a cm/mm), possono contenere errori di rilievo perché il commerciale non ha necessariamente competenza tecnica.
+
+Vivono in `quotes.openings[].dimensions.width_indicative_mm` e `height_indicative_mm`.
+
+**Misure definitive**  
+Rilevate dal **tecnico rilevatore** dopo firma contratto, in cantiere, con strumenti calibrati e competenza tecnica. Sono le uniche misure valide per la produzione (lista di taglio, ordine materiali, ecc.). Il rilievo tecnico è OBBLIGATORIO prima di autorizzare la produzione.
+
+Vivono in `surveys.openings[].dimensions_final.width_mm` e `height_mm`.
+
+### 15.2 Regole di gestione
+
+1. **Il preventivo lavora solo su misure indicative.** Il motore commerciale (`commercial_perimeter`) usa quelle misure per calcolare il prezzo.
+
+2. **Il contratto eredita misure indicative dal preventivo.** Il PDF del contratto le riporta con la dicitura "misure indicative, soggette a rilievo tecnico".
+
+3. **Dopo firma contratto**, il sistema crea automaticamente una richiesta di rilievo tecnico assegnata al rilevatore per l'area geografica.
+
+4. **Il rilevatore sovrascrive** le misure con quelle definitive. Il sistema calcola lo **scostamento** in mm e in %.
+
+5. **Soglia scostamento** (configurabile, default 3%):
+   - Sotto soglia → rilievo approvabile automaticamente
+   - Sopra soglia → richiede motivazione + accettazione esplicita del rilevatore, oppure richiesta variante contratto
+
+6. **Se lo scostamento comporta variazione prezzo** oltre una soglia (default 5%), il sistema richiede al commerciale di preparare una **revisione contratto** (nuova offerta + rifirma cliente).
+
+7. **La produzione legge esclusivamente le misure definitive.** La lista di taglio si genera dal rilievo, non dal preventivo. La distinta base finale (BOM) usa misure definitive per calcolo materiali.
+
+8. **Non è mai lecito produrre senza rilievo approvato** (vedi §8.8 blocco `MISSING_SURVEY`).
+
+### 15.3 Visualizzazione
+
+Nelle schermate di rilievo, le misure indicative sono visibili in **grigio** come riferimento, quelle definitive in **nero grassetto**. Lo scostamento è visualizzato accanto:
+
+```
+Vano Cucina · Finestra 1 anta
+Misure indicative:  900 × 1500 mm  (dal preventivo)
+Misure definitive:  905 × 1495 mm  → scostamento +5mm / −5mm (0.5%)  ✅ entro soglia
+```
+
+---
+
+## 16 · Gestione errori bloccanti nel preventivo *(nuovo)*
+
+### 16.1 Cataloghi errori
+
+Il motore `commercial_perimeter` produce, quando calcolo incompleto, uno o più codici errore:
+
+- `MISSING_FRAME_PRICE` — Manca prezzo telaio per prodotto/colore selezionato
+- `MISSING_SASH_PRICE` — Manca prezzo anta
+- `MISSING_FRAME_REINFORCEMENT_PRICE` — Manca prezzo rinforzo telaio
+- `MISSING_SASH_REINFORCEMENT_PRICE` — Manca prezzo rinforzo anta
+- `MISSING_GLAZING_BEAD_PRICE` — Manca prezzo fermavetro
+- `MISSING_MEETING_STILE_PRICE` — Manca prezzo scambio battuta (per n_ante > 1)
+- `MISSING_GLASS_PRICE` — Manca prezzo vetro
+- `MISSING_GLASS_FORMULA` — Manca formula vetro per configurazione
+- `MISSING_GLASS_MINIMUM` — Manca minimo fatturabile vetro
+- `MISSING_HARDWARE_PRICE` — Manca prezzo ferramenta
+- `MISSING_INSTALLATION_PRICE` — Manca regola montaggio
+- `MISSING_ACCESSORY_PRICE` — Manca prezzo accessorio selezionato
+- `MISSING_HOURLY_COST` — Manca costo orario produzione (per pricing analitico)
+- `MISSING_PRODUCTION_TIME` — Manca tempo produzione standard
+
+### 16.2 Comportamento
+
+Quando un vano ha `pricing_status=incomplete`:
+
+- Il prezzo del vano è mostrato **grigio con lucchetto** e testo "Prezzo non calcolabile"
+- Sopra al prezzo, banner rosso con:
+  - Descrizione parlante dell'errore (P8: "Manca prezzo vetro 33.1/16/33.1 per colore Bianco RAL 9016")
+  - Chi deve intervenire ("Chiedi all'amministratore di aggiornare listino")
+  - CTA "Notifica amministratore" → crea ticket interno automatico
+- Il tasto **"Salva vano e continua"** è **disabilitato**
+- Il pulsante **"Invia preventivo"** al STEP 6 è **disabilitato** finché anche un solo vano è incompleto
+
+### 16.3 Salvataggio bozza con errori
+
+L'utente **può salvare come bozza** un preventivo con vani incompleti (per non perdere il lavoro), ma:
+- Bozza NON può essere inviata (bloccato)
+- Bozza NON può essere convertita in contratto (bloccato)
+- Bozza appare in "Attività" come "Preventivo incompleto" con lista errori
+
+### 16.4 Regola d'oro
+**Nessun `pricing_status=incomplete` viene mai silenziosamente sostituito con `0`.** Nessuna riga vano a €0 è mai possibile. Se il motore non può calcolare, il vano è bloccato con messaggio parlante — mai zero.
+
+---
+
+## 17 · Comportamento dei preventivi legacy *(nuovo)*
+
+I preventivi creati con il vecchio motore (v1, con `unit_price` digitato a mano) diventano **read-only** al momento del cutover a v2.
+
+### 17.1 Identificazione
+
+Sono legacy i preventivi con:
+- Assenza di campo `pricing_engine` (o `pricing_engine ≠ commercial_perimeter`)
+- Assenza di `pricing_snapshot` completo sui vani
+
+### 17.2 Comportamento UI
+
+- Compaiono nella lista preventivi con **badge `Legacy`** in colore grigio
+- Aprendoli: **schermata read-only** che mostra i dati storici
+- **Banner in alto**:
+  > *Questo preventivo è stato creato con il motore precedente.  
+  > Per modificarlo crea una nuova versione.*
+- CTA nel banner: **"Crea nuova versione"** → apre il wizard v2 con precompilazione cliente + tentativo di mapping vani (dove possibile) alle nuove configurazioni. Prezzi RICALCOLATI dal motore v2 e dal listino attuale.
+- Nessun campo modificabile
+- Nessuna azione "Invia", "Genera contratto", ecc. disponibile
+- Duplicazione crea una **nuova bozza v2** (mai duplica come legacy)
+
+### 17.3 Migrazione
+
+**Nessuna migrazione automatica dei dati legacy.** I preventivi legacy restano nel database come record storici, in una collection separata concettualmente (`quotes` con flag `is_legacy=true`) o filtrati tramite l'assenza di `pricing_snapshot`.
+
+I contratti già firmati da preventivi legacy **restano validi e immutabili** — la firma è terminale. Non c'è conflitto: il contratto ha già congelato i dati economici, non ha bisogno di ricalcolo.
+
+### 17.4 Cancellazione
+
+Nessuna cancellazione automatica. La cancellazione dei record legacy avviene solo **dopo approvazione esplicita del Product Owner**, e comunque non prima del **completamento del ciclo di vita** di eventuali contratti/commesse ad essi collegati (i.e., non prima che il commesa sia in stato "installata" + eventuale periodo di garanzia).
+
+---
+
+## 18 · Criteri di accessibilità *(nuovo)*
+
+Panorama Pilot v2 punta alla conformità **WCAG 2.1 livello AA** (target realistico prima release; livello AAA rimane obiettivo futuro).
+
+### 18.1 Requisiti tecnici minimi
+
+- **Contrasto testo**: rapporto ≥ 4.5:1 per body, ≥ 3:1 per testo grande (≥18pt o 14pt bold)
+- **Focus visibile**: focus ring 2px offset 2px con colore `--ppilot-focus-ring` su tutti gli elementi interattivi (input, select, button, link, tab)
+- **Ordine tab logico**: tab-order coerente con lettura visiva (left→right, top→bottom); nessun tabindex positivo custom
+- **Aria label**: tutti gli elementi icona-only hanno `aria-label` descrittivo. Ogni icona in un bottone senza testo ha etichetta ("Modifica preventivo", non "Modifica")
+- **Landmark ARIA**: `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>` — SPA usa `role="main"` per il container principale
+- **Alt testi**: tutte le immagini funzionali hanno alt; decorative hanno `alt=""` esplicito
+- **Screen reader friendly form**: `<label for=id>` per ogni input; messaggi errore associati via `aria-describedby`
+- **Modal focus trap**: apertura modal → focus si sposta al primo elemento; chiusura → torna al trigger
+- **Skip links**: "Salta al contenuto principale" come primo elemento tab
+
+### 18.2 Requisiti operativi
+
+- **Zoom 200%**: layout resta usabile a browser zoom 200% senza scroll orizzontale (eccetto tabelle dense che possono richiedere scroll orizzontale)
+- **Riflow mobile**: layout riflow su viewport 320px (iPhone SE) senza rottura
+- **Motion prefers-reduced-motion**: rispetto della media query — animazioni disabilitate se utente ha richiesto reduced motion
+- **Contrasto stati**: hover, focus, disabled hanno contrasto sufficiente su sfondi diversi
+- **Timeouts**: sessioni con timeout hanno avviso 60s prima con opzione "Continua sessione"
+- **Errori form**: annunciati via live region (`aria-live="polite"`) — screen reader legge l'errore appena appare
+- **Firma canvas**: alternativa accessibile per utenti con disabilità motorie? → **estensione futura** (firma da digitare o firma da caricare come immagine, con procedura assistita)
+
+### 18.3 Testing
+
+- Test automatico con **axe-core** (integrabile in CI)
+- Test manuale con screen reader NVDA/VoiceOver su almeno le 5 schermate operative principali
+- Test navigazione solo-tastiera su wizard preventivo e pagina firma
+
+---
+
+## 19 · Roadmap
 
 ### Fase 0 · UX Architecture (questo documento)
-- Documento completo → **stato attuale**
-- Approvazione Product Owner → **in attesa**
-- Consolidamento `design_guidelines.md` con token e regole → dopo approvazione
+- Documento v2.1 → **in attesa approvazione**
+- Solo dopo approvazione: consolidamento `design_guidelines.md` con token e regole
 
-### Fase 1 · Backend
-- Nuovo endpoint `POST /api/quotes/:id/openings/:openingId/products/compute-and-add` (motore integrato)
-- Endpoint `PATCH /api/quote-structure/products/:lineId` con ricalcolo
-- Bloccare `base_price` da input commerciale (403 senza `override_price`)
-- Migrare `pricing_snapshot` completo su ogni riga vano
+### Fase 1 · Backend motore integrato
+- Endpoint `POST /api/quotes/:id/openings/:openingId/products/compute-and-add`
+- Endpoint `PATCH /api/quote-structure/products/:lineId` (ricalcolo)
+- Blocco `base_price` da input commerciale (403 senza `override_price`)
+- `pricing_snapshot` completo su ogni riga vano
 - Endpoint `POST /api/contracts/generate-from-quote/:quoteId` migliorato
-- Test regressione backend
+- **Endpoint rilievo tecnico**: `/api/surveys/*` con misure definitive, scostamenti, approvazione
+- Test regressione backend + testing agent
 
-### Fase 2 · Frontend Wizard
-- Nuovo `/quotes/new` e `/quotes/:id` con `<WizardStepper>` 7 step
-- Rimozione `QuoteEditorPage` (route disabilitata, marcata legacy)
-- Rimozione `QuoteStructurePage` (route disabilitata)
+### Fase 2 · Frontend Wizard 6 step
+- Nuovo `/quotes/new` e `/quotes/:id` con `<WizardStepper>` 6 step
+- STEP 3 unificato configurazione+prezzo+disegno+errori
 - `<CommandPalette>` globale
 - `<ContextPanel>` cliente
 - `<AutoSaveIndicator>`
+- Route legacy nascoste dal menu (route disabilitate, marcate legacy)
+- Nuova sezione `/settings/legacy` (read-only viewer)
 
-### Fase 3 · Firma canvas mobile
-- Nuova rotta pubblica `/sign/:token`
-- `<SignaturePad>` con `react-signature-canvas`
-- Validazione consenso + firma non vuota
-- Metadata cattura (nome, IP, UA, timestamp, hash)
-- Incorporazione firma nel PDF finale
-- Test manuale mobile viewport (Playwright user agent iPhone/Android)
+### Fase 3 · Firma canvas mobile pubblica
+- Rotta pubblica `/sign/:token` (token non prevedibile, scadenza, revoca)
+- `<SignaturePad>` con `react-signature-canvas` (touch+mouse+pen)
+- Validazione consenso + firma non vuota + nome firmatario
+- Audit trail completo (IP, UA, timestamp, hash documento)
+- Test manuale mobile viewport Playwright
 
 ### Fase 4 · Contratto da preventivo
-- Precompilazione totale da `pricing_snapshot`
+- Precompilazione totale da `pricing_snapshot` (P7)
 - Template clausole configurabili
 - Anteprima PDF integrata
 - Invio link firma via email/WhatsApp
 
-### Fase 5 · Cleanup e menu per ruolo
-- `AppLayout` con menu differenziato per ruolo
-- Sezione `/settings/*` accessibile via icona ingranaggio
-- Route legacy marcate e disabilitate (non eliminate)
-- Aggiornamento permessi
+### Fase 5 · Rilievo tecnico
+- Nuovo ruolo utente `technical_surveyor`
+- Sezione `/survey/*` con lista rilievi assegnati
+- Form rilievo mobile-first con misure definitive, scostamento, foto, difformità
+- Approvazione rilievo → passaggio a Responsabile Tecnico
+- Blocco produzione senza rilievo approvato
 
-### Fase 6 · Test operativo end-to-end
-- Script Playwright: lead → cliente → preventivo → PDF → contratto → firma mobile → PDF firmato
-- Test in viewport mobile (390x844)
-- Test cross-browser (Chromium, WebKit, Firefox)
-- Se tutto verde → merge in main
+### Fase 6 · Cleanup menu per ruolo
+- `AppLayout` con menu differenziato per 11 ruoli
+- Sezione `/settings/*` accessibile via icona ⚙️
+- Route legacy marcate (non eliminate — conservazione fino ad approvazione esplicita)
 
-### Fase 7 (post-approvazione) · Sezioni admin catalog
+### Fase 7 · Test operativo end-to-end
+- Script Playwright: lead → cliente → preventivo → PDF → contratto → firma mobile → rilievo → produzione (dry run)
+- Test viewport mobile (390x844)
+- Test cross-browser
+
+### Fase 8 (successiva) · Produzione e posa
+- Kanban commesse produzione
+- Ruolo Responsabile Tecnico + Responsabile Produzione + Operatore
+- Ruolo Posatore con verbale posa
+- Ticket assistenza
+
+### Fase 9 (successiva) · Sezioni admin catalogo
 - UI Kit ferramenta
 - UI Montaggio & posa
 - UI Costi accessori (16 categorie)
 - UI Listino vetri dedicato
 
-### Fase 8 (futuro) · Produzione + fatturazione
-- Kanban produzione operativo
-- Ordini fornitori
+### Fase 10 (futuro) · Produzione + fatturazione end-to-end
+- Ordini fornitori automatici da BOM finale
 - Fatturazione elettronica
+- Contabilità
 
 ---
 
-## 14 · Metriche di successo
+## 20 · Metriche di successo
 
-Il successo di v2 non si misura in feature spedite, ma in questi 6 numeri:
+Il successo di v2 non si misura in feature spedite, ma in questi 8 numeri:
 
 | Metrica | Baseline v1 | Target v2 |
 |---|---|---|
 | Tempo medio da "nuovo preventivo" a "inviato" | ~45 min | ≤ 15 min |
 | % preventivi con prezzo digitato a mano | 100% | 0% |
-| % preventivi con vano a prezzo 0 (bug) | ~5% | 0% |
+| % preventivi con vano a €0 (bug) | ~5% | 0% |
 | % firme completate su smartphone al primo tentativo | ~30% | ≥ 90% |
-| NPS commerciali (survey trimestrale) | n/a | ≥ 40 |
-| Click medi per completare "lead → firma" | ~120 | ≤ 40 |
+| % commesse in produzione senza rilievo approvato | non tracciato (rischio) | 0% |
+| Tempo medio scostamento misure indicative → definitive | non tracciato | ≤ 3% |
+| Click medi da lead a firma contratto | ~120 | ≤ 40 |
+| NPS operativo (survey trimestrale su commerciali+rilevatori+posatori) | n/a | ≥ 40 |
 
 ---
 
-## 15 · Rischi noti e ipotesi
+## 21 · Rischi noti e ipotesi
 
 ### Rischi
-1. **Listini incompleti** — molti motori "incomplete" al lancio. Mitigazione: importer intuitivo + banner "prima di iniziare, carica i tuoi listini".
-2. **Utenti abituati a v1** — resistenza al cambio. Mitigazione: tutorial in-app, video 90s.
-3. **Contratti legacy** — restano vecchia UI in sola lettura, non impattano.
-4. **Performance mobile** — su rete 3G il caricamento wizard deve stare ≤ 3s. Mitigazione: code splitting per step.
+1. **Listini incompleti al lancio** → molti motori "incomplete". Mitigazione: importer intuitivo + banner "prima di iniziare, carica listini".
+2. **Utenti abituati a v1** → resistenza al cambio. Mitigazione: tutorial in-app, video 90s per ruolo.
+3. **Contratti legacy** → restano vecchia UI in sola lettura (§17), non impattano.
+4. **Performance mobile** → wizard ≤ 3s su 3G. Mitigazione: code splitting per step.
+5. **Nuovo ruolo Rilevatore** → richiede formazione. Mitigazione: onboarding dedicato per rilevatore + video di 3 minuti.
+6. **Nuovo ruolo Posatore** → dispositivi Android/iOS di generazioni miste. Mitigazione: PWA + supporto browser da Chrome 90 e Safari 14.
+7. **Sovrapposizione responsabilità Responsabile Tecnico ↔ Responsabile Produzione** → i due ruoli devono avere confini chiari. Mitigazione: matrice permessi §2.2 già li distingue.
 
 ### Ipotesi da validare
-- Il commerciale usa davvero lo smartphone in casa cliente? → user testing 3 commerciali
-- La firma disegnata è legalmente sufficiente in Italia? → sì, firma elettronica semplice ex eIDAS, ma per firme "avanzate" servirebbe OTP+SPID (fuori scope v2)
-- Il cliente finale sa cliccare un link email e firmare? → user test 5 clienti finali età varia
+- Il commerciale usa davvero lo smartphone in casa cliente? → user testing 3 commerciali reali
+- Il rilevatore preferisce app mobile o tablet? → user testing 2 rilevatori
+- Il posatore compila davvero il verbale sul telefono? → user testing 2 posatori
+- Il cliente finale sa firmare da link email? → user test 5 clienti età varia
+- La firma disegnata è legalmente sufficiente in Italia? → firma elettronica semplice ex eIDAS: sì, ma soggetta a valutazione giudice caso per caso; per contratti di valore significativo consulente legale può raccomandare firma avanzata (SPID/CIE + OTP), da progettare in fase futura secondo requisiti normativi
 
 ---
 
-## 16 · Cosa richiede approvazione (checklist Product Owner)
+## 22 · Cosa richiede approvazione (checklist Product Owner)
 
-- [ ] Filosofia e principi (sezioni 1)
-- [ ] Personas e matrice ruoli (sezioni 2)
-- [ ] Mappa schermate (sezione 5)
-- [ ] Schema navigazione desktop + mobile (sezione 6)
-- [ ] Wireframe testuali wizard (7.3.1 - 7.3.7)
-- [ ] Wireframe firma mobile (7.5)
-- [ ] State machine cicli (sezione 8)
-- [ ] 10 leggi UX (sezione 9)
-- [ ] Design system token (sezione 12)
-- [ ] Roadmap fasi 0-6 (sezione 13)
-- [ ] Target metriche di successo (sezione 14)
+- [ ] Filosofia e 7 principi + Regola Architetturale (§1)
+- [ ] 11 personas + matrice permessi completa (§2)
+- [ ] Journey commerciale, rilevatore, tecnico, posatore, back office, cliente (§4)
+- [ ] Mappa schermate (§5) + navigazione desktop/mobile (§6)
+- [ ] Wireframe wizard 6 step (§7.3)
+- [ ] Wireframe firma mobile (§7.5) con requisiti legali/tecnici espansi
+- [ ] Flusso completo Vendita → Rilievo → Produzione → Posa → Assistenza (§7.4, §8)
+- [ ] State machine cicli (§8) + condizioni bloccanti produzione (§8.8)
+- [ ] 10 leggi UX (§9)
+- [ ] Regole progettazione fonts (§10) — Serif solo editoriale, Inter per UI, Mono per dati
+- [ ] Design system tokens estesi (§12)
+- [ ] Menu per ruolo — 11 varianti (§13)
+- [ ] Matrice Dato → Fonte → Lettori (§14)
+- [ ] Misure indicative vs definitive (§15)
+- [ ] Gestione errori bloccanti preventivo (§16)
+- [ ] Comportamento preventivi legacy (§17)
+- [ ] Criteri accessibilità (§18)
+- [ ] Roadmap fasi 0-10 (§19)
+- [ ] Target metriche (§20)
 
 Alla firma di approvazione, questo documento diventa la fonte unica di verità per lo sviluppo di v2. Ogni deviazione richiederà nuovo giro di approvazione.
 
 ---
 
-**Fine documento — pronto per revisione**
+**Fine documento v2.1 — pronto per revisione**
