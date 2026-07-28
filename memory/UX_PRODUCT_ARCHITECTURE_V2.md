@@ -783,6 +783,26 @@ Assistenza (eventuali ticket post-vendita)
 
 **Nota terminologica**: questa implementazione realizza una **firma elettronica semplice** ex eIDAS (Reg. UE 910/2014, art. 3, punto 10). NON è una firma elettronica avanzata né qualificata. La progettazione di una firma avanzata o qualificata (con OTP SMS/email/SPID + certificato) è **estensione futura** fuori scope di questa versione, e sarà progettata in un documento dedicato secondo i requisiti normativi applicabili.
 
+### 7.5.1 · Signature Provider abstraction *(nota architetturale)*
+
+La firma canvas interna è la prima implementazione, ma **non deve essere l'unica**. L'architettura backend deve prevedere fin da subito un layer di astrazione:
+
+```
+class SignatureProvider(ABC):
+    def initiate_signing(contract, signer) -> SignatureSession
+    def get_status(session_id) -> SignatureStatus
+    def get_signed_document(session_id) -> bytes
+    def revoke(session_id) -> None
+```
+
+Implementazioni previste:
+- `InternalCanvasSignatureProvider` — canvas + hash + audit trail (la prima, in scope)
+- `DocuSignSignatureProvider` — integrazione API DocuSign (futura)
+- `NamirialSignatureProvider` — provider certificato italiano (futura)
+- `AdESSignatureProvider` — firma elettronica avanzata via SPID/CIE (futura)
+
+Il router `/api/contracts/{id}/sign` chiama `signature_provider.initiate_signing()` senza sapere quale implementazione sta usando. Il tenant può scegliere il provider in Configurazione → Firma. Le migrazioni tra provider **non richiedono riscrittura** del resto del sistema (contratti, PDF, audit, notifiche). Le firme già emesse restano legate al provider che le ha prodotte.
+
 ---
 
 ## 8 · Flussi operativi (state machines completi)

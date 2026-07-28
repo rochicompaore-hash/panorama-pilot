@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.db import get_db
-from app.deps import require_permission, get_client_ip
+from app.deps import require_permission, get_client_ip, get_permission_keys_for_user
 from app.mongo_utils import to_mongo, from_mongo
 from app.models import utcnow, new_id
+from app.services.audit import record_audit
 from app.services.quote_structure import (
     check_compatibility, resolve_dimensions, DEFAULT_RULES,
 )
@@ -19,6 +20,7 @@ from app.models_quote_structure import (
     ProductCompatibilityRule, DimensionFormula,
     ProductRole, OpeningDimensions,
 )
+from app.models_catalog import ProductSimulateRequest
 
 
 router = APIRouter(prefix="/quote-structure", tags=["Quote Structure"])
@@ -28,6 +30,63 @@ async def _get_quote(db, tenant_id: str, quote_id: str):
     q = await db.quotes.find_one({"_id": quote_id, "tenant_id": tenant_id, "deleted_at": None})
     if not q: raise HTTPException(404, "Preventivo non trovato")
     return q
+
+
+# --------------------------------------------------------------------
+# Fase 1 · Legacy guard + unit_price protection (P2 — motore calcola, non l'utente)
+# --------------------------------------------------------------------
+def is_legacy_quote(q: dict) -> bool:
+    """Un preventivo è legacy quando è stato marcato tale, OR è associato al vecchio motore,
+    OR contiene righe con base_price>0 senza pricing_snapshot (residuo v1).
+    Preventivi nuovi vuoti NON sono legacy.
+    """
+    if q.get("is_legacy") is True:
+        return True
+    engine = q.get("pricing_engine")
+    if engine and engine != "commercial_perimeter":
+        return True
+    lines = q.get("lines") or []
+    if not lines:
+        return False
+    return any(
+        float(l.get("base_price") or 0) > 0 and not l.get("pricing_snapshot")
+        for l in lines
+    )
+
+
+def _assert_not_legacy(q: dict):
+    if is_legacy_quote(q):
+        raise HTTPException(status_code=409, detail={
+            "code": "LEGACY_QUOTE_READ_ONLY",
+            "message": "Questo preventivo è stato creato con il motore precedente. "
+                       "Per modificarlo crea una nuova versione.",
+            "quote_id": q.get("_id") or q.get("id"),
+        })
+
+
+async def _guard_unit_price(user: dict, submitted_unit_price):
+    """Blocca l'inserimento di un prezzo unitario manuale a chi non ha `quotes.edit_prices`.
+    Il commerciale standard NON può digitare prezzi (P2 · Il motore calcola).
+    """
+    if submitted_unit_price is None:
+        return
+    try:
+        val = float(submitted_unit_price)
+    except (TypeError, ValueError):
+        return
+    if val <= 0:
+        return
+    if user.get("is_superadmin") or user.get("is_platform_owner"):
+        return
+    perms = await get_permission_keys_for_user(user)
+    if "*" in perms or "quotes.edit_prices" in perms:
+        return
+    raise HTTPException(status_code=403, detail={
+        "code": "MANUAL_PRICE_NOT_ALLOWED",
+        "message": "Il commerciale non può inserire manualmente un prezzo. "
+                   "Il prezzo è calcolato automaticamente dal motore. "
+                   "Serve il permesso 'quotes.edit_prices' per override manuale.",
+    })
 
 
 # ============================================================
@@ -185,10 +244,16 @@ async def duplicate_opening(opening_id: str,
 @router.post("/openings/{opening_id}/products")
 async def add_product_to_opening(opening_id: str, payload: OpeningProductAddPayload,
                                   user: dict = Depends(require_permission("quotes.edit"))):
-    """Aggiunge un prodotto (con ruolo) allo stesso opening_id."""
+    """Aggiunge un prodotto (con ruolo) allo stesso opening_id.
+
+    Fase 1: `payload.unit_price > 0` richiede permesso `quotes.edit_prices`.
+    Il commerciale standard usa `compute-and-add` che calcola col motore.
+    """
     db = get_db()
     q = await db.quotes.find_one({"tenant_id": user["tenant_id"], "openings.id": opening_id, "deleted_at": None})
     if not q: raise HTTPException(404, "Vano non trovato")
+    _assert_not_legacy(q)
+    await _guard_unit_price(user, payload.unit_price)
 
     # Check compatibility con prodotti già presenti
     lines = list(q.get("lines") or [])
@@ -243,6 +308,250 @@ async def add_product_to_opening(opening_id: str, payload: OpeningProductAddPayl
     lines.append(new_line)
     await db.quotes.update_one({"_id": q["_id"]}, {"$set": {"lines": lines}})
     return {"line": new_line, "compatibility_warnings": check.warnings}
+
+
+# ============================================================
+# FASE 1 · MOTORE COMMERCIALE INTEGRATO — compute-and-add + recompute
+# ============================================================
+
+class ComputeAndAddPayload(BaseModel):
+    """Payload commerciale: parametri di configurazione del vano, MAI un prezzo.
+    Il motore commercial_perimeter calcola prezzo e produce pricing_snapshot.
+    """
+    product_id: str
+    quantity: int = 1
+    width_mm: int
+    height_mm: int
+    number_of_sashes: int = 1
+    window_type: str = "apribile"
+    color_code: str
+    is_color_premium: bool = False
+    glass_code: Optional[str] = None
+    glass_price_per_sqm: Optional[float] = None
+    glass_min_sqm: Optional[float] = None
+    hardware_kit_price: Optional[float] = None
+    hardware_not_required: bool = False
+    installation_cost: Optional[float] = None
+    installation_declared_zero: bool = False
+    transport_cost: float = 0.0
+    disposal_cost: float = 0.0
+    accessory_cost: float = 0.0
+    other_components_cost: Optional[float] = None
+    other_components_declared_zero: bool = False
+    discount_amount: float = 0.0
+    override_margin_pct: Optional[float] = None
+    override_hourly_cost: Optional[float] = None
+    override_production_time_min: Optional[float] = None
+    description: Optional[str] = None
+    role: str = "primary_frame"
+
+
+def _build_simulate_request(payload: ComputeAndAddPayload) -> ProductSimulateRequest:
+    return ProductSimulateRequest(
+        product_id=payload.product_id,
+        width_mm=payload.width_mm,
+        height_mm=payload.height_mm,
+        color_code=payload.color_code,
+        is_color_premium=payload.is_color_premium,
+        glass_price_per_sqm=payload.glass_price_per_sqm,
+        glass_min_sqm=payload.glass_min_sqm,
+        hardware_kit_price=payload.hardware_kit_price,
+        other_components_cost=payload.other_components_cost,
+        other_components_declared_zero=payload.other_components_declared_zero,
+        pricing_mode="commercial_perimeter",
+        window_type=payload.window_type,  # type: ignore[arg-type]
+        number_of_sashes=payload.number_of_sashes,
+        hardware_not_required=payload.hardware_not_required,
+        glass_code=payload.glass_code,
+        installation_cost=payload.installation_cost,
+        installation_declared_zero=payload.installation_declared_zero,
+        transport_cost=payload.transport_cost,
+        disposal_cost=payload.disposal_cost,
+        accessory_cost=payload.accessory_cost,
+        discount_amount=payload.discount_amount,
+        override_margin_pct=payload.override_margin_pct,
+        override_hourly_cost=payload.override_hourly_cost,
+        override_production_time_min=payload.override_production_time_min,
+    )
+
+
+def _extract_blocking_errors(snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
+    errs = snapshot.get("blocking_errors") or []
+    if not errs and snapshot.get("pricing_status") not in ("ok", None):
+        errs = [{"code": "PRICING_INCOMPLETE",
+                 "message": f"pricing_status={snapshot.get('pricing_status')}"}]
+    return errs
+
+
+@router.post("/{quote_id}/openings/{opening_id}/products/compute-and-add")
+async def compute_and_add_product(
+    quote_id: str, opening_id: str,
+    payload: ComputeAndAddPayload, request: Request,
+    user: dict = Depends(require_permission("quotes.edit")),
+):
+    """MOTORE INTEGRATO — riceve config, chiama commercial_perimeter, salva linea con snapshot.
+    Se pricing_status != ok → 422 con blocking_errors. Nessun base_price accettato (P2).
+    """
+    db = get_db()
+    q = await _get_quote(db, user["tenant_id"], quote_id)
+    _assert_not_legacy(q)
+
+    opening = next((o for o in (q.get("openings") or []) if o.get("id") == opening_id), None)
+    if not opening:
+        raise HTTPException(404, "Vano non trovato nel preventivo")
+
+    from app.services.perimeter_assembler import run_perimeter_simulation
+    sim_body = _build_simulate_request(payload)
+    try:
+        snapshot = await run_perimeter_simulation(user["tenant_id"], sim_body)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Errore motore: {type(e).__name__}: {e}")
+
+    if snapshot.get("pricing_status") != "ok":
+        raise HTTPException(status_code=422, detail={
+            "code": "PRICING_INCOMPLETE",
+            "message": "Prezzo non calcolabile — configurazione o listino incompleti.",
+            "pricing_status": snapshot.get("pricing_status"),
+            "blocking_errors": _extract_blocking_errors(snapshot),
+            "hint": "Chiedi all'amministratore di completare listino/formule.",
+        })
+
+    unit_price_final = float(snapshot.get("total") or snapshot.get("sale_price") or 0.0)
+    if unit_price_final <= 0:
+        raise HTTPException(status_code=422, detail={
+            "code": "COMPUTED_ZERO",
+            "message": "Motore ha prodotto prezzo zero — configurazione anomala.",
+        })
+
+    line_id = new_id()
+    lines = list(q.get("lines") or [])
+    existing_in_opening = [l for l in lines if l.get("opening_id") == opening_id]
+    new_line = {
+        "id": line_id,
+        "opening_id": opening_id,
+        "role": payload.role,
+        "category": payload.role,
+        "product_key": snapshot.get("product_key") or payload.product_id,
+        "product_id": payload.product_id,
+        "product_config": {
+            "number_of_sashes": payload.number_of_sashes,
+            "window_type": payload.window_type,
+            "color_code": payload.color_code,
+            "is_color_premium": payload.is_color_premium,
+            "glass_code": payload.glass_code,
+        },
+        "description": payload.description or "",
+        "width_mm": payload.width_mm,
+        "height_mm": payload.height_mm,
+        "quantity": payload.quantity,
+        "base_price": round(unit_price_final, 2),
+        "unit_price_final": round(unit_price_final, 2),
+        "subtotal_line": round(unit_price_final * payload.quantity, 2),
+        "vat_rate": 0.22,
+        "order_index": len(existing_in_opening),
+        "pricing_engine": "commercial_perimeter",
+        "pricing_snapshot": snapshot,
+        "pricing_snapshot_hash": snapshot.get("snapshot_hash"),
+    }
+    lines.append(new_line)
+
+    now_iso = utcnow().isoformat()
+    await db.quotes.update_one(
+        {"_id": quote_id},
+        {"$set": {"lines": lines, "pricing_engine": "commercial_perimeter",
+                  "updated_at": now_iso}, "$inc": {"version": 1}},
+    )
+    await record_audit(
+        action="quotes.line_computed_add", tenant_id=user["tenant_id"],
+        user_id=user["id"], user_email=user.get("email"),
+        ip=get_client_ip(request),
+        entity_type="quote", entity_id=quote_id,
+        after={"line_id": line_id, "product_id": payload.product_id,
+               "unit_price_final": new_line["unit_price_final"],
+               "snapshot_hash": snapshot.get("snapshot_hash")},
+    )
+    return {"line": new_line, "pricing_status": "ok"}
+
+
+@router.post("/products/{line_id}/recompute")
+async def recompute_line(
+    line_id: str, payload: ComputeAndAddPayload, request: Request,
+    user: dict = Depends(require_permission("quotes.edit")),
+):
+    """Ricalcola una riga esistente col motore."""
+    db = get_db()
+    q = await db.quotes.find_one({
+        "tenant_id": user["tenant_id"], "lines.id": line_id, "deleted_at": None,
+    })
+    if not q:
+        raise HTTPException(404, "Riga non trovata")
+    _assert_not_legacy(q)
+
+    from app.services.perimeter_assembler import run_perimeter_simulation
+    sim_body = _build_simulate_request(payload)
+    snapshot = await run_perimeter_simulation(user["tenant_id"], sim_body)
+    if snapshot.get("pricing_status") != "ok":
+        raise HTTPException(status_code=422, detail={
+            "code": "PRICING_INCOMPLETE",
+            "pricing_status": snapshot.get("pricing_status"),
+            "blocking_errors": _extract_blocking_errors(snapshot),
+        })
+    unit_price_final = float(snapshot.get("total") or snapshot.get("sale_price") or 0.0)
+    if unit_price_final <= 0:
+        raise HTTPException(422, detail={"code": "COMPUTED_ZERO"})
+
+    lines = list(q.get("lines") or [])
+    for l in lines:
+        if l.get("id") == line_id:
+            l["width_mm"] = payload.width_mm
+            l["height_mm"] = payload.height_mm
+            l["quantity"] = payload.quantity
+            l["product_config"] = {
+                "number_of_sashes": payload.number_of_sashes,
+                "window_type": payload.window_type,
+                "color_code": payload.color_code,
+                "is_color_premium": payload.is_color_premium,
+                "glass_code": payload.glass_code,
+            }
+            l["base_price"] = round(unit_price_final, 2)
+            l["unit_price_final"] = round(unit_price_final, 2)
+            l["subtotal_line"] = round(unit_price_final * payload.quantity, 2)
+            l["pricing_engine"] = "commercial_perimeter"
+            l["pricing_snapshot"] = snapshot
+            l["pricing_snapshot_hash"] = snapshot.get("snapshot_hash")
+            break
+    await db.quotes.update_one(
+        {"_id": q["_id"]},
+        {"$set": {"lines": lines, "updated_at": utcnow().isoformat()},
+         "$inc": {"version": 1}},
+    )
+    await record_audit(
+        action="quotes.line_recomputed", tenant_id=user["tenant_id"],
+        user_id=user["id"], user_email=user.get("email"),
+        ip=get_client_ip(request),
+        entity_type="quote", entity_id=q["_id"],
+        after={"line_id": line_id, "new_unit_price": unit_price_final,
+               "snapshot_hash": snapshot.get("snapshot_hash")},
+    )
+    return {"line_id": line_id, "unit_price_final": unit_price_final,
+            "snapshot_hash": snapshot.get("snapshot_hash")}
+
+
+@router.get("/{quote_id}/legacy-status")
+async def get_legacy_status(quote_id: str,
+                             user: dict = Depends(require_permission("quotes.view"))):
+    """Ritorna se un preventivo è legacy (read-only) o compatibile v2."""
+    db = get_db()
+    q = await _get_quote(db, user["tenant_id"], quote_id)
+    return {
+        "quote_id": quote_id,
+        "is_legacy": is_legacy_quote(q),
+        "pricing_engine": q.get("pricing_engine"),
+        "lines_with_snapshot": sum(1 for l in (q.get("lines") or []) if l.get("pricing_snapshot")),
+        "lines_total": len(q.get("lines") or []),
+    }
 
 
 @router.get("/openings/{opening_id}/products")
