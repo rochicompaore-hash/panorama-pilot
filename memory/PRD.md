@@ -494,3 +494,26 @@ Implementazione servizio SMTP production-ready per SiteGround (`gnldm1111.sitegr
 - Sprint 2 Catalogo: UI Ferramenta (Kit), UI Montaggio e posa
 - Sprint 3 Catalogo: UI Costi accessori (16 categorie)
 - Formule vetro 3-ante e 4-ante (bloccato: attende specifiche tecniche)
+
+## Fase 1 · Motore commercial_perimeter integrato — Feb 2026 (iter 29)
+
+### Deliverables
+- Nuovi endpoint (`/app/backend/app/routers/quote_structure.py`):
+  - `POST /api/quote-structure/{qid}/openings/{oid}/products/compute-and-add` — motore integrato, salva pricing_snapshot
+  - `POST /api/quote-structure/products/{line_id}/recompute` — ricalcolo linea esistente
+  - `GET /api/quote-structure/{qid}/legacy-status` — flag legacy read-only
+- Endpoint esistente `POST /api/quote-structure/openings/{oid}/products` ora rifiuta `unit_price>0` senza permesso `quotes.edit_prices` (403 MANUAL_PRICE_NOT_ALLOWED)
+- Helper `is_legacy_quote(q)` + `_assert_not_legacy(q)` (409 LEGACY_QUOTE_READ_ONLY su mutations)
+- Guard `_guard_unit_price(user, val)` — bypass solo per superadmin o utenti con `quotes.edit_prices`
+- Test file `/app/backend/tests/test_fase1_motor_integration.py` — 6 test (5 pass + 1 skip in caso listini incompleti, comportamento voluto)
+- Git tags: `pre-fase1-backend-motor-2026-02` (rollback), `p0-fase1-motor-integrato` (checkpoint)
+- Commit: `464b413`
+
+### Codici errore bloccanti gestiti (dal motore)
+MISSING_ADDITIONAL_COMPONENTS_COST, MISSING_COMPONENT_COLOR_PRICE, MISSING_FRAME_PRICE, MISSING_FRAME_REINFORCEMENT_PRICE, MISSING_GLASS_MINIMUM, MISSING_GLASS_PRICE, MISSING_GLASS_RECIPE, MISSING_GLAZING_BEAD_PRICE, MISSING_HARDWARE_PRICE, MISSING_HOURLY_COST, MISSING_INSTALLATION_PRICE, MISSING_MARGIN, MISSING_MEETING_STILE_PRICE, MISSING_MEETING_STILE_REINFORCEMENT_PRICE, MISSING_PRODUCTION_TIME, MISSING_SASH_PRICE, MISSING_SASH_REINFORCEMENT_PRICE
+
+### Comportamento preventivi legacy
+- Rilevati automaticamente: `is_legacy=true` OR `pricing_engine≠commercial_perimeter` OR presenza linee con `base_price>0` e senza `pricing_snapshot`
+- API `/api/quote-structure/{qid}/legacy-status` espone il flag al frontend
+- Mutations su preventivi legacy → HTTP 409 con code `LEGACY_QUOTE_READ_ONLY`
+- Nessuna migrazione automatica, nessuna cancellazione automatica
