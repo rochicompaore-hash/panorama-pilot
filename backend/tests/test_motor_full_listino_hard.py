@@ -128,8 +128,8 @@ def test_motor_returns_pricing_status_ok_with_full_listino():
 
     # Assert coerenza breakdown: total_internal = production_cost + services
     production_cost = float(s.get("production_cost") or 0)
-    services = float(s.get("installation_and_services_cost") or 0)
     total_internal = float(s.get("total_internal_cost") or 0)
+    services = total_internal - production_cost  # derivato: motore non lo espone
     margin_pct = float(s.get("margin_pct") or 0)
     discount = float(s.get("discount_amount") or 0)
 
@@ -137,9 +137,11 @@ def test_motor_returns_pricing_status_ok_with_full_listino():
     assert abs(production_cost - (materials + labor)) < 0.05, (
         f"BREAKDOWN INCOERENTE: production_cost={production_cost} vs materials+labor={materials+labor}"
     )
-    # total_internal = production_cost + services
-    assert abs(total_internal - (production_cost + services)) < 0.05, (
-        f"BREAKDOWN INCOERENTE: total_internal={total_internal} vs prod+services={production_cost+services}"
+    # services ≈ posa+trasporto+accessori (50+15+0 = 65)
+    assert services >= 0, f"services derivato negativo: {services}"
+    expected_services = 50.0 + 15.0
+    assert abs(services - expected_services) < 0.05, (
+        f"SERVICES MISMATCH: derivato={services} atteso={expected_services}"
     )
     # sale_price = total_internal * (1 + margin/100) - discount
     expected_sale = total_internal * (1 + margin_pct / 100.0) - discount
