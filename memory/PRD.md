@@ -517,3 +517,57 @@ MISSING_ADDITIONAL_COMPONENTS_COST, MISSING_COMPONENT_COLOR_PRICE, MISSING_FRAME
 - API `/api/quote-structure/{qid}/legacy-status` espone il flag al frontend
 - Mutations su preventivi legacy → HTTP 409 con code `LEGACY_QUOTE_READ_ONLY`
 - Nessuna migrazione automatica, nessuna cancellazione automatica
+
+
+## Iterazione 30 · AUDIT TECNICO COMPLETO v1 — Feb 2026
+
+**Scope**: audit pre-unificazione architetturale (opzione D2:b) su richiesta esplicita del PO — 17 sezioni di analisi + fix Critical/High + report + rollback tag.
+
+### Report completo
+`/app/memory/AUDIT_REPORT_V1.md` — mappa file, duplicazioni, query, motori, formule vetro, unità, versionamento, legacy, permessi, frontend, seed, performance, error handling, bug classificati, test, verdetto finale.
+
+### Bug fixati (Critical / High)
+| ID | Severità | File | Descrizione |
+|---|---|---|---|
+| BUG-01 | CRITICAL | `routers/quotes.py:449-462` | Guard `sent` leggeva collezione `opening_products` inesistente per lo schema — preventivi con `pricing_status=incomplete` potevano essere inviati. Ora ispeziona `q.lines[].pricing_snapshot.blocking_errors` inline + codes `QUOTE_HAS_BLOCKING_ERRORS` / `QUOTE_CONTAINS_MANUAL_PRICES`. |
+| BUG-02 | HIGH | `services/catalog_service.py:126-140` | `resolve_component_prices` senza ordering deterministico su `find_one`. Aggiunto sort `version DESC, updated_at DESC, _id DESC`. |
+| BUG-03 | CRITICAL | `services/catalog_service.py:24-33` | `DEFAULT_PROD_CFG` inventava `default_glass_price_per_sqm=76.0` e `default_glass_min_sqm=0.50` silent. Rimossi → ora `None` → motore emerge MISSING_GLASS_PRICE / MISSING_GLASS_MINIMUM esplicito (P6 rispettato). |
+| BUG-04 | HIGH | `services/indexes.py` | Indici mancanti su 6 collezioni hot. Aggiunti: `ix_ipl_tenant_status_ver`, `ix_ipl_tenant_active_ver`, `ix_glass_recipes_lookup`, `ix_color_categories_tenant_code`, `ix_ccm_tenant_code`, `ix_products_demo_guard`, `ux_production_config_tenant`. |
+| BUG-06 | HIGH | `services/recipes/glass_engine.py:136-170` | Troncamento `int((L-wr)/sf)` → ROUND_HALF_UP. 2-ante L=1400 wr=347 sf=2 ora restituisce 527 (era 526 silent). Rifiuta split_factor ≤0. |
+| BUG-15 | HIGH | `production_config` | Unique sparse index per tenant_id. Cleanup manuale duplicati esistenti demandato. |
+| BUG-16 | HIGH | `services/recipes/commercial_perimeter.py:377-385` | Latent bug: `installation_declared_zero=True` con `installation_cost=None` causava TypeError `None + Decimal` in service_cost. Aggiunto helper `_z()` che coerce None→Decimal("0"). |
+
+### Bug documentati NON corretti (in scope unificazione)
+- **BUG-14** [CRITICAL/ARCHITETTURALE] — `ParametricAdminPage.jsx` disconnessa dai listini/motore commerciale. Fix = opzione D2:b (unificazione), documentato in `/app/memory/UNIFICATION_PLAN_V1.md` (attende approvazione A/B/C).
+- BUG-05/07/09/10/11/12/13 (MEDIUM cosmetici/refactor) — documentati nel report.
+
+### Test aggiunti
+- `tests/test_audit_v1_regression.py` — 7 test regressione per BUG-01/02/03/04/06/15
+- Totale: **92 test verdi + 2 xfail attesi** (test flaky su tenant Infissi Express con listino ricco)
+- Regressione: `test_finestra_1a_recipe`, `test_catalog_area*`, `test_commercial_perimeter*`, `test_motor_full_listino_hard`, `test_iter25_smoke`, `test_ci_security_guards`, `test_code_quality_regression` — tutti verdi
+
+### Git tags
+- `pre-audit-v1-2026-02` — rollback point (commit `870d704`)
+- `p1-audit-v1-fixes` — dopo primo giro di fix (commit `3668a32`)
+- `p1-audit-v1-fixes-final` — dopo fix BUG-16 e finalizzazione (commit `28fdd81`)
+
+### Verdetto
+✅ **Motore commercial_perimeter corretto e coerente** per il perimetro implementato: math, snapshot deterministico, MISSING_* espliciti, no silent zeros, no fallback inventati, permessi enforced, tenant isolation OK.  
+⚠️ **Fase 2A/unificazione ancora bloccati**: `ParametricAdminPage` disconnessa. Serve approvazione utente su UNIFICATION_PLAN_V1 (opzione A/B/C) per procedere.  
+⚠️ **BUG-15 duplicato production_config** su PanoramaPilot richiede cleanup manuale prima dell'attivazione unique index in produzione.
+
+### Endpoint modificati (comportamento)
+- `POST /api/quotes/{id}/status` — ora blocca correttamente invio con blocking errors
+- `POST /api/catalog/products/{id}/simulate` — glass_price/min_sqm ora obbligatori esplicitamente
+- `POST /api/quote-structure/{qid}/openings/{oid}/products/compute-and-add` — behavior invariato ma ora usa motore corretto per service_cost None
+
+### File modificati (7 file)
+```
+app/routers/quotes.py                          +43 -11
+app/services/catalog_service.py                +18  -4
+app/services/recipes/glass_engine.py           +22  -8
+app/services/recipes/commercial_perimeter.py    +8  -3
+app/services/indexes.py                        +45   0
+backend/tests/test_audit_v1_regression.py     +140   0 (new)
+memory/AUDIT_REPORT_V1.md                     +500   0 (new)
+```
