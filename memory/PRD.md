@@ -624,3 +624,30 @@ L'utente deve scegliere A/B/C su `/app/memory/UNIFICATION_PLAN_V1.md`.
 Fino alla scelta esplicita, l'agente NON procede con migrazione,
 riscrittura ParametricAdminPage, o unificazione dei modelli.
 
+
+
+## Iterazione 31 · AUDIT PLUGIN & DIPENDENZE + Script cleanup production_config
+
+### Deliverable
+- `/app/memory/AUDIT_PLUGINS_V1.md` — audit 10 sezioni, evidence-based
+- `/app/backend/scripts/cleanup_production_config_duplicates.py` — dry-run + apply per BUG-15
+
+### Plugin da rimuovere subito (~500kb bundle sprecati)
+Frontend: `swr`, `framer-motion`, `dayjs`, `lodash`, `@types/lodash`
+Backend: `pymupdf` (opzionale), `websockets` (o attivare), `tenacity` (o usare per retry)
+
+### GAP P0 identificati per ERP serramenti IT
+1. Fatturazione Elettronica SDI (Aruba/FIC) — **obbligo legale**
+2. Portale ENEA ecobonus — killer feature settore
+3. OCR listini fornitori via Gemini Vision (Universal Key già in deps!)
+4. WhatsApp Business (Twilio o Meta Cloud)
+5. APScheduler async — reminder/follow-up/cleanup
+6. Sentry SDK backend — visibilità errori produzione
+7. ezdxf export lista taglio → CNC
+8. Firma canvas mobile-first (Fase 3 UX_ARCH V2)
+9. Verifica backup + procedura restore MongoDB
+
+### Cleanup production_config duplicati (BUG-15)
+- Script pronto: `python3 backend/scripts/cleanup_production_config_duplicates.py [--apply]`
+- Dry-run eseguito ✅ — 1 tenant con 2 doc, KEEP pc-* più recente, DELETE prodcfg-*
+- **Non applicato** — attende conferma utente prima di `--apply` in preview e prod
