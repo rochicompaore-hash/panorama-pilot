@@ -445,21 +445,49 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
     if new == "sent" and doc.get("approval", {}).get("status") == "pending":
         raise HTTPException(status_code=400, detail="Preventivo in attesa di approvazione")
 
-    # Blocca invio se ci sono errori bloccanti sui prodotti collegati
+    # BUG-01 FIX (audit v1) — Blocca invio se ci sono errori bloccanti sulle line del preventivo.
+    # La versione precedente leggeva da `opening_products` (collezione inesistente per questo schema)
+    # e non bloccava mai. Ora ispeziona `q.lines[].pricing_snapshot.blocking_errors` inline +
+    # verifica `pricing_status` != "ok" e opening_products se presente.
     if new == "sent":
-        blocked_products = await db.opening_products.find({
-            "tenant_id": user["tenant_id"], "quote_id": qid, "deleted_at": None,
-            "$or": [
-                {"blocking_errors": {"$exists": True, "$ne": []}},
-                {"last_compute.blocking_errors": {"$exists": True, "$ne": []}},
-            ],
-        }, {"_id": 1, "blocking_errors": 1}).to_list(50)
-        if blocked_products:
+        blocking_lines: list = []
+        # 1) Line inline con pricing_snapshot incompleto
+        for l in (doc.get("lines") or []):
+            snap = l.get("pricing_snapshot") or {}
+            berrors = snap.get("blocking_errors") or l.get("blocking_errors") or []
+            status = snap.get("pricing_status")
+            if berrors or (status and status != "ok"):
+                blocking_lines.append({
+                    "line_id": l.get("id"),
+                    "opening_id": l.get("opening_id"),
+                    "codes": [e.get("code") for e in berrors if isinstance(e, dict)],
+                    "pricing_status": status,
+                })
+        # 2) Line senza motore (base_price digitato)—accettabili solo se quotes.edit_prices
+        legacy_manual = [l for l in (doc.get("lines") or [])
+                          if float(l.get("base_price") or 0) > 0 and not l.get("pricing_snapshot")]
+        if blocking_lines:
             raise HTTPException(
                 status_code=400,
-                detail=f"Preventivo non inviabile: {len(blocked_products)} prodotto/i con errori bloccanti "
-                        f"(prezzi mancanti o listini non pubblicati). Correggi prima dell'invio."
+                detail={
+                    "code": "QUOTE_HAS_BLOCKING_ERRORS",
+                    "message": f"Preventivo non inviabile: {len(blocking_lines)} riga/e con errori bloccanti. "
+                               "Correggi prima dell'invio.",
+                    "blocking_lines": blocking_lines,
+                },
             )
+        # Legacy manual pricing lines are allowed only if the user has edit_prices permission.
+        if legacy_manual:
+            perms = await _get_perms(user)
+            if not user.get("is_superadmin") and "*" not in perms and "quotes.edit_prices" not in perms:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "code": "QUOTE_CONTAINS_MANUAL_PRICES",
+                        "message": f"{len(legacy_manual)} riga/e con prezzo digitato manualmente. "
+                                   "Riesegui il calcolo col motore oppure richiedi il permesso 'quotes.edit_prices'.",
+                    },
+                )
 
     now = datetime.now(timezone.utc).isoformat()
     update = {"quote_status": new, "updated_at": now, "updated_by": user["id"]}

@@ -86,20 +86,27 @@ def test_production_config_default_glass_premium_present(admin_session):
     r = admin_session.get(f"{API}/catalog/production-config", timeout=10)
     assert r.status_code == 200
     body = r.json()
-    assert body["default_glass_price_per_sqm"] == 76.0
-    assert body["default_glass_min_sqm"] == 0.5
+    # BUG-03 (audit v1): default_glass_price / min_sqm ora None (no valori silent inventati)
+    assert body["default_glass_price_per_sqm"] is None
+    assert body["default_glass_min_sqm"] is None
     assert body["premium_pvc_surcharge_pct"] == 6.0
 
 
 def test_simulate_reports_missing_prices_when_no_pricelist(admin_session, proevolution_id):
     """With overrides for labour/margin and no pricelist entries, simulator
-    still reports MISSING_FRAME_PRICE etc. — never silently coerces to 0."""
+    still reports MISSING_FRAME_PRICE etc. — never silently coerces to 0.
+
+    BUG-03 fix (audit v1): glass_price / glass_min / installation devono essere passati
+    esplicitamente altrimenti emergono MISSING_* corretti.
+    """
     payload = {
         "width_mm": 900, "height_mm": 1500, "weld_allowance_mm": 6,
         "color_code": "BIANCO",
         "hardware_kit_price": 12.0, "other_components_declared_zero": True,
         "override_hourly_cost": 30, "override_production_time_min": 30,
         "override_margin_pct": 40,
+        "glass_price_per_sqm": 76.0, "glass_min_sqm": 0.50,
+        "installation_declared_zero": True,
     }
     r = admin_session.post(f"{API}/catalog/products/{proevolution_id}/simulate", json=payload, timeout=15)
     assert r.status_code == 200, r.text[:400]
@@ -146,7 +153,12 @@ def test_simulate_invalid_geometry_blocks(admin_session, proevolution_id):
 
 
 def test_production_config_patch_then_missing_prices(admin_session, proevolution_id):
-    """Fill production config → missing errors reduce to only MISSING_*_PRICE (no pricelist)."""
+    """Fill production config → missing errors reduce to only MISSING_*_PRICE (no pricelist).
+
+    BUG-03 fix (audit v1): il motore ora emette anche MISSING_GLASS_PRICE / MISSING_GLASS_MINIMUM
+    / MISSING_INSTALLATION_PRICE se non forniti esplicitamente. Il test deve passare tali valori
+    esplicitamente per far emergere solo i MISSING_*_PRICE dei componenti profilo.
+    """
     patch = admin_session.patch(f"{API}/catalog/production-config", json={
         "hourly_cost": 30.0,
         "production_time_default_minutes": 30,
@@ -156,6 +168,9 @@ def test_production_config_patch_then_missing_prices(admin_session, proevolution
     payload = {
         "width_mm": 900, "height_mm": 1500, "color_code": "BIANCO",
         "hardware_kit_price": 12.0, "other_components_declared_zero": True,
+        # Valori espliciti richiesti dopo BUG-03 fix (nessun default silent)
+        "glass_price_per_sqm": 76.0, "glass_min_sqm": 0.50,
+        "installation_declared_zero": True,
     }
     r = admin_session.post(f"{API}/catalog/products/{proevolution_id}/simulate", json=payload, timeout=10)
     body = r.json()
@@ -164,6 +179,8 @@ def test_production_config_patch_then_missing_prices(admin_session, proevolution
     assert "MISSING_HOURLY_COST" not in codes
     assert "MISSING_PRODUCTION_TIME" not in codes
     assert "MISSING_MARGIN" not in codes
+    assert "MISSING_GLASS_PRICE" not in codes
+    assert "MISSING_GLASS_MINIMUM" not in codes
     for missing in ("MISSING_FRAME_PRICE", "MISSING_SASH_PRICE",
                     "MISSING_FRAME_REINFORCEMENT_PRICE",
                     "MISSING_SASH_REINFORCEMENT_PRICE",

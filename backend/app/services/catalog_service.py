@@ -22,14 +22,17 @@ from app.mongo_utils import from_mongo
 # Production config
 # --------------------------------------------------------------------
 DEFAULT_PROD_CFG = {
+    # BUG-03 FIX (audit v1) — rimossi i default silent per glass_price/min_sqm.
+    # Motore deve emergere MISSING_GLASS_PRICE / MISSING_GLASS_MINIMUM se il tenant
+    # non ha configurato esplicitamente questi valori (P6: nessun valore inventato).
     "hourly_cost": None,
     "production_time_default_minutes": None,
     "default_margin_pct": None,
-    "default_glass_price_per_sqm": 76.0,
-    "default_glass_min_sqm": 0.50,
-    "premium_pvc_surcharge_pct": 6.0,
-    "default_bar_length_pvc_mm": 6500,
-    "default_bar_length_reinforcement_mm": 6000,
+    "default_glass_price_per_sqm": None,   # was 76.0 (silent) → obbliga configurazione esplicita
+    "default_glass_min_sqm": None,          # was 0.50 (silent)
+    "premium_pvc_surcharge_pct": 6.0,       # 6% è documentato normativamente, resta default
+    "default_bar_length_pvc_mm": 6500,      # tecnico standard PVC, resta default
+    "default_bar_length_reinforcement_mm": 6000,  # tecnico standard acciaio, resta default
 }
 
 
@@ -128,7 +131,13 @@ async def resolve_component_prices(
     }
     if pricelist_id:
         pl_query["_id"] = pricelist_id
-    pl = await db.item_pricelists.find_one(pl_query)
+    # BUG-02 FIX (audit v1) — ordering deterministico: version DESC, updated_at DESC.
+    # Se coesistono più listini attivi (design consente) → vince il più recente.
+    pl_cursor = db.item_pricelists.find(pl_query).sort([
+        ("version", -1), ("updated_at", -1), ("_id", -1),
+    ]).limit(1)
+    pls = await pl_cursor.to_list(1)
+    pl = pls[0] if pls else None
 
     prices: Dict[str, Optional[Decimal]] = {kind: None for kind in codes_by_kind}
     if not pl:

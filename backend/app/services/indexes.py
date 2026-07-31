@@ -79,6 +79,53 @@ async def ensure_indexes():
                   "bar_optimization_runs", "parametric_snapshots"):
         await db[coll].create_index([("tenant_id", 1), ("created_at", -1)], name=f"ix_{coll}_tenant_created")
         await db[coll].create_index([("tenant_id", 1), ("deleted_at", 1)], name=f"ix_{coll}_tenant_deleted")
+
+    # ---------- BUG-04 FIX (audit v1) — indici mirati catalogo + motore commerciale ----------
+    await db.item_pricelists.create_index(
+        [("tenant_id", 1), ("pl_status", 1), ("version", -1), ("updated_at", -1)],
+        name="ix_ipl_tenant_status_ver",
+    )
+    await db.item_pricelists.create_index(
+        [("tenant_id", 1), ("active", 1), ("version", -1)],
+        name="ix_ipl_tenant_active_ver",
+    )
+    await db.glass_recipes.create_index(
+        [("tenant_id", 1), ("product_key", 1), ("window_type", 1),
+         ("number_of_sashes", 1), ("status", 1)],
+        name="ix_glass_recipes_lookup",
+    )
+    await db.glass_recipes.create_index(
+        [("tenant_id", 1), ("deleted_at", 1)], name="ix_glass_recipes_tenant_deleted",
+    )
+    await db.color_categories.create_index(
+        [("tenant_id", 1), ("code", 1)], name="ix_color_categories_tenant_code",
+    )
+    await db.color_categories.create_index(
+        [("tenant_id", 1), ("deleted_at", 1)], name="ix_color_categories_tenant_deleted",
+    )
+    await db.catalog_code_mappings.create_index(
+        [("tenant_id", 1), ("code", 1)], name="ix_ccm_tenant_code",
+    )
+    await db.catalog_code_mappings.create_index(
+        [("is_system", 1), ("code", 1)], name="ix_ccm_system_code", sparse=True,
+    )
+    # BUG-15 FIX (audit v1) — production_config deve essere UNICA per tenant.
+    # Unique index sparse tollera legacy duplicati durante grace period; il de-dup
+    # deve essere eseguito manualmente via migration script se necessario.
+    await db.production_config.create_index(
+        [("tenant_id", 1)], name="ux_production_config_tenant", unique=True, sparse=True,
+    )
+    await db.products.create_index(
+        [("tenant_id", 1), ("deleted_at", 1)], name="ix_products_tenant_deleted",
+    )
+    await db.products.create_index(
+        [("tenant_id", 1), ("lifecycle_status", 1)], name="ix_products_lifecycle",
+    )
+    # Guard demo product filtering in real quotes
+    await db.products.create_index(
+        [("tenant_id", 1), ("is_demo", 1), ("environment_scope", 1)],
+        name="ix_products_demo_guard",
+    )
     await db.profiles.create_index([("tenant_id", 1), ("system_id", 1), ("role", 1)], name="ix_profiles_sys_role")
     await db.bom_templates.create_index([("tenant_id", 1), ("product_key", 1), ("bom_status", 1)], name="ix_bom_product_status")
     await db.price_matrices.create_index([("tenant_id", 1), ("product_key", 1), ("pm_status", 1)], name="ix_matrix_product_status")

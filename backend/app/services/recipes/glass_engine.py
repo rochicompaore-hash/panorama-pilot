@@ -137,15 +137,20 @@ def compute_glass_dimensions(recipe: Dict[str, Any], L_mm: int, H_mm: int,
                               S_mm: int = 6) -> Tuple[int, int, int]:
     """Applica la formula della ricetta. Ritorna (glass_width_mm, glass_height_mm, glass_quantity).
 
+    BUG-06 FIX (audit v1) — usa ROUND_HALF_UP invece di troncamento `int()`.
+    Prima: `int((L_mm - wr) / sf)` → per L=1400, wr=347, sf=2 → 526.5 → 526 (perde 0.5mm silent)
+    Ora: `Decimal.quantize(ROUND_HALF_UP)` → 527 (deterministico + tracciabile).
+
     Structured:
-        gw = (L - width_reduction) / split_factor
-        gh = H - height_reduction
+        gw = ROUND_HALF_UP((L - width_reduction) / split_factor)
+        gh = ROUND_HALF_UP(H - height_reduction)
         qty = quantity
-    Custom (parser AST):
-        gw = eval_formula(recipe["custom_width"], ctx)
-        gh = eval_formula(recipe["custom_height"], ctx)
-        qty = int(recipe["custom_qty_expression"] evaluated)
     """
+    from decimal import Decimal, ROUND_HALF_UP
+
+    def _round_mm(v) -> int:
+        return int(Decimal(str(v)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
     ft = recipe.get("formula_type", "structured")
     if ft == "structured":
         s = recipe.get("structured") or {}
@@ -153,15 +158,17 @@ def compute_glass_dimensions(recipe: Dict[str, Any], L_mm: int, H_mm: int,
         hr = int(s.get("height_reduction_mm", 0))
         sf = int(s.get("split_factor", 1) or 1)
         qty = int(s.get("quantity", 1))
-        gw = int((L_mm - wr) / sf)
-        gh = int(H_mm - hr)
+        if sf <= 0:
+            raise ValueError("split_factor deve essere > 0")
+        gw = _round_mm((L_mm - wr) / sf)
+        gh = _round_mm(H_mm - hr)
         return gw, gh, qty
     if ft == "custom":
         c = recipe.get("custom") or {}
         ctx = {"L": L_mm, "H": H_mm, "S": S_mm}
         try:
-            gw = int(eval_formula(c["width_expression"], ctx, strict=True))
-            gh = int(eval_formula(c["height_expression"], ctx, strict=True))
+            gw = _round_mm(eval_formula(c["width_expression"], ctx, strict=True))
+            gh = _round_mm(eval_formula(c["height_expression"], ctx, strict=True))
             qty_expr = c.get("quantity_expression") or str(c.get("quantity", 1))
             qty = int(eval_formula(qty_expr, ctx, strict=True))
         except (FormulaError, KeyError, ValueError) as e:

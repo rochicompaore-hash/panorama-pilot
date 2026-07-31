@@ -205,8 +205,9 @@ def test_prod_config_patch_and_get_roundtrip(admin):
     assert cfg["production_time_default_minutes"] == 30
     assert cfg["default_margin_pct"] == 40.0
     # defaults still present
-    assert cfg["default_glass_price_per_sqm"] == 76.0
-    assert cfg["default_glass_min_sqm"] == 0.5
+    # BUG-03 (audit v1): default silent glass_price/min_sqm rimossi
+    assert cfg["default_glass_price_per_sqm"] is None
+    assert cfg["default_glass_min_sqm"] is None
     assert cfg["premium_pvc_surcharge_pct"] == 6.0
 
 
