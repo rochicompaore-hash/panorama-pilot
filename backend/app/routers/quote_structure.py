@@ -89,6 +89,27 @@ async def _guard_unit_price(user: dict, submitted_unit_price):
     })
 
 
+async def _guard_demo_product(product_id: str):
+    """Rifiuta prodotti is_demo=true nell'ambiente operativo reale (DEMO_MODE=false).
+    I prodotti demo (TEST-MOTORE ecc.) servono solo ai test automatici — mai ai preventivi reali.
+    """
+    import os as _os
+    demo_mode = _os.environ.get("DEMO_MODE", "false").lower() == "true"
+    if demo_mode:
+        return  # ambiente di test: consentiti
+    db = get_db()
+    p = await db.products.find_one({"_id": product_id})
+    if not p:
+        return  # 404 verrà gestito dal motore
+    if p.get("is_demo") is True or p.get("environment_scope") == "test" \
+       or p.get("selectable_in_real_quotes") is False:
+        raise HTTPException(status_code=403, detail={
+            "code": "DEMO_PRODUCT_NOT_ALLOWED",
+            "message": "Prodotto disponibile solo in ambiente di test. Non selezionabile in preventivi reali.",
+            "product_id": product_id, "product_name": p.get("name"),
+        })
+
+
 # ============================================================
 # ENVIRONMENTS
 # ============================================================
@@ -395,6 +416,7 @@ async def compute_and_add_product(
     db = get_db()
     q = await _get_quote(db, user["tenant_id"], quote_id)
     _assert_not_legacy(q)
+    await _guard_demo_product(payload.product_id)
 
     opening = next((o for o in (q.get("openings") or []) if o.get("id") == opening_id), None)
     if not opening:
