@@ -220,7 +220,10 @@ def test_kpi_unchanged_around_simulate(admin, proevolution_id):
         admin.post(f"{API}/catalog/products/{proevolution_id}/simulate",
                     json={"width_mm": 900, "height_mm": 1500,
                            "color_code": "BIANCO",
-                           "other_components_declared_zero": True},
+                           "other_components_declared_zero": True,
+                           # BUG-16 blindage: fornisci tutti i declared_zero + glass espliciti
+                           "installation_declared_zero": True,
+                           "glass_price_per_sqm": 76.0, "glass_min_sqm": 0.50},
                     timeout=10)
     after = admin.get(f"{API}/bi/quotes/kpi?period_days=30", timeout=10).json()
     assert before.get("counts_by_status") == after.get("counts_by_status")
