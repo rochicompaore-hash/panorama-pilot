@@ -97,6 +97,8 @@ def test_motor_returns_pricing_status_ok_with_full_listino():
         "hardware_kit_price": 45.0, "installation_cost": 50.0,
         "transport_cost": 15.0, "accessory_cost": 0.0,
         "other_components_cost": 0.0, "other_components_declared_zero": True,
+        # BUG-03 fix (audit v1): glass_price / min_sqm devono essere espliciti (no silent default)
+        "glass_price_per_sqm": 76.0, "glass_min_sqm": 0.50,
     }
     r = requests.post(
         f"{API}/quote-structure/{qid}/openings/{oid}/products/compute-and-add",

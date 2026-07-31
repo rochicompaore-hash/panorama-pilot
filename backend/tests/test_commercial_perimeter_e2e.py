@@ -122,6 +122,8 @@ def test_no_alteration_of_existing_kpi(admin_session, proev_id):
             "width_mm": 900, "height_mm": 1500, "number_of_sashes": 1,
             "window_type": "apribile", "color_code": "BIANCO",
             "other_components_declared_zero": True, "installation_declared_zero": True,
+            # BUG-03 fix (audit v1): valori glass espliciti dopo rimozione silent default
+            "glass_price_per_sqm": 76.0, "glass_min_sqm": 0.50,
         }, timeout=10)
     q_after = admin_session.get(f"{API}/bi/quotes/kpi?period_days=30", timeout=10).json()
     assert q_before["counts_by_status"] == q_after["counts_by_status"]

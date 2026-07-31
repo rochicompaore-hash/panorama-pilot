@@ -375,8 +375,13 @@ def compute_perimeter(inp: PerimeterInput) -> PerimeterResult:
     r.production_cost = production_cost
 
     # (m) Services
-    service_cost = (_D(inp.installation_cost) + _D(inp.transport_cost)
-                    + _D(inp.disposal_cost) + _D(inp.accessory_cost))
+    # BUG-16 FIX (audit v1) — se installation/transport/disposal/accessory sono None (declared_zero=True),
+    # coerce a Decimal("0") per evitare TypeError. Il check semantico "declared_zero" è già stato fatto sopra.
+    def _z(v):
+        d = _D(v)
+        return d if d is not None else Decimal("0")
+    service_cost = (_z(inp.installation_cost) + _z(inp.transport_cost)
+                    + _z(inp.disposal_cost) + _z(inp.accessory_cost))
     r.service_cost = service_cost
 
     total_internal = production_cost + service_cost
