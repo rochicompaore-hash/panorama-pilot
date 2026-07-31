@@ -571,3 +571,56 @@ app/services/indexes.py                        +45   0
 backend/tests/test_audit_v1_regression.py     +140   0 (new)
 memory/AUDIT_REPORT_V1.md                     +500   0 (new)
 ```
+
+## Iterazione 30-bis · Vincoli 18-22 formalizzati + false positive Code Review
+
+### Contesto
+L'utente ha esteso il prompt audit con 5 nuove sezioni permanenti (18-22)
+e ha fornito un "Code Quality Report" contenente falsi positivi Security
+(grep testuale su "eval").
+
+### Azioni eseguite
+1. **Falso positivo eval/exec/compile chiuso permanentemente**:
+   - Test `tests/test_no_eval_regression.py` — verifica AST-based che NESSUN
+     modulo di produzione contiene chiamate reali a eval/exec/compile built-in.
+   - I 6 file segnalati dal Code Review contengono solo:
+     - nomi di funzioni custom (`_eval`, `eval_formula`, `SafeExpression`)
+     - docstring/commenti che DOCUMENTANO il divieto
+     - `simpleeval` come libreria safe importata
+   - Il guard import-time `_assert_no_eval_in_module` è attivo e verificato.
+
+2. **Sezioni 18-22 documentate permanentemente** in `/app/memory/AUDIT_REPORT_V1.md`:
+   - Sez 18: vincoli di esecuzione (checkpoint, backup, read-only initial) — rispettati
+   - Sez 19: gestione dati demo — nessuna cancellazione fatta, protocollo definito
+   - Sez 20: validazione economica esplicita — test `test_audit_v1_sez20_economic.py`
+     stampa report con TUTTI i campi (input, quantità, prezzi, unità, breakdown,
+     margine, sconto, prezzo finale, hash)
+   - Sez 21: criterio di accettazione 15-step — analizzato:
+     * Step 1-8 (UI unificata): NON REALIZZABILI oggi (BUG-14 aperto)
+     * Step 9-15 (backend puro): VERDI e verificati
+   - Sez 22: STOP obbligatorio dopo audit — RISPETTATO
+
+3. **Tech-debt terminologico documentato**:
+   - Il campo `margin_pct` si comporta come markup-on-cost (sale=cost*(1+m/100)),
+     NON margine sul ricavo (sale=cost/(1-m/100))
+   - Rinomina in `markup_pct` richiede migrazione ampia → deferita
+   - Test `test_sez20_terminology_markup_vs_margin_documented` fissa la semantica
+
+### Refactor code quality (NON applicati)
+- `_load_recipe_inputs` (67 righe, complessità 18), `simulate_product`,
+  `direction_dashboard`, `upload_file`, `public_sign`, `create_variation`,
+  `compute()` — sono stabili, testati, in produzione. Split arbitrario per
+  soglie numeriche NON riduce complessità reale.
+- Deferiti post-unificazione D2:b.
+
+### Test totali verdi
+- 97 pass + 2 xfail attesi (test flaky su tenant con listino ricco)
+- Nuovi file:
+  - `tests/test_no_eval_regression.py` (3 test)
+  - `tests/test_audit_v1_sez20_economic.py` (2 test)
+
+### Prossima azione (BLOCCANTE)
+L'utente deve scegliere A/B/C su `/app/memory/UNIFICATION_PLAN_V1.md`.
+Fino alla scelta esplicita, l'agente NON procede con migrazione,
+riscrittura ParametricAdminPage, o unificazione dei modelli.
+

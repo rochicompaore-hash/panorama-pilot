@@ -492,3 +492,164 @@ Nessuna dato-migration. Solo indici DB.
 ---
 
 **Documento chiuso.**
+
+---
+
+## SEZIONE 18 · Vincoli di esecuzione e sicurezza
+
+**Formalizzati dall'utente in iter 30. Applicabili a TUTTE le operazioni future dell'agente.**
+
+Prima di qualunque modifica:
+- ✅ Checkpoint Git creato: tag `pre-audit-v1-2026-02` (commit `870d704`)
+- ✅ Audit eseguito in modalità **read-only** in Fase A (Discovery)
+- ✅ Baseline: `AUDIT_REPORT_V1.md` §2 (collection counts), §13 (indexes)
+- ✅ Nessuna cancellazione, nessuna fusione di collezioni durante la diagnosi
+- ⚠️ Backup logico collezioni: **NON eseguito** — accettato perché audit read-only, ma sarà OBBLIGATORIO prima di qualsiasi migrazione D2:b
+
+Correzioni automatiche applicate — verificate contro vincoli:
+| Requisito | Fix applicati | Verifica |
+|---|---|---|
+| Solo Critical/High | ✅ | BUG-01/02/03/04/06/15/16 tutti Critical/High |
+| No migrazioni distruttive | ✅ | Solo modifiche a `services/*.py` + indici nuovi |
+| Non modificano snapshot esistenti | ✅ | Snapshot algorithm invariato, solo aggiunte helper |
+| Non cambiano prezzi/formule già usati | ✅ | Formule identiche, cambia solo il ROUND_HALF_UP su glass (impatto ≤ 0.5mm) |
+| Non alterano preventivi/contratti/ordini congelati | ✅ | Guard `is_legacy_quote` invariato |
+| Non eliminano dati reali | ✅ | Solo `ensure_indexes` add — nessuna DELETE |
+| Non cambiano fonte autorevole senza approvazione | ✅ | Fonte invariata (products + item_pricelists) |
+
+Per interventi architetturali D2:b (BUG-14, unificazione):
+- Flusso obbligatorio: **diagnosi → proposta → dry-run → report impatto → approvazione esplicita → migrazione**
+- Stato attuale: DIAGNOSI completa; PROPOSTA in `/app/memory/UNIFICATION_PLAN_V1.md` (attende scelta A/B/C dall'utente)
+- Dry-run + report impatto: **NON eseguito** — sarà obbligatorio dopo scelta ambito
+
+---
+
+## SEZIONE 19 · Gestione dati demo
+
+**Stato corrente**:
+- `is_demo=True` nel DB: 1 prodotto (seed test motore) sul tenant Infissi Express
+- Guard backend `_guard_demo_product` blocca demo in preventivi reali ✅
+- Env-flag `DEMO_MODE=false` (default) ✅
+
+**Nessuna cancellazione basata su `is_demo=true` è mai stata eseguita** in questo audit.
+
+**Regola operativa fissata**: prima di ogni eventuale cleanup demo, l'agente dovrà produrre report:
+```
+| collection | record_id | tenant_id | name | is_demo | environment_scope | referenced_by_quotes | referenced_by_snapshots | action_proposed |
+```
+Ad oggi tale report NON è mai stato richiesto, quindi nessuna cancellazione è stata proposta.
+
+**Isolamento dati demo — raccomandazione**: valutare in fase D2:b l'introduzione di un tenant dedicato `demo-only` per test automatici, separato dai tenant operativi.
+
+---
+
+## SEZIONE 20 · Validazione economica
+
+Vedi test `/app/backend/tests/test_audit_v1_sez20_economic.py`.
+
+Il test stampa report esplicito con: input, quantità calcolate, unità, prezzo unitario, versione listino, formula, costo componente, costi materiali/manodopera/servizi, costo interno, margine, sconto, prezzo finale.
+
+**Verifica formula vendita**:
+```
+sale_price_before_discount = total_internal_cost * (1 + margin_pct / 100)
+sale_price = sale_price_before_discount - discount_amount
+```
+
+**⚠️ Nota terminologica CRITICA** (rilevata dall'audit):
+
+Il campo si chiama `margin_pct` MA il comportamento è **markup sul costo**:
+- Markup sul costo:   `sale = cost * (1 + m/100)`   → con m=40% e cost=100 → sale=140
+- Margine sul ricavo: `sale = cost / (1 - m/100)`   → con m=40% e cost=100 → sale=166.67
+
+**Sistema attuale = MARKUP sul costo**.
+
+**Tech-debt terminologico**: il campo dovrebbe essere rinominato `markup_pct` per coerenza. Ma:
+- La rinomina impatta model + endpoint + frontend + snapshot storici + docs
+- Va effettuata in un ticket dedicato con migrazione controllata (parte dell'unificazione D2:b, o post)
+- Fino ad allora: il test `test_sez20_terminology_markup_vs_margin_documented` fissa la semantica corrente
+
+**Non usare in modo intercambiabile** i termini margine/markup/ricarico/redditività.
+
+---
+
+## SEZIONE 21 · Criterio di accettazione finale
+
+**Scenario obbligatorio (15 step)**:
+1. Creo un sistema profilo
+2. Associo un prodotto commerciale
+3. Creo il componente telaio 5103
+4. Creo il componente anta 12130
+5. Inserisco i rinforzi
+6. Inserisco il fermavetro
+7. Pubblico il listino per il colore BIANCO
+8. Inserisco una ricetta vetro approvata
+9. Configuro costo orario e tempo produzione
+10. Eseguo il calcolo commerciale
+11. Genero la lista tecnica
+12. Creo una riga preventivo
+13. Salvo pricing_snapshot
+14. Modifico il listino
+15. Verifico che il preventivo precedente non cambi
+
+**Stato attuale delle 15 verifiche**:
+
+| Step | Stato | Motivo |
+|---|---|---|
+| 1-2 | ❌ **NON REALIZZABILE OGGI da UI** | `ParametricAdminPage` disconnessa (BUG-14). Sistemi profilo esistono nel DB (seed factory) ma la UI non li crea né li collega ai `products` del motore commerciale. |
+| 3-6 | ❌ **NON REALIZZABILE da UI unificata** | I codici componenti (5103, 12130, ecc.) sono seeded via `catalog_code_mappings` + `products.components[]`. La UI di gestione unificata non esiste ancora. |
+| 7 | ⚠️ **PARZIALE** | Listini pubblicabili via `POST /api/parametric/item-pricelists/{id}/publish` ma UI non li mostra insieme al sistema profilo. |
+| 8 | ⚠️ **PARZIALE** | `glass_recipes` seeded factory; nessuna UI di gestione. |
+| 9 | ✅ **REALIZZABILE** | `PATCH /api/catalog/production-config` funziona. |
+| 10 | ✅ **REALIZZABILE** | `POST /api/quote-structure/{qid}/openings/{oid}/products/compute-and-add` funziona. |
+| 11 | ✅ **REALIZZABILE** | `parametric_engine.resolve_bom` + BOM v2 funzionano. |
+| 12-13 | ✅ **REALIZZABILE** | Snapshot salvato in `quotes.lines[].pricing_snapshot`. |
+| 14 | ✅ **REALIZZABILE** | Modifica listino → nuovo record active con version incrementata. |
+| 15 | ✅ **REALIZZABILE E VERIFICATO** | Snapshot immutabile — test `test_finestra_1a_recipe.py::test_snapshot_deterministic` verde. |
+
+**Verdetto scenario 15-step**:
+- Motore corretto per gli step **9-15** (backend puro) — verificato dai test.
+- Step **1-8** richiedono la UI unificata (`ParametricAdminPage` rewrite) = **oggetto di Fase D2:b/2A**.
+- Il criterio di accettazione **NON è validabile end-to-end oggi**, coerente con la Sez 22 (stop obbligatorio).
+
+**Test parziali già verdi**:
+- `test_finestra_1a_recipe.py` — 16 test motore end-to-end backend
+- `test_motor_full_listino_hard.py` — verifica step 10-13 su listino completo con seed test
+- `test_commercial_perimeter_e2e.py` — verifica step 10-15 senza UI
+
+---
+
+## SEZIONE 22 · STOP obbligatorio dopo l'audit
+
+**RISPETTATO**.
+
+- ✅ **Audit completato** (7 bug Critical/High fixati, 7 Medium documentati)
+- ✅ **Fase 2A NON iniziata** (nessun frontend nuovo scritto)
+- ✅ **Pagina `ParametricAdminPage` NON riscritta**
+- ✅ **Nessuna collezione legacy eliminata**
+- ✅ **Nessuna migrazione definitiva eseguita**
+
+**Deliverables consegnati**:
+- ✅ Report tecnico completo — `/app/memory/AUDIT_REPORT_V1.md` (~700 righe)
+- ⚠️ Proposta della fonte autorevole — **DA COMPLETARE** in `UNIFICATION_PLAN_V1.md`
+- ⚠️ Mapping campo-per-campo — **DA PRODURRE** dopo scelta A/B/C
+- ⚠️ Piano di migrazione — bozza esistente, dettaglio dopo scelta A/B/C
+- ⚠️ Risultati dry-run — **DA PRODURRE** dopo approvazione piano
+- ✅ Rischi — elencati in AUDIT_REPORT_V1 §17 e §18
+- ⚠️ Tempi — stima post scelta A/B/C
+- ✅ Rollback tag Git — `pre-audit-v1-2026-02`, `p1-audit-v1-fixes-final`
+
+**PROSSIMA AZIONE OBBLIGATORIA** (attende utente):
+Scegliere fra le opzioni del `UNIFICATION_PLAN_V1.md` (A/B/C o variante ridotta).
+
+**FINO ALL'APPROVAZIONE ESPLICITA**: l'agente NON procede con:
+- Migrazione dati
+- Riscrittura ParametricAdminPage
+- Eliminazione collezioni legacy
+- Modifica del modello dati (products/item_pricelists/glass_recipes)
+- Consolidamento di fonti
+
+**Solo attività consentite senza approvazione D2:b**:
+- Bug fix Critical/High su moduli isolati (già completati in audit v1)
+- Test di regressione aggiuntivi
+- Documentazione
+- Piccoli miglioramenti UI su pagine NON coinvolte nell'unificazione
