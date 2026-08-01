@@ -651,3 +651,35 @@ Backend: `pymupdf` (opzionale), `websockets` (o attivare), `tenacity` (o usare p
 - Script pronto: `python3 backend/scripts/cleanup_production_config_duplicates.py [--apply]`
 - Dry-run eseguito ✅ — 1 tenant con 2 doc, KEEP pc-* più recente, DELETE prodcfg-*
 - **Non applicato** — attende conferma utente prima di `--apply` in preview e prod
+
+
+## Iterazione 33 · ARCHITECTURAL_AUDIT_V3 — direzione ribaltata
+
+Il PO ha rifiutato l'Opzione B ridotta (V2) e richiesto la direzione opposta:
+**Sistema B (parametric) diventa fonte autorevole tecnico-produttiva.
+Sistema A (catalog) si riduce a livello commerciale puro.**
+
+### Deliverable
+- `/app/memory/ARCHITECTURAL_AUDIT_V3.md` — piano completo con 4 resolver,
+  4 pricing method distinti, doppio snapshot, 9 fasi, 18-step accettazione
+- `/app/memory/ARCHITECTURAL_AUDIT_V2_SUPERSEDED.md` — versione superata (V2)
+
+### Punti architetturali chiave
+1. `TechnicalCostResolver → CommercialPricingService` (flusso unidirezionale)
+2. Sistema A tiene solo: `CommercialProduct` (FK a profile_system+bom+versione)
+   e `CommercialRules` (pricing_method + parametri)
+3. 4 pricing_method separati: `MULTIPLIER`, `MARKUP_ON_COST`,
+   `TARGET_GROSS_MARGIN`, `FIXED_PRICE` — no più uso generico di margin_pct
+4. Doppio snapshot immutabile per riga preventivo:
+   - `technical_snapshot` (immutabile ai cambi di listino costo)
+   - `commercial_snapshot` (immutabile ai cambi di regola commerciale)
+5. `ParametricAdminPage` rewrite come "Sistemi profilo e formule"
+   con 9 tab (8 tecnici + 1 commerciale con permesso separato)
+
+### Stato
+- Zero implementazione
+- Zero modifica frontend/wizard/firma/plugin
+- Attende approvazione esplicita del PO su §2/§3/§6/§8/§9/§10/§11 di V3
+
+### Git tag
+- `p1-architectural-audit-v3` — punto di ripartenza dopo approvazione
