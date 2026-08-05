@@ -683,3 +683,48 @@ Sistema A (catalog) si riduce a livello commerciale puro.**
 
 ### Git tag
 - `p1-architectural-audit-v3` — punto di ripartenza dopo approvazione
+
+
+## Iterazione 34 · DESIGN_REVIEW_V3 (4 livelli, pronto per cross-validation)
+
+### Deliverable unico
+`/app/memory/DESIGN_REVIEW_V3.md` — analisi completa Prodotto+Architettura+UX+Dati
++ analisi flusso aziendale + preventivatore + motori + schermate + DB + API +
+frontend + backend + produzione + scalabilità 100/1k/10k aziende.
+
+### Output strutturato consegnato
+1. Punti di forza (10)
+2. Lacune progettuali (18)
+3. Bug architetturali (12: ARCH-01..11 + BUG-15)
+4. Ridondanze (9)
+5. Moduli da ELIMINARE
+6. Moduli da RIFARE
+7. Moduli da MANTENERE
+8. Priorità Critical(5) / High(10) / Medium(9) / Low(5)
+9. Roadmap Q1-Q4 (12 mesi)
+10. Nuovo modello architetturale a 4 layer
+
+### Verdetto principale
+ERP funzionalmente ricco ma architetturalmente frammentato:
+- 57 router + 53 pagine + 200 collezioni
+- 6 pagine per preparare 1 preventivo
+- 2 fonti autorevoli tecniche in conflitto
+- 4 SDK AI mai attivate
+- 500kb deps frontend mai usate
+- Nessuna fatturazione elettronica IT (bloccante legale)
+- Nessun scheduler, nessun monitoring
+- Preventivatore matematicamente corretto ma disconnesso dalla produzione
+
+### Prossimo passo (PO)
+Sottoporre il documento a un secondo modello indipendente (Claude Opus /
+Gemini 3 Pro) per cross-validation. Suggerimenti espliciti forniti nel doc §
+"DOPO IL REPORT" per guidare il secondo review.
+
+### Git tag
+- `p1-design-review-v3` — checkpoint post-review, pre-decisione finale
+
+### Vincoli rispettati
+- Zero implementazione
+- Zero modifica codice
+- Zero plugin add/remove
+- Zero nuove pagine/collezioni
