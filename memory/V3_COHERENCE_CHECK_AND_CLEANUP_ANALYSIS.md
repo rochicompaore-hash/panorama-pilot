@@ -26,35 +26,79 @@
 
 ---
 
-## PARTE 2 — Confronto puntuale duplicati `production_config`
+## PARTE 2 — Confronto puntuale duplicati `production_config` (CON EVIDENZA REALE)
 
-**Nota metodologica**: come richiesto, il criterio "record più recente" NON è sufficiente. Confronto campo-per-campo, uso reale nel codice, riferimenti snapshot.
+**Nota metodologica**: come richiesto, il criterio "record più recente" NON è sufficiente. Confronto campo-per-campo, uso reale nel codice, riferimenti snapshot, **flag `is_demo`**.
 
-**Stato DB (verificato ora)**: la query mostra i doc esistenti. Vista tenant PanoramaPilot esistono 2 doc di `production_config`. Struttura confrontata (già raccolta iter 30 audit v1):
+### Evidenza raccolta dal DB (query effettiva iter 35)
 
-| Campo | Doc A (`pc-*`) | Doc B (`prodcfg-*`) | Fonte / significato | Ultima modifica | Uso codice | Ref snapshot | Scelta proposta | Motivazione |
-|---|---|---|---|---|---|---|---|---|
-| `_id` | `pc-5e353147...` | `prodcfg-5e353147...` | ID doc | A: 2026-07-31 22:00:51 · B: 2026-07-31 21:15:23 | `catalog_service.get_production_config` fa `find_one` per `tenant_id` (non deterministico oggi, prende primo che restituisce l'index) | 0 quote referenziano esplicitamente il `_id` (snapshot cattura valori non ID) | **Tenere A** (`pc-*`) | Il prefix `pc-` è quello nuovo introdotto in area catalog (post audit v1). Il `prodcfg-*` è il legacy pre-refactor |
-| `tenant_id` | uguale | uguale | scope tenant | uguale | filtro tenant | — | — | — |
-| `hourly_cost` | Da verificare | Da verificare | €/h manodopera | — | letto da `perimeter_assembler` | usato in `pricing_snapshot.labor_cost` (valore, non ref) | **Verificare uguaglianza**. Se A=None e B=30 → tenere B; se A=30 e B=None → tenere A | Non si può ancora decidere senza confronto valore-per-valore |
-| `production_time_default_minutes` | idem | idem | tempo default manodopera | — | idem | idem | idem | idem |
-| `default_margin_pct` | idem | idem | markup applicato al costo | — | usato da motore commerciale | catturato nello snapshot (audit v1 sez 20 markup vs margine) | Tenere quello **usato** — verificare quale il tenant sta usando in produzione | Cambia il prezzo dei prossimi preventivi |
-| `default_glass_price_per_sqm` | Post BUG-03 fix: `None` | Legacy: potrebbe avere 76.0 | €/m² vetro fallback | audit v1 BUG-03 ha rimosso i default silent | letto da perimeter_assembler | valore assoluto in snapshot | Tenere quello con valore **esplicito valorizzato** dal tenant | Se A=None e B=76 → il valore utile è B; se A=76 (ancora legacy) e B=76 → equivalenti |
-| `default_glass_min_sqm` | idem BUG-03 | idem | m² minimo fatturabile | — | idem | idem | idem | idem |
-| `premium_pvc_surcharge_pct` | 6.0 | 6.0 | +6% PVC premium | probabile uguale | motore commerciale | idem | equivalenti | Documentato standard |
-| `default_bar_length_pvc_mm` | 6500 | 6500 | mm barra PVC | uguale | motore commerciale | idem | equivalenti | standard |
-| `default_bar_length_reinforcement_mm` | 6000 | 6000 | mm barra acciaio | uguale | motore | idem | equivalenti | standard |
-| `fixed_window_time_minutes` / `one_sash_time_minutes` / ecc. | Da verificare presenza | Da verificare presenza | tempi per tipologia | — | motore (via `prod_time_field_map`) | valore in snapshot | Tenere quello **valorizzato** per più tipologie | Se A ha solo default e B ha per-tipologia → tenere B |
-| `created_at` | 2026-07-31 22:00 | 2026-07-31 21:15 | audit | — | — | — | — | — |
-| `updated_at` | 2026-07-31 22:00 | 2026-07-31 21:15 | audit | — | — | — | — | — |
-| `updated_by` | Da verificare | Da verificare | audit | — | — | — | Tenere il più recente per continuità audit trail | — |
+Tenant `5e353147-2416-4ef7-aa3f-3e0007435c42` (Infissi Express Cloud demo tenant — NON PanoramaPilot come inizialmente scritto):
 
-### Verdetto cleanup
+| Campo | Doc A (`pc-*`) | Doc B (`prodcfg-*`) | Interpretazione |
+|---|---|---|---|
+| `_id` | `pc-5e353147...` | `prodcfg-5e353147...` | prefix diverso |
+| `tenant_id` | `5e353147...` | `5e353147...` | stesso tenant |
+| `created_at` | 2026-07-20 13:34:55 | 2026-07-31 21:15:23 | **B creato DOPO A** |
+| `updated_at` | 2026-07-31 **22:00:51** | 2026-07-31 21:15:23 | A aggiornato per ultimo |
+| `created_by` | `924460c7-db5c...` (utente) | assente | A creato da utente reale |
+| **`is_demo`** | **assente (=False)** | **`True`** | 🔴 **B è un doc SEED demo, non dato operativo** |
+| `hourly_cost` | **30.0** €/h | 28.0 €/h | valori diversi |
+| `production_time_default_minutes` | 30 min | 45 min | valori diversi |
+| `default_margin_pct` | **40.0**% | 35.0% | valori diversi |
+| `default_glass_price_per_sqm` | **assente** | 76.0 €/m² | A incompleto |
+| `default_glass_min_sqm` | **assente** | 0.5 m² | A incompleto |
+| `fixed_window_time_minutes` | **assente** | 30 min | A incompleto |
+| `one_sash_time_minutes` | **assente** | 45 min | A incompleto |
+| `two_sash_time_minutes` | **assente** | 60 min | A incompleto |
+| `three_sash_time_minutes` | **assente** | 80 min | A incompleto |
+| `four_sash_time_minutes` | **assente** | 100 min | A incompleto |
+| `deleted_at` | None | None | entrambi attivi |
 
-- **Nessuna quote referenzia `production_config._id` esplicitamente** → i valori sono già catturati nel `pricing_snapshot` dei preventivi. **Cancellare il doc "perdente" NON tocca i preventivi storici** (sono immutabili grazie al snapshot).
-- Il criterio raccomandato è **NON "più recente"** ma **"più valorizzato"**: teniamo il doc che ha più campi popolati (specialmente tempi per tipologia e prezzi vetro).
-- **Serve un dump JSON dei 2 doc completi** prima di decidere. Lo script `cleanup_production_config_duplicates.py --apply` **NON va lanciato** finché non hai visto il dump e approvato quale record tenere. Il dump lo produco in iterazione dedicata se lo autorizzi.
-- **Autorizzazione richiesta**: dammi luce verde a produrre il dump JSON side-by-side dei 2 doc per una decisione finale caso-per-caso.
+### Analisi verdetto rivista (rispetto alla prima ipotesi errata)
+
+**Scoperta chiave**: Doc B è `is_demo=True`. Questo cambia radicalmente la decisione:
+
+1. **Doc B è un seed demo** — creato dal `seed_test_motor.py` per popolare un tenant di test. NON è dato operativo del cliente
+2. **Doc A è il config vero** del tenant (creato dall'utente reale `924460c7...` il 20 luglio, aggiornato il 31 luglio) — ma è **radicalmente sotto-configurato** (mancano glass_price, glass_min_sqm, tempi per tipologia)
+3. **Il "criterio record più valorizzato" NON si applica** — B è più ricco solo perché è un seed template, non perché il cliente l'abbia configurato
+
+### Decisione corretta
+
+| Azione | Doc A (`pc-*`) | Doc B (`prodcfg-*`) |
+|---|---|---|
+| **Da mantenere?** | ✅ **SÌ** (config vero del tenant) | ❌ **NO** — è `is_demo=True` |
+| **Da eliminare?** | No | ✅ **Sì** |
+| **Motivazione** | Creato dall'utente reale, updated_at più recente, non demo | Doc seed inserito da script `seed_test_motor.py` per test motore |
+
+### Problema secondario emerso: A è incompleto
+
+Dopo l'eliminazione di B, il tenant si troverà con un `production_config` **valido ma incompleto**:
+- Mancano `default_glass_price_per_sqm` → dopo BUG-03 audit v1: motore emette `MISSING_GLASS_PRICE` corretto ✅
+- Mancano `default_glass_min_sqm` → `MISSING_GLASS_MINIMUM` corretto ✅
+- Mancano tempi per tipologia → motore userà `production_time_default_minutes=30` per tutti (non ottimale, ma non blocca)
+
+**Cioè: l'eliminazione di B è sicura ma dopo l'utente deve completare A tramite UI di gestione.**
+
+### Rischi cancellazione B
+
+- **Preventivi che citano B**: 0 (verificato — `pricing_snapshot` cattura valori, non ID)
+- **Motore che legge B**: `find_one` non deterministico oggi. Se prende B → prezzi con hourly=28, margin=35, glass=76. Se prende A → hourly=30, margin=40, glass=None → `MISSING_GLASS_PRICE`. **Comportamento correntemente incoerente**.
+- **Post-cleanup**: motore legge sempre A (unico record). Prezzi coerenti ma con MISSING errors espliciti per glass — che è il comportamento voluto post BUG-03.
+
+### Comando cleanup aggiornato
+
+**NON usare il criterio "record più recente"** dello script attuale (che avrebbe scelto A perché updated_at più recente — casualmente giusto).
+
+**Comando corretto (semantico)**:
+```bash
+python3 scripts/cleanup_production_config_duplicates.py --tenant-id 5e353147-2416-4ef7-aa3f-3e0007435c42 --prefer-id pc-5e353147-2416-4ef7-aa3f-3e0007435c42
+```
+
+Con `--prefer-id` forziamo la scelta invece di affidarci all'euristica.
+
+Successivamente, l'utente deve compilare i campi mancanti in A via `/pricing-hub` (o UI equivalente).
+
+**Autorizzazione richiesta prima di procedere**: OK a lanciare `--apply` con `--prefer-id pc-5e353147...` sul preview? (0 rischio su preventivi storici — snapshot immutabili — ma verifica finale che il tenant sia effettivamente Infissi Express demo e non produzione reale)
 
 ---
 
