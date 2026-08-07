@@ -1,3 +1,43 @@
+## Iter 40 — P0 OPERATIVO (Feb 2026, 07/08)
+
+**Branch:** `fix/p0-operational-quoting` — **Tag rollback:** `pre-p0-operational-quoting` → `db439d6`  
+**Tag release:** `p0-operational-quoting-preview-v1`  
+**Autorizzato:** Messaggio 156
+
+### Root cause del mancato calcolo (identificato)
+1. `production_config`: `default_glass_price_per_sqm=null`, `default_glass_min_sqm=null` (rimossi da BUG-03 audit v1)
+2. Listino default "Listino Standard Infissi Express 2026": `entries=[]` (mai seedato)
+3. Prodotti ProEvolution non-demo: `default_hardware_kit=null`
+
+### Fix (idempotenti, non-distruttivi)
+- **`backend/scripts/seed_p0_operational.py`** (NUOVO): popola glass_price=76€/m², glass_min=0.5m², 11 entries listino, hardware_kit=45€
+- **`backend/tests/test_p0_operational_seed.py`** (NUOVO): 3/3 test verdi — production_config, simulate ok, fail-closed su MISSING_INSTALLATION_PRICE
+- **`frontend/src/layouts/AppLayout.jsx`**: sidebar riscritta con struttura semplificata
+
+### Verifica E2E
+- Simulate ProEvolution 900×1500 BIANCO: `sale_price=356.29€`, snapshot_hash presente
+- Preventivo `PRV-2026-01711-R00` (Cucina hard-test): totale **453.97€** calcolato realmente
+- Sidebar: Operatività / Prodotti / Produzione e Posa / CRM avanzato / Amministrazione / Configurazione tecnica
+
+### Route nascoste dalla sidebar (mantenute in App.js)
+- `/pricelists`, `/pricelist-importer`, `/parametric`, `/parametric/admin`
+- `/product-simulator` restricted a `pricing_admin.manage`
+- `/pricing-hub` rinominato "Servizi e prezzi semplici"
+- `/quote-structure` esposto come "Catalogo prodotti"
+
+### Documenti
+- `memory/P0_OPERATIONAL_FIX_ITER40.md` — 9 sezioni deliverable
+
+### Backlog dichiarato (non fatto in P0)
+- Nuovo configuratore prodotto con campi condizionali (soglia ribassata, scambio battuta, traversi/montanti, colore int/est, ferramenta da kit)
+- Formule complete V1_3 (soglia ribassata, scambio battuta, montante, traverso, pellicolato +10%)
+- Ricetta 3-ante telaio unico (BR-03)
+- Migrazione UI /pricelists → Configurazione tecnica
+- Redis in preview per firma OTP
+
+---
+
+
 # Infissi Express Cloud — PRD & Progress Log
 
 ## Vision

@@ -20,51 +20,58 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+// P0 Operational — sidebar semplificata (Feb 2026)
+// - Preventivatore unificato: Clienti → Preventivi → Catalogo prodotti → Servizi
+// - Route legacy nascoste dalla sidebar (non eliminate): /pricelists, /pricelist-importer, /parametric, /parametric/admin
+// - /product-simulator restricted a Admin/tech
+// - /quote-structure viene esposto come "Catalogo prodotti" (schermata operativa)
 const NAV = [
   {
     group: "core",
+    label: "Operatività",
     items: [
       { to: "/dashboard", i18n: "nav.dashboard", icon: House, perm: "dashboard.view" },
-      { to: "/search", i18n: "nav.search", icon: MagnifyingGlass, perm: "search.global" },
-      { to: "/notifications", i18n: "nav.notifications", icon: Bell, perm: null },
-    ],
-  },
-  {
-    group: "crm",
-    items: [
-      { to: "/leads", i18n: "nav.leads", icon: Kanban, perm: "crm.leads.view" },
       { to: "/customers", i18n: "nav.customers", icon: UserCircle, perm: "crm.customers.view" },
-      { to: "/contacts", i18n: "nav.contacts", icon: IdentificationCard, perm: "crm.contacts.view" },
+      { to: "/quotes", label: "Preventivi", icon: FileText, perm: "quotes.view" },
+      { to: "/leads", i18n: "nav.leads", icon: Kanban, perm: "crm.leads.view" },
       { to: "/tasks", i18n: "nav.tasks", icon: ListChecks, perm: "crm.tasks.view" },
       { to: "/calendar", i18n: "nav.calendar", icon: CalendarBlank, perm: "crm.appointments.view" },
-      { to: "/goals", i18n: "nav.goals", icon: Target, perm: "crm.goals.view" },
-      { to: "/attachments", i18n: "nav.attachments", icon: Files, perm: "attachments.view" },
+      { to: "/contracts", label: "Ordini e contratti", icon: FileText, perm: "contracts.view" },
     ],
   },
   {
-    group: "commercial",
-    label: "Preventivatore",
+    group: "products",
+    label: "Prodotti",
     items: [
-      { to: "/quote-structure", label: "Nuovo preventivo", icon: FileText, perm: "quotes.edit" },
-      { to: "/quotes", label: "I tuoi preventivi", icon: FileText, perm: "quotes.view" },
-      { to: "/templates", i18n: "nav.templates", icon: FileText, perm: "quotes.view" },
-      { to: "/clauses", i18n: "nav.clauses", icon: FileText, perm: "quotes.view" },
+      { to: "/quote-structure", label: "Catalogo prodotti", icon: FileText, perm: "products.view" },
+      { to: "/pricing-hub", label: "Servizi e prezzi semplici", icon: Hash, perm: "pricelists.view" },
     ],
   },
   {
     group: "operations",
-    label: "Operativo",
+    label: "Produzione e Posa",
     items: [
       { to: "/surveys", label: "Rilievi tecnici", icon: FileText, perm: "surveys.view" },
       { to: "/technical-schedules", label: "Abaci tecnici", icon: FileText, perm: "surveys.view" },
       { to: "/sales-orders", label: "Ordini cliente", icon: FileText, perm: "sales_orders.view" },
-      { to: "/suppliers", label: "Fornitori", icon: Buildings, perm: "suppliers.view" },
-      { to: "/purchase-orders", label: "Ordini fornitore", icon: FileText, perm: "purchase_orders.view" },
-      { to: "/items", label: "Magazzino", icon: Hash, perm: "items.view" },
       { to: "/production-orders", label: "Produzione", icon: FileText, perm: "production.view" },
       { to: "/qc", label: "Qualità", icon: ShieldCheck, perm: "qc.view" },
       { to: "/installation-plans", label: "Pianificazione posa", icon: CalendarBlank, perm: "installation.view" },
       { to: "/service-tickets", label: "Assistenza", icon: ListChecks, perm: "service.view" },
+      { to: "/suppliers", label: "Fornitori", icon: Buildings, perm: "suppliers.view" },
+      { to: "/purchase-orders", label: "Ordini fornitore", icon: FileText, perm: "purchase_orders.view" },
+      { to: "/items", label: "Magazzino", icon: Hash, perm: "items.view" },
+    ],
+  },
+  {
+    group: "crm_more",
+    label: "CRM avanzato",
+    items: [
+      { to: "/contacts", i18n: "nav.contacts", icon: IdentificationCard, perm: "crm.contacts.view" },
+      { to: "/goals", i18n: "nav.goals", icon: Target, perm: "crm.goals.view" },
+      { to: "/attachments", i18n: "nav.attachments", icon: Files, perm: "attachments.view" },
+      { to: "/templates", i18n: "nav.templates", icon: FileText, perm: "quotes.view" },
+      { to: "/clauses", i18n: "nav.clauses", icon: FileText, perm: "quotes.view" },
     ],
   },
   {
@@ -78,25 +85,14 @@ const NAV = [
     ],
   },
   {
-    group: "catalog",
-    label: "Catalogo e listini",
-    items: [
-      { to: "/product-catalog", label: "Catalogo prodotti", icon: FileText, perm: "products.view" },
-      { to: "/product-simulator", label: "Simulatore prodotto", icon: Play, perm: "products.view" },
-      { to: "/pricing-hub", label: "Listini e regole di calcolo", icon: Hash, perm: "pricelists.view" },
-      { to: "/pricelists", label: "Listini prodotto (dettaglio)", icon: Hash, perm: "pricelists.view" },
-      { to: "/pricelist-importer", label: "Importazione listini (XLS/CSV)", icon: Hash, perm: "pricelists.manage" },
-      { to: "/parametric/admin", label: "Sistemi profilo & formule", icon: FileText, perm: "products.manage" },
-      { to: "/parametric", label: "Engine parametrico (avanzato)", icon: FileText, perm: "products.manage" },
-    ],
-  },
-  {
     group: "tech_config",
     label: "Configurazione tecnica",
     items: [
-      { to: "/geometry-builder", label: "Configuratore geometrico", icon: FileText, perm: "quotes.view" },
-      { to: "/contracts", label: "Contratti", icon: FileText, perm: "contracts.view" },
-      { to: "/site-conditions", label: "Test questionario cantiere", icon: FileText, perm: "quotes.view" },
+      // Ristretta ad admin — pricing_admin.manage (o superuser via has())
+      { to: "/product-catalog", label: "Tipologie e configuratore", icon: FileText, perm: "products.manage" },
+      { to: "/product-simulator", label: "Simulatore tecnico (debug)", icon: Play, perm: "pricing_admin.manage" },
+      { to: "/geometry-builder", label: "Configuratore geometrico", icon: FileText, perm: "products.manage" },
+      { to: "/site-conditions", label: "Questionario cantiere", icon: FileText, perm: "quotes.view" },
     ],
   },
   {
@@ -109,6 +105,7 @@ const NAV = [
   },
   {
     group: "governance",
+    label: "Utenti e permessi",
     items: [
       { to: "/users", i18n: "nav.users", icon: Users, perm: "users.view" },
       { to: "/roles", i18n: "nav.roles", icon: ShieldCheck, perm: "roles.view" },
@@ -118,7 +115,10 @@ const NAV = [
   },
   {
     group: "system",
+    label: "Impostazioni sistema",
     items: [
+      { to: "/notifications", i18n: "nav.notifications", icon: Bell, perm: null },
+      { to: "/search", i18n: "nav.search", icon: MagnifyingGlass, perm: "search.global" },
       { to: "/audit", i18n: "nav.audit", icon: ClockCounterClockwise, perm: "audit.view" },
       { to: "/sessions", i18n: "nav.sessions", icon: Devices, perm: null },
       { to: "/email-settings", label: "Impostazioni email", icon: EnvelopeSimple, perm: "email.view_settings" },
@@ -127,6 +127,12 @@ const NAV = [
     ],
   },
 ];
+
+// Route mantenute per compatibilità interna ma NASCOSTE dalla sidebar:
+// - /pricelists         → gestione componenti spostata in Configurazione tecnica (backlog Fase 1)
+// - /pricelist-importer → azione amministrativa interna
+// - /parametric         → engine legacy, integrazione futura
+// - /parametric/admin   → engine legacy, integrazione futura
 
 export default function AppLayout() {
   const { t } = useTranslation();
