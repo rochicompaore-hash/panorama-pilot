@@ -728,3 +728,58 @@ Gemini 3 Pro) per cross-validation. Suggerimenti espliciti forniti nel doc §
 - Zero modifica codice
 - Zero plugin add/remove
 - Zero nuove pagine/collezioni
+
+
+---
+
+## Iter 39 — PREVIEW FULL TEST v1 (Feb 2026)
+
+**Data:** 2026-08-07  
+**Autorizzato dall'utente:** Messaggio 155 — pubblicazione completa in **PREVIEW / STAGING** (NON produzione)
+
+### Cosa è stato fatto
+- ✅ Inventario completo (28 commit tra `main` e `feat/smtp-email-system`)
+- ✅ Verifica configurazione ambiente (60+ variabili `backend/.env`, tutte configurate; nessun segreto esposto nel report)
+- ✅ Verifica servizi: `backend` RUNNING, `frontend` RUNNING, `mongodb` RUNNING; `redis` FATAL (documentato in known issues)
+- ✅ Esecuzione suite test critiche: `test_first_operational_release`, `test_no_eval_regression`, `test_commercial_perimeter_e2e` (18/19 + 1 xfail race), `test_fase1_motor_integration`, `test_demo_product_guard`, `test_motor_full_listino_hard`, `test_audit_v1_sez20_economic` (2/2), `test_audit_v1_regression` (31/31), `test_commercial_perimeter_recipe`, `test_ci_security_guards`, `test_code_quality_regression`, `test_finestra_1a_recipe`, `test_bom_engine_blocco_a`, `test_stabilization_rc1` (85 pass + errori di rete non-code)
+- ✅ Test economico obbligatorio ProEvolution 900×1500 — motore risponde `pricing_status=incomplete` con `MISSING_GLASS_PRICE`, `MISSING_GLASS_MINIMUM`, `MISSING_HARDWARE_PRICE`, `MISSING_ADDITIONAL_COMPONENTS_COST`, `MISSING_INSTALLATION_PRICE` (comportamento **fail-closed** corretto: geometria calcolata, prezzi mancanti dichiarati esplicitamente)
+- ✅ Smoke test browser desktop 1920×800: login → dashboard OK, nessuna schermata bianca, console pulita, KPI e pipeline caricati
+- ✅ Smoke test mobile 390×800: login mobile-friendly, dashboard responsive
+- ✅ Documenti prodotti:
+  - `memory/PREVIEW_KNOWN_ISSUES_V1.md` — 13 sezioni di limitazioni con trasparenza CRITICAL
+  - `memory/PREVIEW_FULL_TEST_v1_INVENTORY.md` — deliverable completo (13 sezioni)
+
+### Git checkpoints creati (locali)
+- **Tag rollback:** `pre-preview-full-publish-2026-08` → commit `2b97058`
+- **Tag release:** `preview-full-test-v1` → commit `2b97058`
+- I due tag puntano allo stesso commit perché **nessun codice è stato aggiunto** con questa pubblicazione (Blocco Sviluppo rispettato).
+
+### Vincoli rispettati (nessuna operazione distruttiva)
+- ❌ NON eseguito: `cleanup_production_config_duplicates.py --apply`
+- ❌ NON eseguite: migrazioni distruttive, rinomine collezioni, cancellazioni dati demo
+- ❌ NON implementati: `ProfileSystemResolver`, `BomResolver`, `TechnicalCostResolver`, `CommercialPricingService`
+- ❌ NON attivati: nuovi plugin (OCR, AI, WhatsApp, scheduler)
+- ❌ NON pubblicato in produzione
+- ❌ NON eseguito force push / rebase distruttivo
+
+### Limitazioni note dichiarate (in `PREVIEW_KNOWN_ISSUES_V1.md`)
+1. Doppia fonte dati Sistema A ↔ Sistema B non unificata (P0 Critical)
+2. `commercial_perimeter` non ancora sostituito da `TechnicalCostResolver`
+3. Formule Excel V1_3 non ancora nel motore
+4. Ricetta 3-ante telaio unico (BR-03) mancante
+5. UI `/parametric/admin` scollegata dal motore (dichiarata legacy)
+6. Redis non disponibile in preview → firma OTP non testabile
+7. Tenant `PanoramaPilot Test` non pre-seedato (guard `DEMO_PRODUCT_NOT_ALLOWED` già attivo)
+8. Layout mobile non ottimizzato < 375px
+
+### Criterio di accettazione preview
+La release è accettata quando l'utente conferma dal browser:  
+login → cliente → prodotto → simulazione → preventivo → PDF (se già implementato).
+
+### STOP
+Attendo:  
+1. Collaudo manuale dell'utente sulla preview  
+2. Lista precisa anomalie e funzioni mancanti  
+3. Approvazione esplicita per avviare Fase 1 (Unificazione Sistema B → Sistema A)
+
+Fino ad allora — nessuna modifica al codice.
