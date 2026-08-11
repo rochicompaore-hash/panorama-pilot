@@ -1,0 +1,406 @@
+"""4 Resolver della nuova architettura pricing.
+
+Ogni resolver ha responsabilità netta e non ne conosce altre:
+- ProfileSystemResolver: quale sistema profilo + quale ricetta tecnica per il prodotto
+- BomResolver: quali componenti + quantità (formule V1_3)
+- TechnicalCostResolver: costo industriale (materiali + manodopera)
+- CommercialPricingService: prezzo vendita da regola commerciale
+"""
+from __future__ import annotations
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+from app.db import get_db
+from .models import (
+    PricingRequest, ProfileSystemResolution, BomResolution, BomComponent,
+    TechnicalSnapshot, CommercialSnapshot,
+)
+from .errors import PricingError
+from .formulas import (
+    frame_ml_1sash, frame_reinforcement_ml_1sash,
+    sash_ml_1sash, sash_reinforcement_ml_1sash,
+    glass_dimensions_1sash, glass_real_area_sqm, glass_billable_area_sqm,
+    recipe_code, production_time_hours_for,
+    glass_price_per_sqm, V1_3_COMPONENT_PRICES,
+    PVC_ELIGIBLE_ROLES, is_foil_surcharge_applicable,
+)
+
+
+# =====================================================================
+# 1. ProfileSystemResolver
+# =====================================================================
+class ProfileSystemResolver:
+    """Determina profile_system + technical_recipe per il prodotto configurato.
+
+    Legge dalla collection `technical_recipes` (Sistema B target, non products).
+    Non calcola prezzi, non applica moltiplicatori, non conosce sconti né IVA.
+
+    Fail-closed:
+      MISSING_PROFILE_SYSTEM
+      MISSING_TECHNICAL_RECIPE
+      INVALID_PRODUCT_CONFIGURATION
+    """
+
+    def __init__(self, db):
+        self.db = db
+
+    async def resolve(self, req: PricingRequest) -> ProfileSystemResolution:
+        if req.width_mm <= 0 or req.height_mm <= 0:
+            raise PricingError(
+                "INVALID_GEOMETRY",
+                configuration={"width_mm": req.width_mm, "height_mm": req.height_mm},
+                hint="Configurazione tecnica → Prodotto",
+            )
+
+        rc = recipe_code(req.window_type, req.number_of_sashes)
+
+        # Cerca ricetta tecnica: prima per tenant, poi wildcard "*"
+        recipe = await self.db.technical_recipes.find_one({
+            "$or": [
+                {"tenant_id": req.tenant_id},
+                {"tenant_id": "*"},
+            ],
+            "product_key": req.product_key,
+            "recipe_code": rc,
+            "deleted_at": None,
+        }, sort=[("tenant_id", -1)])   # preferisci tenant-specific su wildcard
+
+        if not recipe:
+            raise PricingError(
+                "MISSING_TECHNICAL_RECIPE",
+                configuration={"product_key": req.product_key, "recipe_code": rc},
+                hint=f"Configurazione tecnica → Ricette → aggiungi {req.product_key}:{rc}",
+            )
+
+        if not recipe.get("profile_system_id"):
+            raise PricingError(
+                "MISSING_PROFILE_SYSTEM",
+                configuration={"recipe_id": recipe.get("_id")},
+                hint="Configurazione tecnica → Ricetta senza profile_system_id",
+            )
+
+        return ProfileSystemResolution(
+            profile_system_id=recipe["profile_system_id"],
+            profile_system_code=recipe.get("profile_system_code", ""),
+            profile_system_version=int(recipe.get("profile_system_version", 1)),
+            technical_recipe_id=recipe["_id"],
+            technical_recipe_version=int(recipe.get("version", 1)),
+            recipe_code=rc,
+        )
+
+
+# =====================================================================
+# 2. BomResolver
+# =====================================================================
+class BomResolver:
+    """Trasforma (L, H, tipologia, n_ante, config) in componenti + quantità.
+
+    Usa esclusivamente le formule V1_3 (services/pricing_v3/formulas.py).
+    NON usa commercial_perimeter.
+
+    Milestone 1: gestisce solo WINDOW_1_SASH.
+    """
+
+    def __init__(self, db):
+        self.db = db
+
+    async def resolve(self, req: PricingRequest, ps: ProfileSystemResolution) -> BomResolution:
+        rc = ps.recipe_code
+        if rc != "WINDOW_1_SASH":
+            raise PricingError(
+                "MISSING_TECHNICAL_RECIPE",
+                configuration={"recipe_code": rc},
+                hint=f"Fase 1 supporta solo WINDOW_1_SASH. {rc} è nel backlog Fase 1B/1C.",
+            )
+
+        L = req.width_mm
+        H = req.height_mm
+        S = req.weld_allowance_mm
+
+        components: List[BomComponent] = [
+            BomComponent(
+                role="FRAME",
+                component_code=V1_3_COMPONENT_PRICES.get("FRAME_PROEVOLUTION") and "FRAME_PROEVOLUTION" or "FRAME",
+                quantity_formula=f"2*(L+S) + 2*(H+S) [L={L},H={H},S={S}]",
+                quantity_value=frame_ml_1sash(L, H, S),
+                unit_of_measure="ml",
+                is_pvc_eligible=True,
+            ),
+            BomComponent(
+                role="FRAME_REINFORCEMENT",
+                component_code="FRAME_REINFORCEMENT_PROEVOLUTION",
+                quantity_formula=f"2*(L-70) + 2*(H-70) [L={L},H={H}]",
+                quantity_value=frame_reinforcement_ml_1sash(L, H),
+                unit_of_measure="ml",
+                is_pvc_eligible=False,
+            ),
+            BomComponent(
+                role="SASH",
+                component_code="SASH_PROEVOLUTION",
+                quantity_formula=f"2*(L-206) + 2*(H-206) [L={L},H={H}]",
+                quantity_value=sash_ml_1sash(L, H),
+                unit_of_measure="ml",
+                is_pvc_eligible=True,
+            ),
+            BomComponent(
+                role="SASH_REINFORCEMENT",
+                component_code="SASH_REINFORCEMENT_PROEVOLUTION",
+                quantity_formula=f"2*(L-186) + 2*(H-186) [L={L},H={H}]",
+                quantity_value=sash_reinforcement_ml_1sash(L, H),
+                unit_of_measure="ml",
+                is_pvc_eligible=False,
+            ),
+        ]
+
+        # Vetro
+        gd = glass_dimensions_1sash(L, H)
+        real = glass_real_area_sqm(gd["width_mm"], gd["height_mm"])
+        billable = glass_billable_area_sqm(gd["width_mm"], gd["height_mm"])
+        gd_out = {
+            **gd,
+            "real_area_sqm": float(real),
+            "billable_area_sqm": float(billable),
+        }
+
+        return BomResolution(
+            components=components,
+            glass_dimensions=gd_out,
+            hardware_role="WINDOW_STD",
+            production_time_hours=production_time_hours_for(req.window_type, req.number_of_sashes),
+        )
+
+
+# =====================================================================
+# 3. TechnicalCostResolver
+# =====================================================================
+class TechnicalCostResolver:
+    """Costo industriale del serramento.
+
+    Input: BOM risolta + prezzi listino + workshop_cost + configurazione colore.
+    Output: TechnicalSnapshot con dettaglio completo.
+
+    Fail-closed:
+      MISSING_COMPONENT_PRICE
+      MISSING_GLASS_PRICE
+      MISSING_HARDWARE_PRICE
+      MISSING_PRODUCTION_TIME
+      MISSING_WORKSHOP_COST
+    """
+
+    def __init__(self, db):
+        self.db = db
+
+    async def _load_workshop_cost(self, tenant_id: str) -> Decimal:
+        """Legge hourly_workshop_cost dalla nuova collection versionata."""
+        doc = await self.db.workshop_cost_configs.find_one({
+            "tenant_id": tenant_id, "active": True, "deleted_at": None,
+        })
+        if not doc or doc.get("hourly_workshop_cost") is None:
+            raise PricingError(
+                "MISSING_WORKSHOP_COST",
+                configuration={"tenant_id": tenant_id},
+                hint="Configurazione tecnica → Costo officina — imposta hourly_workshop_cost (V1_3: 180 €/h)",
+            )
+        return Decimal(str(doc["hourly_workshop_cost"]))
+
+    async def _load_component_price(self, tenant_id: str, component_code: str,
+                                      role: str) -> Decimal:
+        """Cerca prezzo componente nel listino tecnico. Fallback: prezzi V1_3 di riferimento."""
+        # 1) Listino tenant
+        pl = await self.db.item_pricelists.find_one({
+            "tenant_id": tenant_id, "active": True, "deleted_at": None,
+        }, sort=[("version", -1)])
+        if pl:
+            for entry in (pl.get("entries") or []):
+                if entry.get("code") == component_code:
+                    p = entry.get("unit_price")
+                    if p is not None:
+                        return Decimal(str(p))
+        # 2) Fallback V1_3 (riferimento normativo, non seed)
+        v13 = V1_3_COMPONENT_PRICES.get(component_code)
+        if v13 is not None:
+            return v13
+        raise PricingError(
+            "MISSING_COMPONENT_PRICE",
+            component_role=role,
+            configuration={"component_code": component_code, "tenant_id": tenant_id},
+            hint=f"Configurazione tecnica → Listino componenti — aggiungi {component_code}",
+        )
+
+    async def _load_glass_price(self, glass_type: str) -> Decimal:
+        try:
+            return glass_price_per_sqm(glass_type)
+        except KeyError:
+            raise PricingError(
+                "MISSING_GLASS_PRICE",
+                component_role="GLASS",
+                configuration={"glass_type": glass_type},
+                hint="Configurazione tecnica → Listino vetri",
+            )
+
+    async def _load_hardware_price(self, hardware_role: str) -> Decimal:
+        code = f"HARDWARE_{hardware_role}"
+        v13 = V1_3_COMPONENT_PRICES.get(code)
+        if v13 is None:
+            raise PricingError(
+                "MISSING_HARDWARE_PRICE",
+                component_role="HARDWARE",
+                configuration={"hardware_role": hardware_role},
+                hint="Configurazione tecnica → Ferramenta",
+            )
+        return v13
+
+    async def resolve(self, req: PricingRequest, ps: ProfileSystemResolution,
+                       bom: BomResolution) -> TechnicalSnapshot:
+        if bom.production_time_hours is None or bom.production_time_hours <= 0:
+            raise PricingError(
+                "MISSING_PRODUCTION_TIME",
+                configuration={"recipe_code": ps.recipe_code},
+                hint="Configurazione tecnica → Tempi produzione",
+            )
+        hourly = await self._load_workshop_cost(req.tenant_id)
+
+        # Materiali (profili + rinforzi + fermavetro)
+        material_cost = Decimal("0")
+        components_snapshot: List[Dict[str, Any]] = []
+        foil_pvc_base = Decimal("0")   # base per pellicolato +10%
+
+        for c in bom.components:
+            price = await self._load_component_price(req.tenant_id, c.component_code, c.role)
+            total = c.quantity_value * price
+            c.unit_cost = price
+            c.total_cost = total
+            material_cost += total
+            if c.is_pvc_eligible:
+                foil_pvc_base += total
+            components_snapshot.append({
+                "role": c.role,
+                "component_code": c.component_code,
+                "quantity_formula": c.quantity_formula,
+                "quantity_value": str(c.quantity_value),
+                "unit_of_measure": c.unit_of_measure,
+                "unit_cost": str(price),
+                "total_cost": str(total),
+                "waste_pct": str(c.waste_pct),
+                "is_pvc_eligible": c.is_pvc_eligible,
+            })
+
+        # Vetro
+        glass_price = await self._load_glass_price(req.glass_type)
+        gd = bom.glass_dimensions or {}
+        billable = Decimal(str(gd.get("billable_area_sqm", 0)))
+        glass_cost = billable * glass_price * Decimal(gd.get("quantity", 1))
+
+        # Ferramenta
+        hardware_cost = await self._load_hardware_price(bom.hardware_role or "WINDOW_STD")
+
+        # Manodopera
+        labor_cost = bom.production_time_hours * hourly
+
+        # Pellicolato +10% (solo Fase 1B: attivato solo se colore non è WHITE_MASS)
+        foil_surcharge = Decimal("0")
+        if is_foil_surcharge_applicable(req.color_internal, req.color_external):
+            foil_surcharge = foil_pvc_base * Decimal("0.10")
+
+        total_internal = (material_cost + glass_cost + hardware_cost
+                          + labor_cost + foil_surcharge)
+
+        return TechnicalSnapshot(
+            profile_system_id=ps.profile_system_id,
+            profile_system_version=ps.profile_system_version,
+            technical_recipe_id=ps.technical_recipe_id,
+            technical_recipe_version=ps.technical_recipe_version,
+            hourly_workshop_cost=hourly,
+            production_time_hours=bom.production_time_hours,
+            components=components_snapshot,
+            glass_dimensions=gd,
+            material_cost=material_cost,
+            glass_cost=glass_cost,
+            hardware_cost=hardware_cost,
+            additional_technical_costs=Decimal("0"),
+            labor_cost=labor_cost,
+            foil_surcharge=foil_surcharge,
+            total_internal_cost=total_internal,
+        )
+
+
+# =====================================================================
+# 4. CommercialPricingService
+# =====================================================================
+class CommercialPricingService:
+    """Applica la regola commerciale al costo tecnico.
+
+    NON conosce telaio, anta, vetro, rinforzo, ferramenta, BOM.
+    Riceve solo: technical_internal_cost + commercial_pricing_rule.
+
+    Metodi supportati:
+      - MULTIPLIER: sale = cost × multiplier
+      - MARKUP_ON_COST: sale = cost × (1 + markup/100)
+      - TARGET_GROSS_MARGIN: sale = cost / (1 - margin/100)
+      - FIXED_PRICE: sale = fixed_price
+    """
+
+    def __init__(self, db):
+        self.db = db
+
+    async def _load_rule(self, tenant_id: str) -> Dict[str, Any]:
+        doc = await self.db.commercial_pricing_rules.find_one({
+            "tenant_id": tenant_id, "active": True, "deleted_at": None,
+        }, sort=[("version", -1)])
+        if not doc:
+            raise PricingError(
+                "MISSING_COMMERCIAL_MULTIPLIER",
+                configuration={"tenant_id": tenant_id},
+                hint="Configurazione tecnica → Regola commerciale — imposta il moltiplicatore",
+            )
+        return doc
+
+    async def apply(self, req: PricingRequest, tech: TechnicalSnapshot) -> CommercialSnapshot:
+        rule = await self._load_rule(req.tenant_id)
+        method = rule.get("method", "MULTIPLIER").upper()
+        cost = tech.total_internal_cost
+
+        cs = CommercialSnapshot(pricing_method=method, rule_version=int(rule.get("version", 1)))
+
+        if req.override_multiplier is not None:
+            method = "MULTIPLIER"
+            cs.pricing_method = "MULTIPLIER"
+            cs.multiplier = Decimal(str(req.override_multiplier))
+        elif method == "MULTIPLIER":
+            m = rule.get("multiplier")
+            if m is None:
+                raise PricingError("MISSING_COMMERCIAL_MULTIPLIER",
+                                    configuration={"method": method},
+                                    hint="Regola commerciale senza campo `multiplier`")
+            cs.multiplier = Decimal(str(m))
+        elif method == "MARKUP_ON_COST":
+            cs.markup_pct = Decimal(str(rule.get("markup_pct")))
+        elif method == "TARGET_GROSS_MARGIN":
+            cs.gross_margin_pct = Decimal(str(rule.get("gross_margin_pct")))
+        elif method == "FIXED_PRICE":
+            cs.fixed_price = Decimal(str(rule.get("fixed_price")))
+        else:
+            raise PricingError("INVALID_CONFIGURATION",
+                                configuration={"method": method},
+                                hint="Regola commerciale: metodo non supportato")
+
+        # Calcolo
+        if method == "MULTIPLIER":
+            cs.unit_sale_price = cost * cs.multiplier
+        elif method == "MARKUP_ON_COST":
+            cs.unit_sale_price = cost * (Decimal(1) + cs.markup_pct / Decimal(100))
+        elif method == "TARGET_GROSS_MARGIN":
+            denom = Decimal(1) - cs.gross_margin_pct / Decimal(100)
+            if denom <= 0:
+                raise PricingError("INVALID_CONFIGURATION",
+                                    configuration={"gross_margin_pct": str(cs.gross_margin_pct)},
+                                    hint="gross_margin_pct >= 100 non valido")
+            cs.unit_sale_price = cost / denom
+        elif method == "FIXED_PRICE":
+            cs.unit_sale_price = cs.fixed_price
+
+        # Sconti/promozioni: Fase 1 non li supporta ancora (discount=0)
+        cs.discount = Decimal("0")
+        cs.final_unit_price = cs.unit_sale_price - cs.discount
+
+        return cs

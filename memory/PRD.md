@@ -1,3 +1,65 @@
+## Iter 42 — FASE 1 Milestone 1 Unified Pricing (Feb 2026)
+
+**Branch:** `feature/unified-pricing-phase1`  
+**Tag rollback:** `pre-unified-pricing-phase1` → `2e88011`  
+**Tag release:** `milestone-1-unified-pricing-v1`  
+**Autorizzato:** Messaggio 158
+
+### Architettura target implementata (vertical slice ProEvolution 1-anta)
+```
+POST /api/pricing/compute
+  → ProfileSystemResolver → technical_recipes
+  → BomResolver → formule V1_3 pure (no eval)
+  → TechnicalCostResolver → workshop_cost_configs (180€/h)
+  → CommercialPricingService → commercial_pricing_rules (×3.0)
+  → technical_snapshot + commercial_snapshot + calculation_hash (SHA-256)
+```
+
+### Golden Test GT-01 verde
+ProEvolution 900×1500 BIANCO DOUBLE_STANDARD:
+- material 40.83€ + glass 68.25€ + hardware 76€ + labor 135€ = **total_internal 320.08€**
+- × multiplier 3.0 = **unit_sale_price 960.25€** (target GT-01: 960.21€, tolleranza ±0.30)
+
+### File nuovi (9)
+- `backend/app/services/pricing_v3/{__init__,models,errors,formulas,resolvers,orchestrator}.py`
+- `backend/app/routers/pricing_v3.py`
+- `backend/scripts/seed_pricing_v3_milestone1.py`
+- `backend/tests/test_pricing_v3_milestone1.py` (6/6 test verdi)
+
+### Nuove collezioni (Sistema B target)
+- `technical_recipes`, `workshop_cost_configs`, `commercial_pricing_rules`
+
+### Regole V1_3 in codice
+- BR-06: hourly_workshop_cost = 180€/h (versionato, non hardcoded)
+- BR-07: glass prices per_sqm (76/96/125/156.25)
+- BR-10: min_billable_sqm = 0.50 m² per lastra
+- BR-05: production times WINDOW_1_SASH=0.75h, WINDOW_2_SASH=1.0h, ...
+- BR-09: foil +10% framework su PVC eleggibili (attivato solo con colori standard)
+
+### Vincoli rispettati
+- Zero modifiche a motori legacy (commercial_perimeter, perimeter_assembler, finestra_1a, parametric_engine)
+- Zero modifiche a products, item_pricelists, production_config
+- Zero wiring UI (attende collaudo esplicito)
+- Zero ricalcolo preventivi storici
+- Zero pubblicazione in produzione
+
+### Backlog Fase 1B/1C (non implementato)
+- WINDOW_2_SASH, DOOR_WINDOW_1_SASH, DOOR_WINDOW_2_SASH + MEETING_STILE (5.50 €/ml) + THRESHOLD
+- FIXED_MULLION (7.51 €/ml × q), TRANSOM (7.50 €/ml × q), STANDARD_FOIL applicato
+- BR-03 THREE_SASH_SINGLE_FRAME (attende formula ufficiale)
+- Wiring UI simulator / catalogo / preventivo
+- verify_snapshot_integrity wiring nel load preventivi
+- SimplePricingResolver per prodotti semplici (tapparelle, servizi)
+
+### Deliverable
+`memory/MILESTONE_1_UNIFIED_PRICING_DELIVERABLE.md` (29 sezioni)
+
+### STOP
+Attendo collaudo manuale del nuovo endpoint prima di procedere con Fase 1B / wiring UI.
+
+---
+
+
 ## Iter 40 — P0 OPERATIVO (Feb 2026, 07/08)
 
 **Branch:** `fix/p0-operational-quoting` — **Tag rollback:** `pre-p0-operational-quoting` → `db439d6`  
