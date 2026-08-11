@@ -92,13 +92,25 @@ Output finale:
 | `backend/app/services/pricing_v3/errors.py` | 55 | `PricingError` + `ERROR_CODES` (12 codici fail-closed) |
 | `backend/app/services/pricing_v3/models.py` | 135 | Dataclasses: `PricingRequest`, `ProfileSystemResolution`, `BomResolution`, `BomComponent`, `TechnicalSnapshot`, `CommercialSnapshot`, `PricingResult` |
 | `backend/app/services/pricing_v3/formulas.py` | 145 | Formule V1_3 pure Python su Decimal (nessun eval): `frame_ml_1sash`, `sash_ml_1sash`, `glass_dimensions_1sash`, etc. |
-| `backend/app/services/pricing_v3/resolvers.py` | 285 | I 4 resolver: `ProfileSystemResolver`, `BomResolver`, `TechnicalCostResolver`, `CommercialPricingService` |
+| `backend/app/services/pricing_v3/resolvers.py` | 295 | I 4 resolver: `ProfileSystemResolver`, `BomResolver` (5 componenti profilo: FRAME, FRAME_REINFORCEMENT, SASH, SASH_REINFORCEMENT, GLAZING_BEAD), `TechnicalCostResolver`, `CommercialPricingService` |
 | `backend/app/services/pricing_v3/orchestrator.py` | 130 | `compute_pricing()` + `verify_snapshot_integrity()` |
 | `backend/app/routers/pricing_v3.py` | 70 | `POST /api/pricing/compute` (registrato in server.py QUOTING_ROUTERS) |
 | `backend/scripts/seed_pricing_v3_milestone1.py` | 100 | Seed idempotente 3 nuove collezioni |
-| `backend/tests/test_pricing_v3_milestone1.py` | 155 | 6 test verdi (GT-01 golden + integrità + fail-closed + determinismo) |
+| `backend/tests/test_pricing_v3_milestone1.py` | 165 | 6 test verdi (GT-01 golden + integrità + fail-closed + determinismo + 7 ruoli BOM verificati) |
 
-**Totale:** 9 file, ~1096 righe, tutte NUOVE. Nessun file esistente modificato tranne `backend/server.py` (2 righe: import + include_router).
+**Totale:** 9 file, ~1116 righe, tutte NUOVE. Nessun file esistente modificato tranne `backend/server.py` (2 righe: import + include_router).
+
+### 3.1 BOM completa Milestone 1 (7 ruoli come da specifica §2)
+
+| # | Role | Component code | Formula | Fonte prezzo |
+|---|---|---|---|---|
+| 1 | FRAME | FRAME_PROEVOLUTION | `2*(L+S) + 2*(H+S) / 1000` | V1_3: 4.02 €/ml |
+| 2 | FRAME_REINFORCEMENT | FRAME_REINFORCEMENT_PROEVOLUTION | `2*(L-70) + 2*(H-70) / 1000` | V1_3: 1.52 €/ml |
+| 3 | SASH | SASH_PROEVOLUTION | `2*(L-206) + 2*(H-206) / 1000` | V1_3: 2.31 €/ml |
+| 4 | SASH_REINFORCEMENT | SASH_REINFORCEMENT_PROEVOLUTION | `2*(L-186) + 2*(H-186) / 1000` | V1_3: 1.34 €/ml |
+| 5 | GLAZING_BEAD | GLAZING_BEAD_PROEVOLUTION | `2*(L-206) + 2*(H-206) / 1000` (perimetro anta) | V1_3 GT-01: "?" → placeholder 0 €/ml (attende catalogo) |
+| 6 | GLASS | (aggregato) | strutturata: `(L-206) × (H-206)`, min 0.50 m² | V1_3 BR-07: 76.00 €/m² per DOUBLE_STANDARD |
+| 7 | HARDWARE | HARDWARE_WINDOW_STD | fisso finestra | V1_3: 76.00 € |
 
 ---
 
@@ -274,6 +286,29 @@ tests/test_pricing_v3_milestone1.py::test_no_wildcard_recipe_for_unknown_product
 | `bom_engine_v2.resolve_bom_full` | **DEPRECATE** | Chiamato solo da `/pricing-hub` metodi BOM/hybrid, non collegato ai serramenti |
 | `pricing_hub` (metodi A-G) | **REMOVE_LATER** per metodi complessi, **TARGET** per prodotti semplici (per_piece/per_sqm/per_linear) da migrare a `SimplePricingResolver` (backlog) |
 | `commission_engine` | Fuori scope pricing | Dominio provvigioni CRM |
+
+### 14.1 Caller residui di `commercial_perimeter` (evidenza da grep)
+
+| File | Riferimenti | Ruolo |
+|---|---|---|
+| `app/services/recipes/commercial_perimeter.py` | Definizione motore (linee 1-510) | Fonte primaria — invariata |
+| `app/services/perimeter_assembler.py` | `run_perimeter_simulation()`, `build_perimeter_input()` | Wrapper che compone input e chiama `compute_perimeter` |
+| `app/services/recipes/__init__.py` | Righe 20-40: re-export `PerimeterInput`, `PerimeterResult`, `compute_perimeter` e costante `DEFAULT_PRICING_MODE = "commercial_perimeter"` | Registry dei recipe legacy |
+| `app/routers/catalog.py` | Righe 298-323: `simulate_product` con `pricing_mode="commercial_perimeter"` come default | Endpoint `/api/catalog/products/{pid}/simulate` |
+| `app/routers/quote_structure.py` | Righe 46, 340, 382, 413, 425-428, 476, 485, 514-516, 543: intera integrazione `compute-and-add` + `recompute` + tag `pricing_engine` | Motore integrato del preventivatore attuale |
+| `app/models_catalog.py` | Righe 125-126: campo `pricing_mode` sui `Product` | Marker persistito nel documento prodotto |
+| `app/seed_catalog.py` | Righe 128, 141: `default_pricing_mode="commercial_perimeter"` nel seed | Onboarding |
+
+**Totale caller diretti fuori dal motore stesso: 5 file** (assembler + registry + 2 router + models + seed).
+
+**Nessun caller di `commercial_perimeter` esiste in `pricing_v3/`** — l'isolamento è stato verificato.
+
+**Piano di dismissione (Fase 3, dopo collaudo):**
+1. Introdurre un thin adapter `perimeter_to_pricing_v3.py` che riceve una richiesta legacy e la converte in `PricingRequest`
+2. Sostituire `run_perimeter_simulation` con l'adapter dentro `catalog.simulate_product` e `quote_structure.compute_and_add_product`
+3. Rimuovere `default_pricing_mode` dai seed
+4. Deprecare `models_catalog.pricing_mode` come read-only
+5. Solo alla fine: eliminare `commercial_perimeter.py` e `perimeter_assembler.py`
 
 **Verdetto:** dopo Milestone 1 abbiamo 3 TARGET nuovi. I 5 motori legacy/adapter restano coesistenti fino al wiring UI completo (Fase 3).
 

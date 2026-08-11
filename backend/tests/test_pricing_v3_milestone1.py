@@ -70,12 +70,21 @@ def test_gt01_proevolution_window_1sash_900x1500(token):
     tech = d["technical_snapshot"]
     com = d["commercial_snapshot"]
 
-    # Componenti
+    # Componenti — Milestone 1 richiede 7 ruoli (5 profili + GLASS + HARDWARE nel technical_snapshot;
+    # GLASS e HARDWARE sono aggregati separatamente, ma il BOM esplicita anche GLAZING_BEAD)
     comps = {c["role"]: c for c in tech["components"]}
+    assert "FRAME" in comps
+    assert "FRAME_REINFORCEMENT" in comps
+    assert "SASH" in comps
+    assert "SASH_REINFORCEMENT" in comps
+    assert "GLAZING_BEAD" in comps          # richiesto Milestone 1 §2
     assert abs(float(comps["FRAME"]["total_cost"]) - 19.34) < 0.02
     assert abs(float(comps["FRAME_REINFORCEMENT"]["total_cost"]) - 6.87) < 0.02
     assert abs(float(comps["SASH"]["total_cost"]) - 9.18) < 0.02
     assert abs(float(comps["SASH_REINFORCEMENT"]["total_cost"]) - 5.43) < 0.02
+    # GLAZING_BEAD prezzo placeholder 0€/ml (attende catalogo V1_3), formula presente
+    assert comps["GLAZING_BEAD"]["quantity_formula"]
+    assert float(comps["GLAZING_BEAD"]["quantity_value"]) > 0
 
     # Vetro / Ferramenta / Manodopera
     assert abs(tech["glass_cost"] - 68.25) < 0.05

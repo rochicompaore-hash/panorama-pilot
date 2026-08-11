@@ -140,6 +140,7 @@ V1_3_COMPONENT_PRICES = {
     "FRAME_REINFORCEMENT_PROEVOLUTION": Decimal("1.52"),  # €/ml
     "SASH_PROEVOLUTION":               Decimal("2.31"),   # €/ml
     "SASH_REINFORCEMENT_PROEVOLUTION": Decimal("1.34"),   # €/ml
+    "GLAZING_BEAD_PROEVOLUTION":       Decimal("0.00"),   # €/ml — attende catalogo (V1_3 GT-01: "?")
     "HARDWARE_WINDOW_STD":             Decimal("76.00"),  # € (fisso finestra)
     "HARDWARE_DOOR_WINDOW_STD":        None,              # da confermare
 }

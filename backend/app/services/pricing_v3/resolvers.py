@@ -150,6 +150,20 @@ class BomResolver:
                 unit_of_measure="ml",
                 is_pvc_eligible=False,
             ),
+            # GLAZING_BEAD — richiesto dalla specifica Milestone 1 (7 componenti obbligatori).
+            # V1_3 GT-01 non fornisce il prezzo di riferimento (attende catalogo reale).
+            # Placeholder = 0 €/ml documentato in `notes` per non bloccare la vertical slice.
+            # Quando il prezzo sarà disponibile, sarà sufficiente aggiungere l'entry al listino
+            # o il valore in V1_3_COMPONENT_PRICES["GLAZING_BEAD_PROEVOLUTION"].
+            BomComponent(
+                role="GLAZING_BEAD",
+                component_code="GLAZING_BEAD_PROEVOLUTION",
+                quantity_formula=f"2*(L-206) + 2*(H-206) [sash perimeter, L={L},H={H}]",
+                quantity_value=sash_ml_1sash(L, H),
+                unit_of_measure="ml",
+                is_pvc_eligible=True,
+                notes="Prezzo di riferimento non ancora nel listino V1_3; usa placeholder 0€/ml (attende catalogo).",
+            ),
         ]
 
         # Vetro
