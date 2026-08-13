@@ -89,6 +89,7 @@ const NAV = [
     label: "Configurazione tecnica",
     items: [
       // Ristretta ad admin — pricing_admin.manage (o superuser via has())
+      { to: "/tech-config", label: "Configurazione tecnica (nuovo motore)", icon: FileText, perm: "pricing_admin.manage" },
       { to: "/product-catalog", label: "Tipologie e configuratore", icon: FileText, perm: "products.manage" },
       { to: "/product-simulator", label: "Simulatore tecnico (debug)", icon: Play, perm: "pricing_admin.manage" },
       { to: "/geometry-builder", label: "Configuratore geometrico", icon: FileText, perm: "products.manage" },

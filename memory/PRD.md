@@ -1,3 +1,37 @@
+## Iter 44 — Milestone A: Configurazione tecnica amministrabile (Feb 2026)
+
+**Branch:** `feature/unified-pricing-phase1` — **Tag:** `milestone-A-tech-config-v1`  
+**Autorizzato:** Messaggio 162
+
+### Anomalie precedenti risolte documentalmente
+1. **n_comps=5 vs "7 ruoli"** — Scelta strutturale, nessuna divergenza: `components[]` contiene 5 profili (FRAME, FRAME_REINFORCEMENT, SASH, SASH_REINFORCEMENT, GLAZING_BEAD), GLASS e HARDWARE aggregati come campi separati
+2. **GLAZING_BEAD = 0€/ml** — Placeholder V1_3 (`V1_3_COMPONENT_PRICES` = 0), fonte prevista `item_pricelists.entries[]`. Ora impostabile via nuovo endpoint `/api/tech-config/component-prices/{code}`
+
+### Implementato
+- Router `backend/app/routers/tech_config.py` (175 righe): 7 endpoint GET/PUT su `workshop_cost_configs`, `commercial_pricing_rules`, `item_pricelists`, `technical_recipes` (read-only)
+- Pagina `frontend/src/pages/TechConfigPage.jsx` (195 righe): 4 tab (Costo officina · Regola commerciale · Prezzi componenti · Ricette tecniche)
+- Route `/tech-config` in App.js + sidebar entry in AppLayout.jsx (permesso `pricing_admin.manage`)
+
+### Test E2E verificato
+- workshop_cost 180→200 → labor 135→150, sale 960.25→1005.25, **hash CAMBIA** (55ec99b8→88b0045c)
+- GLAZING_BEAD 0→2.10 €/ml → total 8.35€, sale 985.30€
+- Preventivi storici **NON ricalcolati** (snapshot congelato preservato)
+- Milestone 1 test 6/6 verdi (aggiornati per gestire GLAZING_BEAD dinamico)
+
+### Vincoli rispettati
+- Nessuna nuova collection parallela
+- Zero modifiche motore legacy
+- Solo preview
+
+### Deliverable
+`memory/MILESTONE_A_TECH_CONFIG_DELIVERABLE.md`
+
+### STOP
+Attendo collaudo. Prossima: Milestone B (WINDOW_2_SASH + DOOR_WINDOW + formule V1_3).
+
+---
+
+
 ## Iter 42 — FASE 1 Milestone 1 Unified Pricing (Feb 2026)
 
 **Branch:** `feature/unified-pricing-phase1`  

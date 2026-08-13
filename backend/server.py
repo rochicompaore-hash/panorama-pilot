@@ -67,6 +67,7 @@ from app.routers.parametric import router as parametric_router
 from app.routers.importer import router as importer_router
 from app.routers.pdf_router import router as pdf_router
 from app.routers.pricing_v3 import router as pricing_v3_router
+from app.routers.tech_config import router as tech_config_router
 
 # Ops & Production (M4–M8)
 from app.routers.surveys import router as surveys_router
@@ -222,6 +223,7 @@ QUOTING_ROUTERS = [
     quote_structure_router, geometry_router, parametric_router, importer_router,
     pdf_router,
     pricing_v3_router,   # Milestone 1 — endpoint autorevole POST /api/pricing/compute
+    tech_config_router,  # Milestone A — Configurazione tecnica amministrabile
 ]
 OPS_ROUTERS = [
     surveys_router, sales_orders_router,
