@@ -19,9 +19,9 @@
 | M | Nome | Status | Preview URL | Commit | Readiness |
 |---|---|---|---|---|---|
 | 1 | Customer + Site + Timeline + Quote header | `E2E_READY` (attende approvazione) | `/customers`, `/customers/:id` | (post-M1 P2) | 100% |
-| 2 | Configurazione tecnica (Single Source of Truth) | `E2E_READY` (parte P0) | `/tech-config` | (questo turno) | 60% |
-| 3 | Golden Test economico (GT-REAL) | `E2E_READY` (report riga-per-riga) | pytest | (questo turno) | 70% |
-| 4 | Copertura configurazioni (WINDOW_2_SASH, DOOR_WINDOW_*) | `NOT_STARTED` | — | — | 0% |
+| 2 | Configurazione tecnica (Single Source of Truth) | `E2E_READY` (P0 completa) | `/tech-config` (7 tab) | (M2 P0) | 85% |
+| 3 | Golden Test economico (GT-REAL) | `TECHNICAL_TEST_READY` · **BUSINESS_GOLDEN = FAIL** (delta 28.34 €) | pytest | (M3) | 70% |
+| 4 | Copertura configurazioni (WINDOW_1_2, DOOR_WINDOW_1_2, VASISTAS) | `E2E_READY` (5 config + foil, 7/7 test) | pytest + `/tech-config` | (M4) | 90% |
 | 5 | Preventivatore commerciale unico | `NOT_STARTED` | — | — | 0% |
 | 6 | PDF preventivo | `NOT_STARTED` | — | — | 0% |
 | 7 | Contratto (con snapshot congelati) | `NOT_STARTED` | — | — | 0% |
@@ -34,10 +34,11 @@
 | 14 | Pianificazione posa | `NOT_STARTED` | — | — | 0% |
 | 15 | Assistenza | `NOT_STARTED` | — | — | 0% |
 | 16 | Lead conversion wizard | `NOT_STARTED` | — | — | 0% |
-| 17 | Timeline completa (system events) | `IN_PROGRESS` | — | — | 30% |
+| 17 | Timeline completa (system events) | `IN_PROGRESS` (base creata M1) | — | — | 40% |
 | 18 | RBAC finale | `IN_PROGRESS` (ruoli seedati) | — | — | 30% |
 | 19 | Obiettivi commerciali | `NOT_STARTED` | — | — | 0% |
 | 20 | Pagamenti + cash flow | `NOT_STARTED` | — | — | 0% |
+| 2.14 | Servizi & Prezzi Semplici (dual pricing) | `E2E_READY` (backend + seed listino Enerhia) | `/api/simple-services` | (questo turno) | 70% (UI in M5) |
 
 ## Sezioni M2 (Configurazione tecnica) — dettaglio
 

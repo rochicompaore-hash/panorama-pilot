@@ -489,6 +489,7 @@ PRODUCTION_TIME_DEFAULTS = [
     ("DOOR_WINDOW_1_SASH",  1.00, "Portafinestra 1 anta"),
     ("DOOR_WINDOW_2_SASH",  1.50, "Portafinestra 2 ante"),
     ("DOOR_WINDOW_3_SASH",  3.00, "Portafinestra 3 ante"),
+    ("VASISTAS_ONLY_1_SASH", 0.75, "Vasistas puro (1 anta)"),
 ]
 
 

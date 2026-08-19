@@ -995,3 +995,42 @@ Delta NON forzato: come da Master Plan si documenta la riga responsabile. La cor
 M4 (copertura DOOR_WINDOW/WINDOW_2_SASH/VASISTAS con formule V1_3 complete: meeting stile 5.50 €/ml, threshold H×29.50+7.49/9.84, montante 7.51 €/ml, transom 7.50 €/ml, pellicolato +10%) è la prossima milestone approvata dal Master Plan. Non iniziata in questo turno per rispettare i limiti di context.
 
 **Non pubblicare in produzione fino al collaudo utente.**
+
+---
+
+## 2026-02-19 — M4 Ricette + M2.14 Servizi & Prezzi Semplici
+
+### M4 Ricette pricing (TECHNICALLY_IMPLEMENTED)
+Estesa `BomResolver` a 5 ricette con formule V1_3 complete:
+- `WINDOW_1_SASH` (5 profili + GLASS + HW60 + LABOR)
+- `WINDOW_2_SASH` (+ MEETING_STILE H/1000×5.50, HW80, LABOR 180)
+- `DOOR_WINDOW_1_SASH` (+ THRESHOLD variabile H/1000×29.50 + fixed 7.49, HW75, LABOR 180)
+- `DOOR_WINDOW_2_SASH` (+ MEETING_STILE + THRESHOLD + fixed 9.84, HW90, LABOR 270)
+- `VASISTAS_ONLY_1_SASH` (HW40, LABOR 135)
+- `SLIDING_DOOR_WINDOW`: solo regola hardware 380 €/anta (formula geom. in backlog M4B)
+
+Foil surcharge +10% applicato SOLO su PVC eleggibili (FRAME/SASH/GLAZING_BEAD/MEETING_STILE/FIXED_MULLION/TRANSOM) — verificato test `test_foil_surcharge_walnut`.
+
+**Golden tests: 10/10 verdi** (`test_golden_m3_v3.py` 3/3 + `test_golden_m4_recipes.py` 7/7). Report riga-per-riga incluso.
+
+### M3 Status: TECHNICAL_TEST_READY · BUSINESS_GOLDEN = FAIL
+Delta 28.34 € vs Excel target 310.56 € **spiegato analiticamente**: quantità corrette, formule corrette, delta interamente su prezzi profili V1_3 vs listino Enerhia reale. Nessuna correzione compensativa applicata. Chiusura richiede prezzi ufficiali profili da Enerhia → import via UI `/tech-config/component-prices`, zero codice.
+
+### M2.14 Servizi & Prezzi Semplici
+- Nuova collection `simple_services` + router `/api/simple-services` (CRUD + discount-guard)
+- **34 servizi seedati** con dual pricing (listino Enerhia ufficiale posa/smontaggi/motorizzazioni/accessori/logistica)
+- **Dual pricing**: `internal_reference_price` visibile solo a `pricing_admin.manage`, `customer_sale_price` visibile a tutti
+- **Discount Guard** endpoint: `override_required=true` quando net_sale < internal_reference. Preparato per collegamento M5.
+- LOGISTICS_LOADING seedato come `PRICING_RULE_TO_DEFINE`
+
+### Deliverables
+- `/app/memory/M4_PRICING_RECIPES_AND_GOLDEN_TESTS.md` — delta analysis, source-of-truth matrix, ricette, placeholders
+- `/app/memory/ENERHIA_OPERATING_CORE_MASTER_STATUS.md` — status corretti (M2 85%, M3 BUSINESS_GOLDEN FAIL, M4 90%)
+
+### Prossimi bloccanti
+- **B2** Prezzi profili V1_3 reali Enerhia → chiude delta M3 (senza modifica codice)
+- **B9** Formula geometrica SLIDING_DOOR_WINDOW → M4B
+- **B10** Ricetta 3/4 ante telaio unico → M4B
+
+### M5 avviabile con etichetta `TECHNICALLY_IMPLEMENTED · ECONOMICALLY_NOT_VALIDATED`
+Come da Master Plan §21+§27. Non collegare UI commerciale fino a collaudo utente.

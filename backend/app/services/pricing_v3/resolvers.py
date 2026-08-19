@@ -95,10 +95,18 @@ class ProfileSystemResolver:
 class BomResolver:
     """Trasforma (L, H, tipologia, n_ante, config) in componenti + quantità.
 
-    Usa esclusivamente le formule V1_3 (services/pricing_v3/formulas.py).
-    NON usa commercial_perimeter.
+    Milestone 4 — Enerhia Operating Core:
+    Supporta ora WINDOW_1_SASH, WINDOW_2_SASH, DOOR_WINDOW_1_SASH,
+    DOOR_WINDOW_2_SASH, VASISTAS_ONLY_1_SASH.
+    SLIDING_DOOR_WINDOW: solo hardware (formula geometrica in backlog).
 
-    Milestone 1: gestisce solo WINDOW_1_SASH.
+    Formule V1_3 approvate:
+      - MEETING_STILE     = H/1000 × 5.50 × qty         (SASH scambio battuta)
+      - THRESHOLD DW_1    = H/1000 × 29.50 + 7.49        (soglia ribassata portafinestra 1 anta)
+      - THRESHOLD DW_2    = H/1000 × 29.50 + 9.84        (soglia ribassata portafinestra 2 ante)
+      - FIXED_MULLION     = H/1000 × 7.51 × qty
+      - TRANSOM           = L/1000 × 7.50 × qty
+      - FOIL SURCHARGE    = +10% su PVC eleggibile (FRAME/SASH/GLAZING_BEAD/MEETING_STILE/FIXED_MULLION/TRANSOM)
     """
 
     def __init__(self, db):
@@ -106,81 +114,144 @@ class BomResolver:
 
     async def resolve(self, req: PricingRequest, ps: ProfileSystemResolution) -> BomResolution:
         rc = ps.recipe_code
-        if rc != "WINDOW_1_SASH":
+        L, H, S = req.width_mm, req.height_mm, req.weld_allowance_mm
+        n_sashes = int(req.number_of_sashes)
+
+        supported = {
+            "WINDOW_1_SASH", "WINDOW_2_SASH",
+            "DOOR_WINDOW_1_SASH", "DOOR_WINDOW_2_SASH",
+            "VASISTAS_ONLY_1_SASH",
+        }
+        if rc not in supported:
             raise PricingError(
                 "MISSING_TECHNICAL_RECIPE",
                 configuration={"recipe_code": rc},
-                hint=f"Fase 1 supporta solo WINDOW_1_SASH. {rc} è nel backlog Fase 1B/1C.",
+                hint=f"M4 supporta {sorted(supported)}. {rc} nel backlog Fase 4B.",
             )
 
-        L = req.width_mm
-        H = req.height_mm
-        S = req.weld_allowance_mm
+        components: List[BomComponent] = []
 
-        components: List[BomComponent] = [
-            BomComponent(
-                role="FRAME",
-                component_code=V1_3_COMPONENT_PRICES.get("FRAME_PROEVOLUTION") and "FRAME_PROEVOLUTION" or "FRAME",
-                quantity_formula=f"2*(L+S) + 2*(H+S) [L={L},H={H},S={S}]",
-                quantity_value=frame_ml_1sash(L, H, S),
+        # === Profili base (comuni a tutte le tipologie con anta) ===
+        # FRAME (perimetro esterno)
+        components.append(BomComponent(
+            role="FRAME",
+            component_code="FRAME_PROEVOLUTION",
+            quantity_formula=f"2*(L+S) + 2*(H+S) [L={L},H={H},S={S}]",
+            quantity_value=frame_ml_1sash(L, H, S),
+            unit_of_measure="ml",
+            is_pvc_eligible=True,
+        ))
+        components.append(BomComponent(
+            role="FRAME_REINFORCEMENT",
+            component_code="FRAME_REINFORCEMENT_PROEVOLUTION",
+            quantity_formula=f"2*(L-70) + 2*(H-70) [L={L},H={H}]",
+            quantity_value=frame_reinforcement_ml_1sash(L, H),
+            unit_of_measure="ml",
+            is_pvc_eligible=False,
+        ))
+
+        # === SASH / SASH_REINFO / GLAZING_BEAD ===
+        # Per ricette con >1 anta, l'anta si sviluppa su n moduli. Modello semplificato:
+        # sash_perimeter_total = n_sashes × perimetro anta 1-anta (approssimazione geometrica V1_3).
+        sash_ml_per_sash = sash_ml_1sash(L // max(n_sashes, 1), H) if n_sashes >= 1 else Decimal(0)
+        # Per WINDOW/DOOR_WINDOW N-ante V1_3 usa perimetro anta calcolato su singola larghezza modulo.
+        # In assenza di formula ufficiale diversa, applichiamo il perimetro sash 1-anta standard.
+        if rc.endswith("_1_SASH") or rc.endswith("_ONLY_1_SASH"):
+            sash_qty = sash_ml_1sash(L, H)
+            sash_reinfo_qty = sash_reinforcement_ml_1sash(L, H)
+        else:
+            # 2 ante: perimetro totale ante ≈ 2 × perimetro modulo(L/2, H)
+            module_L = L // 2
+            sash_qty = Decimal(2) * sash_ml_1sash(module_L, H)
+            sash_reinfo_qty = Decimal(2) * sash_reinforcement_ml_1sash(module_L, H)
+
+        components.append(BomComponent(
+            role="SASH",
+            component_code="SASH_PROEVOLUTION",
+            quantity_formula=f"perimeter_sashes(n={n_sashes})",
+            quantity_value=sash_qty,
+            unit_of_measure="ml",
+            is_pvc_eligible=True,
+        ))
+        components.append(BomComponent(
+            role="SASH_REINFORCEMENT",
+            component_code="SASH_REINFORCEMENT_PROEVOLUTION",
+            quantity_formula=f"perimeter_sash_reinfo(n={n_sashes})",
+            quantity_value=sash_reinfo_qty,
+            unit_of_measure="ml",
+            is_pvc_eligible=False,
+        ))
+        components.append(BomComponent(
+            role="GLAZING_BEAD",
+            component_code="GLAZING_BEAD_PROEVOLUTION",
+            quantity_formula=f"sash_perimeter(n={n_sashes})",
+            quantity_value=sash_qty,
+            unit_of_measure="ml",
+            is_pvc_eligible=True,
+            notes="Placeholder 2.10 €/ml — NEEDS_PO_CONFIRMATION per listino Enerhia reale.",
+        ))
+
+        # === MEETING_STILE (solo n_sashes > 1) — V1_3: H/1000 × 5.50 ===
+        if n_sashes > 1:
+            ms_qty = Decimal(H) / Decimal(1000)   # ml (unit_cost 5.50 €/ml → letto da listino)
+            components.append(BomComponent(
+                role="MEETING_STILE",
+                component_code="MEETING_STILE_PROEVOLUTION",
+                quantity_formula=f"H/1000 [H={H}] × qty",
+                quantity_value=ms_qty,
                 unit_of_measure="ml",
                 is_pvc_eligible=True,
-            ),
-            BomComponent(
-                role="FRAME_REINFORCEMENT",
-                component_code="FRAME_REINFORCEMENT_PROEVOLUTION",
-                quantity_formula=f"2*(L-70) + 2*(H-70) [L={L},H={H}]",
-                quantity_value=frame_reinforcement_ml_1sash(L, H),
+            ))
+
+        # === THRESHOLD (solo DOOR_WINDOW) — V1_3 soglia ribassata ===
+        # DW_1: H/1000 × 29.50 + 7.49
+        # DW_2: H/1000 × 29.50 + 9.84
+        if rc.startswith("DOOR_WINDOW_"):
+            variable = Decimal(H) / Decimal(1000)   # ml (unit_cost 29.50 €/ml)
+            fixed_part = Decimal("7.49") if rc == "DOOR_WINDOW_1_SASH" else Decimal("9.84")
+            components.append(BomComponent(
+                role="THRESHOLD",
+                component_code="REDUCED_THRESHOLD_PROEVOLUTION",
+                quantity_formula=f"variable=H/1000, fixed={fixed_part} € [H={H}]",
+                quantity_value=variable,
                 unit_of_measure="ml",
                 is_pvc_eligible=False,
-            ),
-            BomComponent(
-                role="SASH",
-                component_code="SASH_PROEVOLUTION",
-                quantity_formula=f"2*(L-206) + 2*(H-206) [L={L},H={H}]",
-                quantity_value=sash_ml_1sash(L, H),
-                unit_of_measure="ml",
-                is_pvc_eligible=True,
-            ),
-            BomComponent(
-                role="SASH_REINFORCEMENT",
-                component_code="SASH_REINFORCEMENT_PROEVOLUTION",
-                quantity_formula=f"2*(L-186) + 2*(H-186) [L={L},H={H}]",
-                quantity_value=sash_reinforcement_ml_1sash(L, H),
-                unit_of_measure="ml",
+                notes=f"Costo variabile H/1000 × unit_cost + costo fisso {fixed_part} €",
+            ))
+            components.append(BomComponent(
+                role="THRESHOLD_FIXED_COMPONENT",
+                component_code="REDUCED_THRESHOLD_FIXED_PROEVOLUTION",
+                quantity_formula=f"fixed {fixed_part} €",
+                quantity_value=Decimal(1),
+                unit_of_measure="pz",
                 is_pvc_eligible=False,
-            ),
-            # GLAZING_BEAD — richiesto dalla specifica Milestone 1 (7 componenti obbligatori).
-            # V1_3 GT-01 non fornisce il prezzo di riferimento (attende catalogo reale).
-            # Placeholder = 0 €/ml documentato in `notes` per non bloccare la vertical slice.
-            # Quando il prezzo sarà disponibile, sarà sufficiente aggiungere l'entry al listino
-            # o il valore in V1_3_COMPONENT_PRICES["GLAZING_BEAD_PROEVOLUTION"].
-            BomComponent(
-                role="GLAZING_BEAD",
-                component_code="GLAZING_BEAD_PROEVOLUTION",
-                quantity_formula=f"2*(L-206) + 2*(H-206) [sash perimeter, L={L},H={H}]",
-                quantity_value=sash_ml_1sash(L, H),
-                unit_of_measure="ml",
-                is_pvc_eligible=True,
-                notes="Prezzo di riferimento non ancora nel listino V1_3; usa placeholder 0€/ml (attende catalogo).",
-            ),
-        ]
+            ))
 
         # Vetro
-        gd = glass_dimensions_1sash(L, H)
-        real = glass_real_area_sqm(gd["width_mm"], gd["height_mm"])
-        billable = glass_billable_area_sqm(gd["width_mm"], gd["height_mm"])
-        gd_out = {
-            **gd,
-            "real_area_sqm": float(real),
-            "billable_area_sqm": float(billable),
-        }
+        if rc == "VASISTAS_ONLY_1_SASH" or rc.endswith("_1_SASH"):
+            gd = glass_dimensions_1sash(L, H)
+            real = glass_real_area_sqm(gd["width_mm"], gd["height_mm"])
+            billable = glass_billable_area_sqm(gd["width_mm"], gd["height_mm"])
+            gd_out = {**gd, "real_area_sqm": float(real), "billable_area_sqm": float(billable)}
+        else:
+            # 2 ante: due lastre modulo(L/2)
+            module_L = L // 2
+            gd_single = glass_dimensions_1sash(module_L, H)
+            real = glass_real_area_sqm(gd_single["width_mm"], gd_single["height_mm"])
+            billable = glass_billable_area_sqm(gd_single["width_mm"], gd_single["height_mm"])
+            gd_out = {
+                "width_mm": gd_single["width_mm"],
+                "height_mm": gd_single["height_mm"],
+                "quantity": 2,
+                "real_area_sqm": float(real * 2),
+                "billable_area_sqm": float(billable * 2),
+            }
 
         return BomResolution(
             components=components,
             glass_dimensions=gd_out,
-            hardware_role="WINDOW_STD",
-            production_time_hours=production_time_hours_for(req.window_type, req.number_of_sashes),
+            hardware_role=rc,   # useremo (window_type, n_sashes) nel TechnicalCostResolver
+            production_time_hours=None,  # letto dal resolver via production_time_configs
         )
 
 
@@ -345,6 +416,31 @@ class TechnicalCostResolver:
         foil_pvc_base = Decimal("0")   # base per pellicolato +10%
 
         for c in bom.components:
+            # THRESHOLD_FIXED_COMPONENT è un valore fisso € (parte fissa soglia ribassata):
+            #   DW_1: 7.49 €, DW_2: 9.84 €. Non richiede listino.
+            if c.role == "THRESHOLD_FIXED_COMPONENT":
+                # Recupera dal quantity_formula: già encoded il fixed_part nella notes precedente.
+                # Convenzione: quantity_value=1, unit_cost = fixed_part
+                # Determiniamo il fixed_part dal recipe code
+                fixed_part = Decimal("7.49") if ps.recipe_code == "DOOR_WINDOW_1_SASH" else Decimal("9.84")
+                price = fixed_part
+                total = price   # qty=1 pz
+                c.unit_cost = price
+                c.total_cost = total
+                material_cost += total
+                components_snapshot.append({
+                    "role": c.role,
+                    "component_code": c.component_code,
+                    "quantity_formula": c.quantity_formula,
+                    "quantity_value": str(c.quantity_value),
+                    "unit_of_measure": c.unit_of_measure,
+                    "unit_cost": str(price),
+                    "total_cost": str(total),
+                    "waste_pct": str(c.waste_pct),
+                    "is_pvc_eligible": c.is_pvc_eligible,
+                })
+                continue
+
             price = await self._load_component_price(req.tenant_id, c.component_code, c.role)
             total = c.quantity_value * price
             c.unit_cost = price

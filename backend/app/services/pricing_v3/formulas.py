@@ -102,8 +102,13 @@ PRODUCTION_TIME_HOURS = {
 def recipe_code(window_type: str, n_sashes: int) -> str:
     """Costruisce il recipe_code dai parametri di configurazione."""
     wt = (window_type or "WINDOW").upper()
+    # Casi speciali
+    if wt == "VASISTAS_ONLY":
+        return "VASISTAS_ONLY_1_SASH"
+    if wt == "SLIDING_DOOR_WINDOW":
+        return f"SLIDING_DOOR_WINDOW_{n_sashes}_SASH"
     if wt not in ("WINDOW", "DOOR_WINDOW"):
-        return f"{wt}_{n_sashes}_SASH"  # e.g. SLIDING_2_SASH, gestito in fasi future
+        return f"{wt}_{n_sashes}_SASH"
     return f"{wt}_{n_sashes}_SASH"
 
 
@@ -140,9 +145,13 @@ V1_3_COMPONENT_PRICES = {
     "FRAME_REINFORCEMENT_PROEVOLUTION": Decimal("1.52"),  # €/ml
     "SASH_PROEVOLUTION":               Decimal("2.31"),   # €/ml
     "SASH_REINFORCEMENT_PROEVOLUTION": Decimal("1.34"),   # €/ml
-    "GLAZING_BEAD_PROEVOLUTION":       Decimal("0.00"),   # €/ml — attende catalogo (V1_3 GT-01: "?")
-    "HARDWARE_WINDOW_STD":             Decimal("76.00"),  # € (fisso finestra)
-    "HARDWARE_DOOR_WINDOW_STD":        None,              # da confermare
+    "GLAZING_BEAD_PROEVOLUTION":       Decimal("2.10"),   # €/ml — placeholder, NEEDS_PO_CONFIRMATION
+    "MEETING_STILE_PROEVOLUTION":      Decimal("5.50"),   # €/ml (scambio battuta V1_3 BR-08)
+    "REDUCED_THRESHOLD_PROEVOLUTION":  Decimal("29.50"),  # €/ml variabile (soglia ribassata)
+    "REDUCED_THRESHOLD_FIXED_PROEVOLUTION": Decimal("1.00"),  # placeholder — usare THRESHOLD_FIXED_COMPONENT come pz × 7.49/9.84
+    "FIXED_MULLION_PROEVOLUTION":      Decimal("7.51"),   # €/ml montante fisso
+    "TRANSOM_PROEVOLUTION":            Decimal("7.50"),   # €/ml traverso
+    # Legacy hardcoded HARDWARE ora obsoleti — usare `hardware_rules` (Milestone 2)
 }
 
 
