@@ -38,7 +38,8 @@
 | 18 | RBAC finale | `IN_PROGRESS` (ruoli seedati) | — | — | 30% |
 | 19 | Obiettivi commerciali | `NOT_STARTED` | — | — | 0% |
 | 20 | Pagamenti + cash flow | `NOT_STARTED` | — | — | 0% |
-| 2.14 | Servizi & Prezzi Semplici (dual pricing) | `E2E_READY` (backend + seed listino Enerhia) | `/api/simple-services` | (questo turno) | 70% (UI in M5) |
+| 2.14 | Servizi & Prezzi Semplici (dual pricing) | `E2E_READY` (backend + seed listino Enerhia) | `/api/simple-services` | (post-M4) | 70% (UI in M5) |
+| MC | **Margin & Cash Flow Control** | `E2E_READY` (backend + 7/7 golden test) | `/api/margin-control/*` | (questo turno) | 70% (UI in M5) |
 
 ## Sezioni M2 (Configurazione tecnica) — dettaglio
 

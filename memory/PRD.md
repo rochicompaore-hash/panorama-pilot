@@ -1068,3 +1068,51 @@ M5 (Preventivatore commerciale unificato) è marcato `BLOCKED_BY_ARCHITECTURE`. 
 3. UI Commerciale Preventivo: `base_product_sale_price` visibile, `production_cost` nascosto al Commerciale
 4. Endpoint `POST /api/quotes/{id}/lines/from-configuration` con snapshot congelati (tech + comm + hash)
 5. Feature flag `USE_UNIFIED_PRICING_V3` in `quote_structure.py` (default false)
+
+---
+
+## 2026-02-19 — Margin Control + Cash Flow Control ✅
+
+### Modulo backend consegnato
+Nuovo router `/api/margin-control/*` con **7 endpoint** (rules, targets, company-dashboard, compute-snapshot).
+Nuove collection MongoDB: `margin_control_rules`, `margin_control_targets` (tenant-scoped, versionate).
+
+### Business rules Enerhia (configurabili, non hardcoded)
+- **Commissione**: `net_vat / 1.17 × 0.10` → `commercial_commission` (costo diretto)
+- **Ritenuta**: `net_vat / 1.22 × 0.11` se `withholding_applicable=YES` → `withholding_cash_effect` (NON è costo economico)
+- **Multiplier default**: 3.00
+
+### Separazione rigorosa applicata
+- `production_cost` **mai modificato** da sconto/commissione/ritenuta/fissi (verificato in test)
+- `contribution_margin` = **economic view** (include commissione, esclude ritenuta)
+- `expected_available_cash` = **cash view** (contribution − withholding)
+- `withholding_receivable` = credito da recuperare
+- Costi fissi/emergency/investment sono **allocations of company margin**, NON costi di commessa
+
+### Target aziendali
+Default `NEEDS_PO_CONFIGURATION` (nessun valore Enerhia inventato). Formule:
+- `MONTHLY_EMERGENCY_ALLOCATION = (target − current) / months`
+- `MONTHLY_INVESTMENT_ALLOCATION = remaining / months`
+- `REQUIRED_MONTHLY_CONTRIBUTION = fissi + emergency + investment + profit_target`
+- `REQUIRED_MARGIN_RATE = REQUIRED_CONTRIBUTION / MONTHLY_REVENUE_TARGET`
+- `MINIMUM_SUSTAINABLE_PRICE = variable_costs / (1 − required_margin_rate)`
+
+### Semaforo GREEN/YELLOW/ORANGE/RED con soglie configurabili (§26)
+Se target non configurati → `POLICY_NOT_CONFIGURED`, ma preventivo procede (§48).
+
+### Test — 17/17 verdi
+`test_margin_control.py` (7): §41 base numerico · §42 sconto · §9/§10/§43 ritenuta · §44 target math · §26 semaforo · §48 policy not configured · §22 immutabilità production_cost.
++ M3 (3/3) + M4 (7/7) invariati.
+
+### Deliverable
+- **`/app/memory/MARGIN_AND_CASHFLOW_CONTROL_V1.md`** — flusso completo, endpoint, RBAC, snapshot, integrazione M5
+- Master Status aggiornato con voce **MC**
+
+### Attesa (UI non implementata questa iterazione)
+- AMMINISTRAZIONE → CONTROLLO MARGINALITÀ (5 tab)
+- Financial snapshot preview panel real-time
+- Dashboard Cash Flow forecast mensile
+- Integrazione discount guard nel motore preventivo (M5)
+
+### Vincoli rispettati
+Nessuna pubblicazione produzione · Nessun blocco M5 aggiuntivo · Nessuna modifica al motore pricing_v3 · M3 BUSINESS_GOLDEN rimane separato (§49)
