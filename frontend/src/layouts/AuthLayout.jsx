@@ -31,7 +31,7 @@ export default function AuthLayout({ children, title, subtitle, testId }) {
             <h2 className="font-display text-4xl xl:text-5xl font-black tracking-tight leading-[1.05]">
               Precisione millimetrica.
               <br />
-              <span className="text-[hsl(var(--brand-red))]">Nel serramento.</span>
+              <span className="text-blue-400">Nel serramento.</span>
               <br />
               Nel software.
             </h2>
