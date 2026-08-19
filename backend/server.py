@@ -49,6 +49,7 @@ from app.routers.debug import router as debug_router
 from app.routers.pipelines import router as pipelines_router
 from app.routers.leads import router as leads_router
 from app.routers.customers import router as customers_router
+from app.routers.customer_timeline import router as customer_timeline_router
 from app.routers.contacts import router as contacts_router
 from app.routers.activities import router as activities_router
 from app.routers.tasks import router as tasks_router
@@ -215,7 +216,7 @@ FOUNDATION_ROUTERS = [
     onboarding_router, debug_router,
 ]
 CRM_ROUTERS = [
-    pipelines_router, leads_router, customers_router, contacts_router,
+    pipelines_router, leads_router, customers_router, customer_timeline_router, contacts_router,
     sites_router,   # Milestone 1 Enerhia — Cantieri
     activities_router, tasks_router, appointments_router,
     goals_router, commissions_router, dashboards_crm_router,

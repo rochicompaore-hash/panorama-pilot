@@ -1,0 +1,34 @@
+{
+  "summary": "M1 Part 2 (Cliente + Cantiere + Timeline + Nuovo Preventivo vincolato) — backend 15/15 pytest passing, frontend full happy-path (desktop + mobile) passing. Verified: PRIVATE/COMPANY creation with progressive CLI-000### (CLI-000006→7 during test), PRIVATE_REQUIRES_NAME/COMPANY_REQUIRES_NAME 400, legacy PATCH requires customer_type (CUSTOMER_TYPE_REQUIRED), timeline SYSTEM event on site/quote create, timeline CALL/PHONE manual event, SYSTEM_EVENT_READONLY + INVALID_CATEGORY 400s, quote create with site_id + rejection when site not owned by customer, /customers UI (N° CLIENTE column, badge Privato/Azienda, legacy '—'), NewCustomerDialog PRIVATE tab creates customer and redirects to detail with 5 tabs (Panoramica/Anagrafica/Cantieri/Timeline/Preventivi), SitesTab creates site with CANT-YYYY-##### and shows Appartamento/Piano/Ascensore badges, TimelineTab posts CALL and shows CHIAMATA/PHONE badges, CustomerQuotesTab creates quote via site select and redirects to /quotes/:id, /quotes NewQuoteDialog has customer+site selects (site disabled until customer), submit disabled until both filled. Mobile 390x844: creation flow reachable, tabs visible, site form usable.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CustomerDetailPage timeline tab (desktop)", "issues": ["Il badge 'SYSTEM' non è stato rilevato immediatamente dopo l'apertura del tab (possibile race di primo fetch — non bloccante). Verificato che il badge è renderizzato correttamente quando event_source==='SYSTEM' (label 'Sistema' + badge 'SYSTEM' zinc). Suggerimento: aggiungere skeleton/loader nel tab timeline durante il primo fetch."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_m1_part2_customers_sites_timeline.py",
+    "/app/test_reports/pytest/m1_part2.xml"
+  ],
+  "action_items": [
+    "(Nice-to-have) Aggiungere skeleton/loader al Timeline tab per evitare che l'utente veda un tab vuoto al primo apertura prima del fetch.",
+    "(Nice-to-have) In /quotes NewQuoteDialog il site trigger risulta con data-disabled='' (stringa vuota) invece di essere realmente 'disabled' — il submit è correttamente disabled fino a quando site è selezionato, ma sarebbe più chiaro impedire l'apertura del dropdown site quando customer non è scelto (verificare prop `disabled={!customerId}` sul SelectTrigger)."
+  ],
+  "critical_code_review_comments": [
+    "backend/app/routers/sites.py::_next_site_number usa count_documents non atomico e include record archiviati (deleted_at != null) → possibile collisione/salto in caso di soft-delete o race. Idealmente andrebbe usato sequences.find_one_and_update con $inc come per customer_number.",
+    "backend/app/routers/customer_timeline.py — POST timeline con category=CALL non richiede channel: valutare se PHONE debba essere obbligatorio per CALL (attualmente channel è opzionale).",
+    "backend/app/routers/customers.py POST → il timeline system event è racchiuso in try/except silenzioso: log strutturato consigliato per non perdere errori silenziosi in produzione."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_m1_part2_customers_sites_timeline.py"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% happy path (desktop + mobile)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "seed_data_creation": "Test crea customers/sites/quotes con prefissi TEST_/UITEST/MobMario. Alcuni cleanup DELETE eseguiti sui customer creati dai test pytest; i dati creati dal test playwright (2 clienti PRIVATE, 1 sito, 2 preventivi, eventi timeline) restano nel DB tenant Infissi Express.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Il file /app/backend/tests/test_m1_part2_customers_sites_timeline.py copre create private/company, progressive customer_number, error codes PRIVATE_REQUIRES_NAME/COMPANY_REQUIRES_NAME/CUSTOMER_TYPE_REQUIRED, legacy PATCH gating, sites create + SYSTEM event, timeline POST rules, quote with site_id validation. Usa pytest -n 0 per evitare che pytest-xdist splitti tra worker (i test condividono stato via pytest.<attr>). Il quote convert-to-contract e il gate MISSING_CUSTOMER_TAX_CODE NON sono stati testati in questa iterazione (era esplicitamente indicato come fuori scope diretto: verrà testato in milestone Contratti).",
+  "rca of the issue": "N/A — nessuna regressione bloccante trovata."
+}

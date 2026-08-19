@@ -127,18 +127,45 @@ class LeadUpdate(BaseModel):
 
 
 # ---------- Customer ----------
-class Customer(BaseDoc):
+# Enerhia Operating Core — Milestone 1 Part 2
+# customer_type valori canonici: PRIVATE | COMPANY | TO_CONFIRM
+# Retro-compat: valori legacy "private" e "business" sono mappati in lettura ma
+# il primo edit deve forzare la ri-classificazione.
+
+
+class ContactPerson(BaseModel):
+    """Referente aziendale (per COMPANY)."""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    role: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class Customer(BaseDoc):
+    # Progressivo per tenant, atomico, non riutilizzabile
+    customer_number: Optional[str] = None
+    # Classificazione anagrafica
+    customer_type: str = "TO_CONFIRM"  # PRIVATE | COMPANY | TO_CONFIRM
+    # Persona (PRIVATE)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    # Azienda (COMPANY)
     company_name: Optional[str] = None
+    contact_person: ContactPerson = Field(default_factory=ContactPerson)
+    # Contatti
     email: Optional[str] = None
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
-    address: LeadAddress = Field(default_factory=LeadAddress)
+    pec: Optional[str] = None
+    sdi_code: Optional[str] = None
+    # Indirizzi
+    address: LeadAddress = Field(default_factory=LeadAddress)          # residenza / sede legale
     billing_address: Optional[LeadAddress] = None
+    # Dati fiscali
     vat_number: Optional[str] = None
     tax_code: Optional[str] = None
-    customer_type: str = "private"  # private | business
+    # Assegnazioni / meta
     assigned_to: Optional[str] = None
     origin_lead_id: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
@@ -147,34 +174,40 @@ class Customer(BaseDoc):
 
 
 class CustomerCreate(BaseModel):
+    customer_type: str = "PRIVATE"  # PRIVATE | COMPANY
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     company_name: Optional[str] = None
+    contact_person: Optional[ContactPerson] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
+    pec: Optional[str] = None
+    sdi_code: Optional[str] = None
     address: Optional[LeadAddress] = None
     billing_address: Optional[LeadAddress] = None
     vat_number: Optional[str] = None
     tax_code: Optional[str] = None
-    customer_type: str = "private"
     assigned_to: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     notes: Optional[str] = None
 
 
 class CustomerUpdate(BaseModel):
+    customer_type: Optional[str] = None  # PRIVATE | COMPANY (TO_CONFIRM non accettato in update)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     company_name: Optional[str] = None
+    contact_person: Optional[ContactPerson] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
+    pec: Optional[str] = None
+    sdi_code: Optional[str] = None
     address: Optional[LeadAddress] = None
     billing_address: Optional[LeadAddress] = None
     vat_number: Optional[str] = None
     tax_code: Optional[str] = None
-    customer_type: Optional[str] = None
     assigned_to: Optional[str] = None
     tags: Optional[List[str]] = None
     notes: Optional[str] = None

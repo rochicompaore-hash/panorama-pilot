@@ -147,14 +147,32 @@ async def create_quote(body: QuoteCreate, request: Request, user: dict = Depends
     if body.customer_id:
         cust = await db.customers.find_one({"_id": body.customer_id, "tenant_id": user["tenant_id"], "deleted_at": None})
         if not cust: raise HTTPException(status_code=400, detail="Cliente non valido")
+    site_doc = None
+    if body.site_id:
+        if not body.customer_id:
+            raise HTTPException(status_code=400, detail="site_id richiede customer_id")
+        site_doc = await db.sites.find_one({"_id": body.site_id, "tenant_id": user["tenant_id"],
+                                              "customer_id": body.customer_id, "deleted_at": None})
+        if not site_doc:
+            raise HTTPException(status_code=400, detail="Cantiere non valido per il cliente indicato")
 
     number, n_int = await _next_quote_number(user["tenant_id"])
+    # Se abbiamo un cantiere, pre-compila il site_address con i dati del cantiere
+    resolved_site_address = body.site_address or LeadAddress()
+    if site_doc and not body.site_address:
+        resolved_site_address = LeadAddress(
+            street=" ".join([str(x) for x in [site_doc.get("address"), site_doc.get("street_number")] if x]) or None,
+            city=site_doc.get("city"),
+            zip_code=site_doc.get("postal_code"),
+            province=site_doc.get("province"),
+            country=site_doc.get("country") or "IT",
+        )
     q = Quote(
         id=new_id(), tenant_id=user["tenant_id"],
         number=f"{number}-R00", number_int=n_int, revision=0, revision_label="R00",
-        lead_id=body.lead_id, customer_id=body.customer_id, contact_id=body.contact_id,
+        lead_id=body.lead_id, customer_id=body.customer_id, site_id=body.site_id, contact_id=body.contact_id,
         assigned_to=body.assigned_to or user["id"],
-        site_address=body.site_address or LeadAddress(),
+        site_address=resolved_site_address,
         title=body.title or f"Preventivo {number}",
         intervention_type=body.intervention_type,
         payment_terms=body.payment_terms, valid_until=body.valid_until,
@@ -166,11 +184,21 @@ async def create_quote(body: QuoteCreate, request: Request, user: dict = Depends
     await db.quotes.insert_one(doc)
     await record_audit(action="quotes.create", tenant_id=user["tenant_id"], user_id=user["id"],
                        user_email=user["email"], ip=get_client_ip(request),
-                       entity_type="quote", entity_id=q.id, after={"number": q.number})
+                       entity_type="quote", entity_id=q.id, after={"number": q.number, "site_id": q.site_id})
     await record_activity(tenant_id=user["tenant_id"], type="quote_created",
                           subject=f"Preventivo {q.number} creato",
                           lead_id=q.lead_id, customer_id=q.customer_id, quote_id=q.id,
                           user_id=user["id"], user_email=user["email"])
+    # Timeline system event sul cliente
+    if q.customer_id:
+        try:
+            from app.routers.customer_timeline import _record_system_event
+            await _record_system_event(db, tenant_id=user["tenant_id"], customer_id=q.customer_id,
+                                        user=user, site_id=q.site_id,
+                                        title=f"Preventivo {q.number} creato",
+                                        body=f"Nuovo preventivo{(' per cantiere ' + (site_doc.get('site_number') or site_doc.get('name'))) if site_doc else ''}.")
+        except Exception:
+            pass
     perms = await _get_perms(user)
     return _strip_costs_if_needed(from_mongo(await db.quotes.find_one({"_id": q.id})), perms)
 
@@ -643,6 +671,12 @@ async def convert_to_contract(qid: str, request: Request, user: dict = Depends(r
             detail=f"Il preventivo deve avere quote_status in {sorted(allowed_source_status)} (attuale: {doc.get('quote_status')})")
     if not doc.get("is_current", True):
         raise HTTPException(status_code=400, detail="Revisione superata: non convertibile")
+    # Gate fiscale — MISSING_CUSTOMER_TAX_CODE (Milestone 1 Part 2)
+    if doc.get("customer_id"):
+        cust = await db.customers.find_one({"_id": doc["customer_id"], "tenant_id": user["tenant_id"], "deleted_at": None})
+        if cust:
+            from app.services.customer_validation import validate_customer_contract_readiness
+            validate_customer_contract_readiness(cust)
     # If signed, require a signature evidence record
     signature_ref = None
     if doc.get("quote_status") == "signed":

@@ -70,6 +70,7 @@ class Quote(BaseDoc):
     # linking
     lead_id: Optional[str] = None
     customer_id: Optional[str] = None
+    site_id: Optional[str] = None
     contact_id: Optional[str] = None
     assigned_to: Optional[str] = None
     site_address: LeadAddress = Field(default_factory=LeadAddress)
@@ -129,6 +130,7 @@ class Quote(BaseDoc):
 class QuoteCreate(BaseModel):
     lead_id: Optional[str] = None
     customer_id: Optional[str] = None
+    site_id: Optional[str] = None
     contact_id: Optional[str] = None
     title: Optional[str] = None
     intervention_type: str = "new"

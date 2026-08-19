@@ -111,6 +111,15 @@ async def create_site(payload: SiteCreate,
     }
     await db.sites.insert_one(doc)
     doc["id"] = doc.pop("_id")
+    # Timeline system event sul cliente
+    try:
+        from app.routers.customer_timeline import _record_system_event
+        await _record_system_event(db, tenant_id=user["tenant_id"], customer_id=payload.customer_id,
+                                    user=user, site_id=doc["id"],
+                                    title=f"Cantiere {site_number} creato",
+                                    body=f"{payload.name}" + (f" · {payload.city}" if payload.city else ""))
+    except Exception:
+        pass
     return doc
 
 

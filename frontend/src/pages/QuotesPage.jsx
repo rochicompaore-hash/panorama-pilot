@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, formatApiError } from "@/api/client";
@@ -11,8 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, FileText } from "@phosphor-icons/react";
+import { Plus, ArrowRight } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { customerDisplayName } from "@/components/customers/CustomerTypeBadge";
 
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0); } catch { return "€ 0"; } }
 
@@ -25,7 +26,11 @@ export default function QuotesPage() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const { data } = useQuery({ queryKey: ["quotes", q], queryFn: async () => (await api.get("/quotes", { params: { q: q || undefined, limit: 200 } })).data });
-  const createMut = useMutation({ mutationFn: async (p) => (await api.post("/quotes", p)).data, onSuccess: (d) => { toast.success("Preventivo creato"); qc.invalidateQueries({ queryKey: ["quotes"] }); setOpen(false); navigate(`/quotes/${d.id}`); }, onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message) });
+  const createMut = useMutation({
+    mutationFn: async (p) => (await api.post("/quotes", p)).data,
+    onSuccess: (d) => { toast.success("Preventivo creato"); qc.invalidateQueries({ queryKey: ["quotes"] }); setOpen(false); navigate(`/quotes/${d.id}`); },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
+  });
 
   return (
     <div className="space-y-8" data-testid="quotes-page">
@@ -75,39 +80,125 @@ export default function QuotesPage() {
   );
 }
 
+/**
+ * NewQuoteDialog — Milestone 1 Part 2
+ * Cliente obbligatorio → Cantiere obbligatorio filtrato per customer.
+ */
 function NewQuoteDialog({ onSubmit, loading }) {
-  const [f, setF] = useState({ title: "", lead_id: "", customer_id: "", intervention_type: "new", payment_terms: "", notes: "" });
-  const upd = (k, v) => setF(x => ({ ...x, [k]: v }));
-  const { data: leads } = useQuery({ queryKey: ["leads-for-quote"], queryFn: async () => (await api.get("/leads", { params: { limit: 100 } })).data });
-  const { data: customers } = useQuery({ queryKey: ["customers-for-quote"], queryFn: async () => (await api.get("/customers", { params: { limit: 100 } })).data });
+  const [customerId, setCustomerId] = useState("");
+  const [siteId, setSiteId] = useState("");
+  const [title, setTitle] = useState("");
+  const [intervention, setIntervention] = useState("new");
+  const [paymentTerms, setPaymentTerms] = useState("");
+  const navigate = useNavigate();
+
+  const { data: customers } = useQuery({
+    queryKey: ["customers-for-quote-picker"],
+    queryFn: async () => (await api.get("/customers", { params: { limit: 500 } })).data,
+  });
+  const { data: sites, isFetching: sitesLoading } = useQuery({
+    enabled: !!customerId,
+    queryKey: ["sites-for-quote", customerId],
+    queryFn: async () => (await api.get("/sites", { params: { customer_id: customerId } })).data,
+  });
+
+  useEffect(() => { setSiteId(""); }, [customerId]);
+
+  const currentCustomer = useMemo(
+    () => (customers?.items || []).find((c) => c.id === customerId),
+    [customers, customerId],
+  );
+  const noSites = !!customerId && !sitesLoading && (sites?.items || []).length === 0;
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!customerId || !siteId) {
+      toast.error("Selezionare cliente e cantiere");
+      return;
+    }
+    onSubmit({
+      customer_id: customerId,
+      site_id: siteId,
+      title: title || undefined,
+      intervention_type: intervention,
+      payment_terms: paymentTerms || undefined,
+    });
+  };
+
   return (
     <DialogContent className="rounded-sm max-w-lg" data-testid="new-quote-dialog">
       <DialogHeader>
         <DialogTitle className="font-display tracking-tight">Nuovo preventivo</DialogTitle>
-        <DialogDescription>Collega un lead o cliente esistente.</DialogDescription>
+        <DialogDescription>Cliente → Cantiere → Preventivo. Entrambi i passi sono obbligatori.</DialogDescription>
       </DialogHeader>
-      <form onSubmit={(e) => { e.preventDefault(); const payload = { ...f }; if (!payload.lead_id) delete payload.lead_id; if (!payload.customer_id) delete payload.customer_id; onSubmit(payload); }} className="space-y-3">
-        <div><Label className="overline">Titolo</Label><Input value={f.title} onChange={(e) => upd("title", e.target.value)} placeholder="Es. Sostituzione infissi Rossi" className="rounded-sm h-10" data-testid="nq-title" /></div>
-        <div><Label className="overline">Lead (opzionale)</Label>
-          <Select value={f.lead_id} onValueChange={(v) => upd("lead_id", v)}>
-            <SelectTrigger className="rounded-sm h-10" data-testid="nq-lead"><SelectValue placeholder="Seleziona lead…" /></SelectTrigger>
-            <SelectContent>{(leads?.items || []).map(l => <SelectItem key={l.id} value={l.id}>{`${l.first_name || ""} ${l.last_name || ""}`.trim() || l.company_name || l.email}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-        <div><Label className="overline">Cliente (opzionale)</Label>
-          <Select value={f.customer_id} onValueChange={(v) => upd("customer_id", v)}>
+      <form onSubmit={submit} className="space-y-3">
+        <div>
+          <Label className="overline">Cliente *</Label>
+          <Select value={customerId} onValueChange={setCustomerId}>
             <SelectTrigger className="rounded-sm h-10" data-testid="nq-customer"><SelectValue placeholder="Seleziona cliente…" /></SelectTrigger>
-            <SelectContent>{(customers?.items || []).map(c => <SelectItem key={c.id} value={c.id}>{`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.company_name}</SelectItem>)}</SelectContent>
+            <SelectContent>
+              {(customers?.items || []).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.customer_number ? `${c.customer_number} · ` : ""}{customerDisplayName(c)}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
-        <div><Label className="overline">Tipo intervento</Label>
-          <Select value={f.intervention_type} onValueChange={(v) => upd("intervention_type", v)}>
+
+        <div>
+          <Label className="overline">Cantiere *</Label>
+          <Select value={siteId} onValueChange={setSiteId} disabled={!customerId || noSites}>
+            <SelectTrigger className="rounded-sm h-10" data-testid="nq-site">
+              <SelectValue placeholder={!customerId ? "Seleziona prima un cliente" : noSites ? "Nessun cantiere per questo cliente" : "Seleziona cantiere…"} />
+            </SelectTrigger>
+            <SelectContent>
+              {(sites?.items || []).map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.site_number} · {s.name} {s.city ? `(${s.city})` : ""}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {noSites && (
+            <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-sm p-2 flex items-center justify-between" data-testid="nq-no-sites">
+              <span>Il cliente non ha cantieri.</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="rounded-sm h-7 gap-1"
+                onClick={() => navigate(`/customers/${customerId}`)}
+                data-testid="nq-create-site"
+              >
+                Vai al cliente <ArrowRight size={14} />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <Label className="overline">Titolo</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Es. Sostituzione infissi" className="rounded-sm h-10" data-testid="nq-title" />
+        </div>
+        <div>
+          <Label className="overline">Tipo intervento</Label>
+          <Select value={intervention} onValueChange={setIntervention}>
             <SelectTrigger className="rounded-sm h-10" data-testid="nq-type"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="new">Nuova costruzione</SelectItem><SelectItem value="renovation">Ristrutturazione</SelectItem><SelectItem value="replacement">Sostituzione</SelectItem></SelectContent>
+            <SelectContent>
+              <SelectItem value="new">Nuova costruzione</SelectItem>
+              <SelectItem value="renovation">Ristrutturazione</SelectItem>
+              <SelectItem value="replacement">Sostituzione</SelectItem>
+            </SelectContent>
           </Select>
         </div>
-        <div><Label className="overline">Termini pagamento</Label><Input value={f.payment_terms} onChange={(e) => upd("payment_terms", e.target.value)} placeholder="Es. 30% acconto, 70% a saldo" className="rounded-sm h-10" data-testid="nq-payment" /></div>
-        <DialogFooter><Button type="submit" disabled={loading || (!f.lead_id && !f.customer_id)} className="rounded-sm" data-testid="nq-submit">{loading ? "…" : "Crea preventivo"}</Button></DialogFooter>
+        <div>
+          <Label className="overline">Termini pagamento</Label>
+          <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="Es. 30% acconto, 70% a saldo" className="rounded-sm h-10" data-testid="nq-payment" />
+        </div>
+        <DialogFooter>
+          <Button type="submit" disabled={loading || !customerId || !siteId} className="rounded-sm" data-testid="nq-submit">
+            {loading ? "…" : "Crea preventivo"}
+          </Button>
+        </DialogFooter>
       </form>
     </DialogContent>
   );

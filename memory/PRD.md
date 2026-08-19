@@ -919,3 +919,30 @@ Attendo:
 3. Approvazione esplicita per avviare Fase 1 (Unificazione Sistema B → Sistema A)
 
 Fino ad allora — nessuna modifica al codice.
+
+---
+
+## 2026-02-19 — Milestone 1 Enerhia Operating Core (PART 2 / FINAL) ✅
+
+Implementato flusso completo **Cliente → Cantiere → Timeline → Preventivo** con UI Italia.
+
+### Cosa è stato consegnato
+- **Customer esteso**: `customer_type` PRIVATE/COMPANY/TO_CONFIRM (retro-compat con legacy `private`/`business`), `customer_number` progressivo continuo `CLI-000001` per tenant (atomico, non riutilizzabile, niente reset annuale), `contact_person{}` strutturato, PEC, SDI.
+- **Timeline strutturata**: `/api/customers/{id}/timeline` con categorie CALL/FOLLOW_UP/COMMERCIAL_NOTE/TECHNICAL_NOTE/ADMIN_NOTE/INSTALLATION_NOTE/SUPPORT_NOTE/SYSTEM_EVENT + channel PHONE/EMAIL/WHATSAPP/IN_PERSON/SYSTEM/OTHER + event_source MANUAL|SYSTEM. Eventi SYSTEM read-only, emessi automaticamente su create Customer/Site/Quote.
+- **Site integrato UI**: SitesTab con CRUD (CANT-YYYY-NNNNN + property_type/floor/elevator/logistics).
+- **Quote vincolato al Site**: `site_id` obbligatorio nella UI, validato server-side (customer/tenant match), pre-compila site_address.
+- **Gate `MISSING_CUSTOMER_TAX_CODE`**: applicato SOLO su `POST /quotes/{id}/convert-to-contract` tramite `validate_customer_contract_readiness()` riutilizzabile.
+- **CustomerDetailPage**: 5 tab (Panoramica, Anagrafica, Cantieri, Timeline, Preventivi) + banner "Da confermare" con edit forzato per legacy.
+- **QuotesPage**: nuovo modal Cliente → Cantiere obbligatori con warning inline se cliente senza cantieri.
+
+### Test (iter29 · testing_agent_v3_fork)
+- 15/15 backend pytest, frontend happy-path desktop + mobile 390px passing.
+- Nessun bug aperto.
+
+### Vincoli rispettati
+- Nessuna modifica a pricing V3, commercial_perimeter, catalog, formule, listini, PDF, produzione, contratti (a parte gate isolato in convert-to-contract).
+- Backward compatibility verificata su clienti legacy.
+- Tenant isolation invariata.
+
+### STOP
+Milestone 1 chiusa. In attesa del **collaudo manuale** dell'utente prima di iniziare Milestone 2 (Configurazione Tecnica).
