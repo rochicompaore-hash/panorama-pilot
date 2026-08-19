@@ -68,6 +68,7 @@ from app.routers.importer import router as importer_router
 from app.routers.pdf_router import router as pdf_router
 from app.routers.pricing_v3 import router as pricing_v3_router
 from app.routers.tech_config import router as tech_config_router
+from app.routers.sites import router as sites_router
 
 # Ops & Production (M4–M8)
 from app.routers.surveys import router as surveys_router
@@ -215,6 +216,7 @@ FOUNDATION_ROUTERS = [
 ]
 CRM_ROUTERS = [
     pipelines_router, leads_router, customers_router, contacts_router,
+    sites_router,   # Milestone 1 Enerhia — Cantieri
     activities_router, tasks_router, appointments_router,
     goals_router, commissions_router, dashboards_crm_router,
 ]
