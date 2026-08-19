@@ -946,3 +946,52 @@ Implementato flusso completo **Cliente → Cantiere → Timeline → Preventivo*
 
 ### STOP
 Milestone 1 chiusa. In attesa del **collaudo manuale** dell'utente prima di iniziare Milestone 2 (Configurazione Tecnica).
+
+---
+
+## 2026-02-19 — Milestone 2 & 3 (P0 parte) — Enerhia Operating Core
+
+### Consegnato
+- **Configurazione tecnica come single source of truth** (3 nuove collezioni + 3 endpoint CRUD + 3 tab UI):
+  - `glass_price_configs`: DOUBLE_STANDARD 76 · DOUBLE_SATIN 96 · TRIPLE_STANDARD 125 · TRIPLE_SATIN 156.25 €/m² con min 0.5 m² per pannello.
+  - `hardware_rules`: WINDOW_1_SASH 60 · WINDOW_2_SASH 80 · DOOR_WINDOW_1_SASH 75 · DOOR_WINDOW_2_SASH 90 · SLIDING_DOOR_WINDOW 380 €/anta · VASISTAS_ONLY 40. Resolver `(opening_type, number_of_sashes)`.
+  - `production_time_configs`: WINDOW 0.75/1.00/2.30 · DOOR_WINDOW 1.00/1.50/3.00 h.
+- **Motore Unified Pricing v3** ora legge tutti i valori da DB (fail-closed su `MISSING_GLASS_PRICE`/`MISSING_HARDWARE_RULE`/`MISSING_PRODUCTION_TIME`). Costanti V1_3 restano come fallback documentato.
+- **Rimosso hardware 76 €** cablato: ora `WINDOW_1_SASH` legge dal DB → 60 €. Nessun altro valore hardcoded per hardware.
+- **Golden Test M3** (pytest, 3/3 passing): report riga-per-riga per GT-REAL (ProEvolution WINDOW 1 sash 1200×1400) + verifica hw=60 + verifica glass min 0.5m².
+
+### GT-REAL — report
+```
+FRAME              5.212 × 4.02  =  20.95
+FRAME_REINFO       4.920 × 1.52  =   7.48
+SASH               4.376 × 2.31  =  10.11
+SASH_REINFO        4.456 × 1.34  =   5.97
+GLAZING_BEAD       4.376 × 2.10  =   9.19
+MATERIAL COST                    =  53.70
+GLASS              1.187 × 76.00 =  90.20
+HARDWARE                         =  60.00  (era 76, ora corretto)
+LABOR              0.75  × 180   = 135.00
+FOIL SURCHARGE                   =   0.00
+─────────────────────────────────────────
+TOTAL INTERNAL                     338.90
+EXCEL TARGET                     ≈ 310.56
+DELTA                              +28.34  (probabile: prezzi profili V1_3 di riferimento ≠ listino Enerhia reale)
+```
+Delta NON forzato: come da Master Plan si documenta la riga responsabile. La correzione avverrà quando Enerhia fornirà i prezzi ufficiali dei profili (usare tab "Prezzi componenti" senza modificare codice).
+
+### Milestone status snapshot
+| M1 Customer/Site/Timeline | E2E_READY ✅ |
+| M2 Configurazione tecnica P0 | E2E_READY ✅ (2.4, 2.5, 2.6, 2.7, 2.13) |
+| M3 Golden Test | E2E_READY ✅ (report generato) |
+| M4-M20 | NOT_STARTED |
+
+### Bloccanti in attesa cliente
+- Prezzo `GLAZING_BEAD_PROEVOLUTION` reale (oggi 2.10 placeholder)
+- Prezzi profili V1_3 (FRAME/SASH/rinforzi) — delta 28.34 € vs Excel
+- Ricetta 3-ante telaio unico
+- Ricette DOOR_WINDOW_*, WINDOW_2_SASH, VASISTAS_ONLY (fail-closed corretto oggi)
+
+### STOP
+M4 (copertura DOOR_WINDOW/WINDOW_2_SASH/VASISTAS con formule V1_3 complete: meeting stile 5.50 €/ml, threshold H×29.50+7.49/9.84, montante 7.51 €/ml, transom 7.50 €/ml, pellicolato +10%) è la prossima milestone approvata dal Master Plan. Non iniziata in questo turno per rispettare i limiti di context.
+
+**Non pubblicare in produzione fino al collaudo utente.**

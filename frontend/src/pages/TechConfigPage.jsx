@@ -25,15 +25,21 @@ export default function TechConfigPage() {
         </p>
       </div>
       <Tabs defaultValue="workshop">
-        <TabsList data-testid="tech-config-tabs">
+        <TabsList data-testid="tech-config-tabs" className="flex flex-wrap h-auto">
           <TabsTrigger value="workshop" data-testid="tab-workshop">Costo officina</TabsTrigger>
           <TabsTrigger value="commercial" data-testid="tab-commercial">Regola commerciale</TabsTrigger>
           <TabsTrigger value="components" data-testid="tab-components">Prezzi componenti</TabsTrigger>
+          <TabsTrigger value="glass" data-testid="tab-glass">Vetri</TabsTrigger>
+          <TabsTrigger value="hardware" data-testid="tab-hardware">Ferramenta</TabsTrigger>
+          <TabsTrigger value="prodtime" data-testid="tab-prodtime">Tempi produzione</TabsTrigger>
           <TabsTrigger value="recipes" data-testid="tab-recipes">Ricette tecniche</TabsTrigger>
         </TabsList>
         <TabsContent value="workshop"><WorkshopCostTab /></TabsContent>
         <TabsContent value="commercial"><CommercialRuleTab /></TabsContent>
         <TabsContent value="components"><ComponentPricesTab /></TabsContent>
+        <TabsContent value="glass"><GlassPricesTab /></TabsContent>
+        <TabsContent value="hardware"><HardwareRulesTab /></TabsContent>
+        <TabsContent value="prodtime"><ProductionTimesTab /></TabsContent>
         <TabsContent value="recipes"><TechnicalRecipesTab /></TabsContent>
       </Tabs>
     </div>
@@ -240,6 +246,230 @@ function TechnicalRecipesTab() {
         <p className="text-xs text-muted-foreground mt-4">
           Editing ricette pianificato nelle Milestone successive. Per ora le ricette sono cablate in `pricing_v3/formulas.py` e seedate via script.
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+// =====================================================================
+// GLASS PRICES TAB — Milestone 2 (Enerhia Operating Core)
+// =====================================================================
+function GlassPricesTab() {
+  const [items, setItems] = useState([]);
+  const [saving, setSaving] = useState("");
+
+  const load = async () => {
+    const r = await api.get("/tech-config/glass-prices");
+    setItems(r.data.items || []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async (row) => {
+    setSaving(row.glass_type);
+    try {
+      await api.put(`/tech-config/glass-prices/${row.glass_type}`, {
+        glass_type: row.glass_type,
+        unit_price_per_sqm: Number(row.unit_price_per_sqm),
+        min_billable_sqm: Number(row.min_billable_sqm),
+        description: row.description || "",
+      });
+      toast.success(`Vetro ${row.glass_type} salvato`);
+      await load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || e.message);
+    } finally { setSaving(""); }
+  };
+
+  return (
+    <Card className="rounded-sm" data-testid="glass-prices-tab">
+      <CardHeader>
+        <CardTitle className="text-base">Vetri — prezzi €/m² e minimo fatturabile</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-muted-foreground mb-3">
+          Valori ufficiali Enerhia (BR-07): <b>DOUBLE_STANDARD 76</b>, <b>DOUBLE_SATIN 96</b>,
+          <b> TRIPLE_STANDARD 125</b>, <b>TRIPLE_SATIN 156,25</b>. Minimo fatturabile per pannello: <b>0.50 m²</b>.
+        </p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th className="p-2 overline">Tipo vetro</th>
+              <th className="p-2 overline">Prezzo €/m²</th>
+              <th className="p-2 overline">Min m² per pannello</th>
+              <th className="p-2 overline">Descrizione</th>
+              <th className="p-2 overline">Ver.</th>
+              <th className="p-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((r, i) => (
+              <tr key={r.id} className="border-b border-border" data-testid={`glass-row-${r.glass_type}`}>
+                <td className="p-2 font-mono-plex text-xs">{r.glass_type}</td>
+                <td className="p-2"><Input type="number" step="0.01" className="rounded-sm h-9 w-28"
+                  value={r.unit_price_per_sqm}
+                  onChange={(e) => setItems((x) => x.map((y, j) => j === i ? { ...y, unit_price_per_sqm: e.target.value } : y))}
+                  data-testid={`glass-price-${r.glass_type}`} /></td>
+                <td className="p-2"><Input type="number" step="0.01" className="rounded-sm h-9 w-24"
+                  value={r.min_billable_sqm}
+                  onChange={(e) => setItems((x) => x.map((y, j) => j === i ? { ...y, min_billable_sqm: e.target.value } : y))}
+                  data-testid={`glass-min-${r.glass_type}`} /></td>
+                <td className="p-2"><Input className="rounded-sm h-9"
+                  value={r.description || ""}
+                  onChange={(e) => setItems((x) => x.map((y, j) => j === i ? { ...y, description: e.target.value } : y))} /></td>
+                <td className="p-2 font-mono-plex text-xs text-muted-foreground">{r.version}</td>
+                <td className="p-2"><Button size="sm" className="rounded-sm" disabled={saving === r.glass_type} onClick={() => save(r)} data-testid={`glass-save-${r.glass_type}`}>Salva</Button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =====================================================================
+// HARDWARE RULES TAB — Milestone 2
+// =====================================================================
+function HardwareRulesTab() {
+  const [items, setItems] = useState([]);
+  const [saving, setSaving] = useState("");
+
+  const load = async () => {
+    const r = await api.get("/tech-config/hardware-rules");
+    setItems(r.data.items || []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async (row) => {
+    setSaving(row.id);
+    try {
+      await api.put(`/tech-config/hardware-rules/${row.id}`, {
+        opening_type: row.opening_type,
+        number_of_sashes: row.number_of_sashes === "" ? null : Number(row.number_of_sashes),
+        cost_per_unit: Number(row.cost_per_unit),
+        per_sash: !!row.per_sash,
+        description: row.description || "",
+      });
+      toast.success(`Ferramenta ${row.opening_type} salvata`);
+      await load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || e.message);
+    } finally { setSaving(""); }
+  };
+
+  return (
+    <Card className="rounded-sm" data-testid="hardware-rules-tab">
+      <CardHeader>
+        <CardTitle className="text-base">Ferramenta — regole per tipologia serramento</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-muted-foreground mb-3">
+          Valori ufficiali Enerhia (BR-08): <b>WINDOW_1_SASH 60</b>, <b>WINDOW_2_SASH 80</b>,
+          <b> DOOR_WINDOW_1_SASH 75</b>, <b>DOOR_WINDOW_2_SASH 90</b>,
+          <b> SLIDING 380 €/anta</b>, <b>VASISTAS_ONLY 40</b>. Costi tecnici di ferramenta, non prezzo di vendita.
+        </p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th className="p-2 overline">Opening</th>
+              <th className="p-2 overline">Ante</th>
+              <th className="p-2 overline">Costo €</th>
+              <th className="p-2 overline">Per anta?</th>
+              <th className="p-2 overline">Descrizione</th>
+              <th className="p-2 overline">Ver.</th>
+              <th className="p-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((r, i) => (
+              <tr key={r.id} className="border-b border-border" data-testid={`hw-row-${r.opening_type}-${r.number_of_sashes ?? "N"}`}>
+                <td className="p-2 font-mono-plex text-xs">{r.opening_type}</td>
+                <td className="p-2 font-mono-plex text-xs">{r.number_of_sashes ?? "—"}</td>
+                <td className="p-2"><Input type="number" step="0.01" className="rounded-sm h-9 w-24"
+                  value={r.cost_per_unit}
+                  onChange={(e) => setItems((x) => x.map((y, j) => j === i ? { ...y, cost_per_unit: e.target.value } : y))}
+                  data-testid={`hw-cost-${r.opening_type}`} /></td>
+                <td className="p-2"><input type="checkbox" checked={!!r.per_sash}
+                  onChange={(e) => setItems((x) => x.map((y, j) => j === i ? { ...y, per_sash: e.target.checked } : y))} /></td>
+                <td className="p-2"><Input className="rounded-sm h-9"
+                  value={r.description || ""}
+                  onChange={(e) => setItems((x) => x.map((y, j) => j === i ? { ...y, description: e.target.value } : y))} /></td>
+                <td className="p-2 font-mono-plex text-xs text-muted-foreground">{r.version}</td>
+                <td className="p-2"><Button size="sm" className="rounded-sm" disabled={saving === r.id} onClick={() => save(r)} data-testid={`hw-save-${r.id}`}>Salva</Button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =====================================================================
+// PRODUCTION TIMES TAB — Milestone 2
+// =====================================================================
+function ProductionTimesTab() {
+  const [items, setItems] = useState([]);
+  const [saving, setSaving] = useState("");
+
+  const load = async () => {
+    const r = await api.get("/tech-config/production-times");
+    setItems(r.data.items || []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async (row) => {
+    setSaving(row.recipe_code);
+    try {
+      await api.put(`/tech-config/production-times/${row.recipe_code}`, {
+        recipe_code: row.recipe_code,
+        hours: Number(row.hours),
+        description: row.description || "",
+      });
+      toast.success(`Tempo ${row.recipe_code} salvato`);
+      await load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || e.message);
+    } finally { setSaving(""); }
+  };
+
+  return (
+    <Card className="rounded-sm" data-testid="production-times-tab">
+      <CardHeader>
+        <CardTitle className="text-base">Tempi di produzione — ore per configurazione</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-muted-foreground mb-3">
+          Valori ufficiali Enerhia (BR-05). Il costo manodopera = tempo × costo officina.
+        </p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th className="p-2 overline">Ricetta</th>
+              <th className="p-2 overline">Ore</th>
+              <th className="p-2 overline">Descrizione</th>
+              <th className="p-2 overline">Ver.</th>
+              <th className="p-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((r, i) => (
+              <tr key={r.id} className="border-b border-border" data-testid={`pt-row-${r.recipe_code}`}>
+                <td className="p-2 font-mono-plex text-xs">{r.recipe_code}</td>
+                <td className="p-2"><Input type="number" step="0.05" className="rounded-sm h-9 w-24"
+                  value={r.hours}
+                  onChange={(e) => setItems((x) => x.map((y, j) => j === i ? { ...y, hours: e.target.value } : y))}
+                  data-testid={`pt-hours-${r.recipe_code}`} /></td>
+                <td className="p-2"><Input className="rounded-sm h-9"
+                  value={r.description || ""}
+                  onChange={(e) => setItems((x) => x.map((y, j) => j === i ? { ...y, description: e.target.value } : y))} /></td>
+                <td className="p-2 font-mono-plex text-xs text-muted-foreground">{r.version}</td>
+                <td className="p-2"><Button size="sm" className="rounded-sm" disabled={saving === r.recipe_code} onClick={() => save(r)} data-testid={`pt-save-${r.recipe_code}`}>Salva</Button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </CardContent>
     </Card>
   );

@@ -241,37 +241,102 @@ class TechnicalCostResolver:
             hint=f"Configurazione tecnica → Listino componenti — aggiungi {component_code}",
         )
 
-    async def _load_glass_price(self, glass_type: str) -> Decimal:
+    async def _load_glass_price(self, tenant_id: str, glass_type: str) -> Dict[str, Decimal]:
+        """Legge prezzo vetro + min_billable_sqm dalla collection versionata.
+        Fallback fail-closed su MISSING_GLASS_PRICE.
+        """
+        doc = await self.db.glass_price_configs.find_one({
+            "tenant_id": tenant_id, "glass_type": glass_type,
+            "active": True, "deleted_at": None,
+        })
+        if doc and doc.get("unit_price_per_sqm") is not None:
+            return {
+                "price": Decimal(str(doc["unit_price_per_sqm"])),
+                "min_sqm": Decimal(str(doc.get("min_billable_sqm", "0.5"))),
+                "version": int(doc.get("version", 1)),
+            }
+        # Fallback su costanti V1_3 (documentate ma NON hardcoded per il tenant)
         try:
-            return glass_price_per_sqm(glass_type)
+            p = glass_price_per_sqm(glass_type)
+            return {"price": p, "min_sqm": Decimal("0.5"), "version": 0}
         except KeyError:
             raise PricingError(
                 "MISSING_GLASS_PRICE",
                 component_role="GLASS",
-                configuration={"glass_type": glass_type},
-                hint="Configurazione tecnica → Listino vetri",
+                configuration={"glass_type": glass_type, "tenant_id": tenant_id},
+                hint="Configurazione tecnica → Vetri — imposta il prezzo del vetro",
             )
 
-    async def _load_hardware_price(self, hardware_role: str) -> Decimal:
-        code = f"HARDWARE_{hardware_role}"
-        v13 = V1_3_COMPONENT_PRICES.get(code)
-        if v13 is None:
+    async def _load_hardware_price(self, tenant_id: str, opening_type: str,
+                                     n_sashes: int) -> Dict[str, Decimal]:
+        """Legge la regola ferramenta dalla collection versionata.
+        Match esatto per (opening_type, number_of_sashes) o wildcard n_sashes=None
+        (per SLIDING_DOOR_WINDOW che è per_sash).
+        Fail-closed su MISSING_HARDWARE_RULE.
+        """
+        # 1) match esatto per anta
+        doc = await self.db.hardware_rules.find_one({
+            "tenant_id": tenant_id,
+            "opening_type": opening_type,
+            "number_of_sashes": n_sashes,
+            "active": True, "deleted_at": None,
+        })
+        # 2) fallback su regola "per anta" (number_of_sashes=None)
+        if not doc:
+            doc = await self.db.hardware_rules.find_one({
+                "tenant_id": tenant_id,
+                "opening_type": opening_type,
+                "number_of_sashes": None,
+                "per_sash": True,
+                "active": True, "deleted_at": None,
+            })
+        if not doc:
             raise PricingError(
-                "MISSING_HARDWARE_PRICE",
+                "MISSING_HARDWARE_RULE",
                 component_role="HARDWARE",
-                configuration={"hardware_role": hardware_role},
-                hint="Configurazione tecnica → Ferramenta",
+                configuration={"opening_type": opening_type, "number_of_sashes": n_sashes,
+                                "tenant_id": tenant_id},
+                hint=(f"Configurazione tecnica → Ferramenta — aggiungi regola per "
+                       f"{opening_type} con {n_sashes} anta/e"),
             )
-        return v13
+        cost = Decimal(str(doc.get("cost_per_unit", 0)))
+        per_sash = bool(doc.get("per_sash", False))
+        total = cost * Decimal(n_sashes) if per_sash else cost
+        return {
+            "total": total,
+            "unit_cost": cost,
+            "per_sash": per_sash,
+            "version": int(doc.get("version", 1)),
+        }
+
+    async def _load_production_time(self, tenant_id: str, recipe_code: str) -> Decimal:
+        """Legge il tempo produzione dalla collection versionata.
+        Fallback su costanti V1_3 documentate.
+        Fail-closed su MISSING_PRODUCTION_TIME.
+        """
+        doc = await self.db.production_time_configs.find_one({
+            "tenant_id": tenant_id, "recipe_code": recipe_code,
+            "active": True, "deleted_at": None,
+        })
+        if doc and doc.get("hours") is not None:
+            return Decimal(str(doc["hours"]))
+        # Fallback: costanti V1_3
+        from .formulas import PRODUCTION_TIME_HOURS
+        v = PRODUCTION_TIME_HOURS.get(recipe_code)
+        if v and v > 0:
+            return v
+        raise PricingError(
+            "MISSING_PRODUCTION_TIME",
+            configuration={"recipe_code": recipe_code, "tenant_id": tenant_id},
+            hint=f"Configurazione tecnica → Tempi produzione — aggiungi {recipe_code}",
+        )
 
     async def resolve(self, req: PricingRequest, ps: ProfileSystemResolution,
                        bom: BomResolution) -> TechnicalSnapshot:
-        if bom.production_time_hours is None or bom.production_time_hours <= 0:
-            raise PricingError(
-                "MISSING_PRODUCTION_TIME",
-                configuration={"recipe_code": ps.recipe_code},
-                hint="Configurazione tecnica → Tempi produzione",
-            )
+        # Tempo produzione (config-based, fail-closed)
+        prod_hours = await self._load_production_time(req.tenant_id, ps.recipe_code)
+        bom.production_time_hours = prod_hours
+
         hourly = await self._load_workshop_cost(req.tenant_id)
 
         # Materiali (profili + rinforzi + fermavetro)
@@ -299,14 +364,21 @@ class TechnicalCostResolver:
                 "is_pvc_eligible": c.is_pvc_eligible,
             })
 
-        # Vetro
-        glass_price = await self._load_glass_price(req.glass_type)
+        # Vetro (config-based)
+        glass_cfg = await self._load_glass_price(req.tenant_id, req.glass_type)
+        glass_price = glass_cfg["price"]
+        min_sqm = glass_cfg["min_sqm"]
         gd = bom.glass_dimensions or {}
-        billable = Decimal(str(gd.get("billable_area_sqm", 0)))
+        # Ricalcolo billable con min dinamico
+        real_sqm = Decimal(str(gd.get("real_area_sqm", 0)))
+        billable = max(real_sqm, min_sqm)
+        gd["min_billable_sqm"] = float(min_sqm)
+        gd["billable_area_sqm"] = float(billable)
         glass_cost = billable * glass_price * Decimal(gd.get("quantity", 1))
 
-        # Ferramenta
-        hardware_cost = await self._load_hardware_price(bom.hardware_role or "WINDOW_STD")
+        # Ferramenta (config-based)
+        hw = await self._load_hardware_price(req.tenant_id, req.window_type, req.number_of_sashes)
+        hardware_cost = hw["total"]
 
         # Manodopera
         labor_cost = bom.production_time_hours * hourly

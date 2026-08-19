@@ -47,7 +47,8 @@ def _compute_hash(payload: Dict[str, Any]) -> str:
 
 async def compute_pricing(req: PricingRequest, db=None) -> PricingResult:
     """Orchestratore. Restituisce PricingResult (mai lancia PricingError — cattura e la mette in blocking_errors)."""
-    db = db or get_db()
+    if db is None:
+        db = get_db()
     result = PricingResult(
         request_echo={
             "tenant_id": req.tenant_id,
