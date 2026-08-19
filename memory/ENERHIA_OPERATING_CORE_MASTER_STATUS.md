@@ -22,7 +22,7 @@
 | 2 | Configurazione tecnica (Single Source of Truth) | `E2E_READY` (P0 completa) | `/tech-config` (7 tab) | (M2 P0) | 85% |
 | 3 | Golden Test economico (GT-REAL) | `TECHNICAL_TEST_READY` · **BUSINESS_GOLDEN = FAIL** (delta 28.34 €) | pytest | (M3) | 70% |
 | 4 | Copertura configurazioni (WINDOW_1_2, DOOR_WINDOW_1_2, VASISTAS) | `E2E_READY` (5 config + foil, 7/7 test) | pytest + `/tech-config` | (M4) | 90% |
-| 5 | Preventivatore commerciale unico | `NOT_STARTED` | — | — | 0% |
+| 5 | Preventivatore commerciale unico | `BLOCKED_BY_ARCHITECTURE` (§37 — due motori paralleli attivi) | — | — | 0% |
 | 6 | PDF preventivo | `NOT_STARTED` | — | — | 0% |
 | 7 | Contratto (con snapshot congelati) | `NOT_STARTED` | — | — | 0% |
 | 8 | Document center | `NOT_STARTED` | — | — | 0% |
@@ -81,3 +81,5 @@
 - ✅ Nessuna eliminazione di codice legacy (commercial_perimeter, parametric)
 - ✅ Motore v3 fail-closed su MISSING_*
 - ✅ Snapshot congelato preservato (preventivi storici invariati)
+- ⚠️ **NUOVO §37 Master Plan**: identificati due motori attivi (`pricing_v3` autoritativo + `commercial_perimeter` legacy). **M5 NON INIZIA** finché non è certificato l'uso esclusivo di `pricing_v3` per nuovi preventivi. Vedi `/app/memory/GEOMETRIC_TO_COMMERCIAL_PRICING_ARCHITECTURE_V1.md`.
+- ✅ **NUOVO §9 Master Plan**: default commercial multiplier = **3.00** verificato attivo (production_cost 338.90 × 3 = base_product_sale_price 1016.70 €).

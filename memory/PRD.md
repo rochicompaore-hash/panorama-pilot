@@ -1034,3 +1034,37 @@ Delta 28.34 € vs Excel target 310.56 € **spiegato analiticamente**: quantit�
 
 ### M5 avviabile con etichetta `TECHNICALLY_IMPLEMENTED · ECONOMICALLY_NOT_VALIDATED`
 Come da Master Plan §21+§27. Non collegare UI commerciale fino a collaudo utente.
+
+---
+
+## 2026-02-19 — Architettura Definitiva Geometric → Commercial Pricing
+
+### Principio vincolante
+Il preventivo Enerhia nasce da: **CONFIGURAZIONE GEOMETRICA → PRODUCTION_COST → × 3 → BASE_PRODUCT_SALE_PRICE + PACCHETTO + POSA + SERVIZI − SCONTO = PREZZO CLIENTE**.
+Il Configuratore Geometrico è la **vista UI** del pricing_v3, non un motore separato.
+
+### Verifica applicata
+- ✅ `pricing_v3` è l'unico motore autoritativo (`ProfileSystemResolver → BomResolver → TechnicalCostResolver`)
+- ✅ Multiplier commerciale default **3.00** verificato attivo (production_cost 338.90 × 3 = **1016.70 €** base_product_sale_price)
+- ⚠️ **Identificati due motori paralleli attivi** — Master Plan §37 attivato:
+  - `pricing_v3` autoritativo (M4 verde)
+  - `commercial_perimeter` (legacy) ancora usato da `quote_structure.py`, `catalog.py`, `pricing_hub.py` per preventivi correnti/storici
+- ✅ Regola commerciale è UI-configurable via `/tech-config/commercial-rule`
+
+### STOP M5 (§37)
+M5 (Preventivatore commerciale unificato) è marcato `BLOCKED_BY_ARCHITECTURE`. Non può iniziare finché:
+1. Delta 28.34 € chiuso o classificato `ECONOMICALLY_NOT_VALIDATED`
+2. CommercialPackage entity creata
+3. Legacy `commercial_perimeter` etichettato `LEGACY_ONLY_HISTORICAL_QUOTES`
+4. Vista Tecnica UI collegata a `pricing_v3` (read-only del motore)
+5. Test di identità (§33) verde su 3 canali (compute API, Vista Tecnica UI, QuoteLine)
+
+### Deliverable
+- `/app/memory/GEOMETRIC_TO_COMMERCIAL_PRICING_ARCHITECTURE_V1.md` — architettura definitiva + flusso E2E target + inventario legacy da decommissionare + step ordinati M5
+
+### Prossima iterazione (M5 preparatoria — appena delta chiuso)
+1. CommercialPackage backend + seed pacchetti Enerhia Standard/Premium
+2. Vista Tecnica UI (component `<TechnicalView />` legge `/api/pricing/compute`)
+3. UI Commerciale Preventivo: `base_product_sale_price` visibile, `production_cost` nascosto al Commerciale
+4. Endpoint `POST /api/quotes/{id}/lines/from-configuration` con snapshot congelati (tech + comm + hash)
+5. Feature flag `USE_UNIFIED_PRICING_V3` in `quote_structure.py` (default false)
