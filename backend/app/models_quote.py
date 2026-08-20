@@ -28,6 +28,18 @@ class QuoteLine(BaseModel):
     internal_cost: float = 0.0
     margin: float = 0.0
     vat_rate: float = 0.22
+    # --- Multi-Category V1 additive fields (default None per righe legacy) ---
+    source: Optional[str] = None  # es. "MULTI_CATEGORY_V1" per nuove righe
+    category_id: Optional[str] = None
+    category_code: Optional[str] = None
+    product_id: Optional[str] = None
+    product_code: Optional[str] = None
+    pricing_model: Optional[str] = None
+    configuration_snapshot: Optional[Dict[str, Any]] = None
+    pricing_snapshot: Optional[Dict[str, Any]] = None
+    technical_snapshot: Optional[Dict[str, Any]] = None
+    commercial_snapshot: Optional[Dict[str, Any]] = None
+    financial_snapshot: Optional[Dict[str, Any]] = None
 
 
 class QuoteOpening(BaseModel):
@@ -170,6 +182,20 @@ class QuoteLineCreate(BaseModel):
     discount_amount: float = 0.0
     internal_cost: float = 0.0
     vat_rate: float = 0.22
+    # Multi-Category V1 additive
+    source: Optional[str] = None
+    category_id: Optional[str] = None
+    category_code: Optional[str] = None
+    product_id: Optional[str] = None
+    product_code: Optional[str] = None
+    pricing_model: Optional[str] = None
+    configuration_snapshot: Optional[Dict[str, Any]] = None
+    pricing_snapshot: Optional[Dict[str, Any]] = None
+    technical_snapshot: Optional[Dict[str, Any]] = None
+    commercial_snapshot: Optional[Dict[str, Any]] = None
+    financial_snapshot: Optional[Dict[str, Any]] = None
+    unit_price_final: Optional[float] = None
+    subtotal_line: Optional[float] = None
 
 
 class QuoteLineUpdate(BaseModel):

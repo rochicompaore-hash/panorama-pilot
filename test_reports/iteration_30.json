@@ -1,0 +1,31 @@
+{
+  "summary": "Multi-Category V1 (Preventivatore) — Backend 16/16 pytest verdi (incluso §36 acceptance + fail-closed + RBAC admin view + seed idempotenza) e Frontend happy-path E2E verde su desktop 1600x1000. Verificato: (1) GET /api/product-categories?active=true ritorna 12 categorie ordinate per display_order con FINESTRE/PORTEFINESTRE/ZANZARIERE/MONTAGGI_POSA. (2) GET /api/multi-cat/products default esclude legacy/fixtures/senza pricing_model, is_admin_view=true. (3) Filtro category_code=FINESTRE ritorna solo PROEVOLUTION + PROEVOLUTION_RESTAURO con pricing_model=FORMULA_TECHNICAL. (4) include_test_fixtures=true espone TEST_ZANZARIERA_AREA_130, TEST_AREA_100_MIN_150, TEST_LINEAR_25, TEST_PER_ITEM_50, TEST_FIXED_120. (5) §36 acceptance: TEST_AREA_100_MIN_150 con 1000x800 → real_area_m2=0.80, billable=1.50, unit=100, total=150. Con 2000x1000 → real=2.0, billable=2.0, total=200. (6) TEST_ZANZARIERA_AREA_130 con 800x800 → real=0.64, billable=1.5, total=195. (7) TEST_LINEAR_25 ml=4 → 100. TEST_PER_ITEM_50 qty=3 → 150. TEST_FIXED_120 qty=1 → 120. (8) Fail-closed: simple_inputs mancante → pricing_status='invalid_inputs' con blocking_errors; body vuoto → invalid_inputs; PROEVOLUTION senza technical_inputs → invalid_inputs. (9) Prodotto legacy=true → pricing_status='legacy_disabled'. (10) FORMULA_TECHNICAL identity: PROEVOLUTION 1200x1400 2 ante ritorna technical_snapshot+calculation_hash coerenti dal motore autoritativo. (11) Seed idempotenza: seconda esecuzione categories=0, classified=0, legacy_flagged=0, fixtures=0 su entrambi i tenant. (12) FRONTEND: login admin OK, apertura preventivo esistente PRV-2026-01715, click 'Aggiungi prodotto' (cfg-open) apre multi-cat-dialog. STEP1 mostra 12 card categorie multi-cat-category-XXX senza vecchio dropdown 'Tapparella/ProEvolution/Zanzariera' misto. STEP2 FINESTRE mostra PROEVOLUTION + PROEVOLUTION_RESTAURO + Back button. STEP3 FORMULA_TECHNICAL: cfg-technical renderizzato, 0 occorrenze di '€/m²'. Back x2 riporta a step 1. STEP3 AREA: TEST_ZANZARIERA_AREA_130 → cfg-area con soli campi width/height/qty. Inserendo 800x800 il pannello 'Prezzo live' mostra correttamente: Area reale 0.64 m², Minimo fatturabile 1.5 m², Area fatturata 1.5 m², Prezzo/m² 130,00 €, TOTALE 195,00 €. Click multi-cat-confirm aggiunge la riga e chiude il dialog.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_multi_category_v1_e2e.py",
+    "/app/test_reports/pytest/multi_category_v1_e2e.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "multi_category_configurator.py::list_products_for_new_quote: quando `include_legacy=True` e `include_test_fixtures=True` un utente NON admin (perms senza *, products.manage, quotes.view_costs, quotes.view_margins) NON verrebbe promosso ma i flag verrebbero comunque ignorati (branch `if not (include_legacy and is_admin)`) — OK, ma per la clean-security valutare di ritornare 403 se un non-admin passa uno di quei flag piuttosto che silenziarli (evita confusione clientside).",
+    "multi_category_pricing.py::_round2 usa `round(x + 1e-9, 2)` — safe per i test attuali ma un valore borderline come 0.005 potrebbe non arrotondare come atteso in altri casi; ok per ora dato il regime prezzi in €.",
+    "multi_category_configurator.py::configure_product NON logga l'audit dei ricalcoli di pricing (endpoint mutation-free ma è comunque un evento significativo commercialmente: valutare audit lite in caso di persistenza sul quote).",
+    "MultiCategoryConfiguratorDialog.jsx: quando `canSeeCosts=false` il component chiama con include_test_fixtures=false, quindi il commerciale non vede mai le fixture — comportamento corretto ma non c'è messaggio esplicito 'test fixtures nascoste' — OK, atteso.",
+    "product_categories.py: nessun endpoint espone default seeded categories quando active=null (default filtro Optional[bool]=None) — comportamento OK ma documentare che la lista di default include anche categorie inattive."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_multi_category_v1_e2e.py"
+  ],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% happy path admin desktop"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 (tenant Infissi Express, permissions=['*'])",
+  "seed_data_creation": "Nessuna nuova seed. Il test frontend ha aggiunto 1 riga TEST_ZANZARIERA_AREA_130 (195€) al preventivo esistente PRV-2026-01715 tramite multi-cat-confirm.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend copertura in /app/backend/tests/test_multi_category_v1_e2e.py — riusabile come regression. Il preventivo PRV-2026-01715 tenant admin contiene ora una riga aggiuntiva dal test UI (source=MULTI_CATEGORY_V1). RBAC deep-test (utente COMMERCIAL) è stato skippato come da nota del review request perché il seed contiene solo superadmin (permissions=['*']); la redaction admin-side è verificata dal ramo is_admin_view=true. Il test §36 acceptance è coperto sia via backend (test_area_min_150_at_1000x800, test_zanzariera_area_130_min_150) sia via UI (preview pannello con 195,00 €). Frontend viewport 1600x1000; mobile non testato in questa iterazione (dialog max-w-5xl → mobile richiederebbe scroll orizzontale, valutare in futuro).",
+  "rca of the issue": "N/A — nessun bug bloccante rilevato. Solo raccomandazioni di code-review non bloccanti nella sezione dedicata."
+}

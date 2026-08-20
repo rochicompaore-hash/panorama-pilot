@@ -157,13 +157,29 @@ class ConfiguratorPreviewResponse(BaseModel):
 
 
 class ProductCatalog(BaseDoc):
-    """Catalog entry for configurator products."""
+    """Catalog entry for configurator products.
+
+    Multi-Category V1 additions (see models_multi_category.py for the enums):
+      * ``pricing_model``          -> FORMULA_TECHNICAL / AREA / LINEAR_METER / PER_ITEM / ...
+      * ``pricing_config``         -> parametri specifici del pricing_model
+      * ``category_id/code``       -> FK verso ``product_categories``
+      * ``subcategory`` / ``line`` -> gerarchia commerciale
+      * ``sale_unit``              -> m2 | ml | pz | forfait
+      * ``minimum_billable_quantity`` -> minimo fatturabile (m2 o ml o pz)
+      * ``compatible_packages``    -> pacchetti compatibili (BASE/ADVANCED/PREMIUM)
+      * ``compatible_services``    -> id simple_services suggeriti
+      * ``technical_recipe_id``    -> collegamento al motore tecnico autorevole
+      * ``configurator_schema``    -> schema data-driven del configuratore
+      * ``legacy``                 -> prodotto pre-multi-cat non classificato
+      * ``new_quote_enabled``      -> se compare nel nuovo flusso
+      * ``classification_status``  -> CLASSIFIED | TO_CONFIRM | LEGACY_ONLY
+    """
     key: str
     name: str
-    category: str  # window | shutter | roller | roller_kit | box | screen | persian | glass | hardware | sill | trim | accessory | installation
+    category: str  # legacy field: window | shutter | roller | ... (retro-compat)
     description: Optional[str] = None
     base_price: float = 0.0
-    base_type: str = "sqm"  # sqm | piece | linear_m
+    base_type: str = "sqm"  # legacy: sqm | piece | linear_m
     min_billable_sqm: float = 0.0
     default_config: Dict[str, Any] = Field(default_factory=dict)
     # Configurator schema — steps rendered in the UI
@@ -171,6 +187,22 @@ class ProductCatalog(BaseDoc):
     image_url: Optional[str] = None
     active: bool = True
     order_index: int = 0
+    # --- Multi-Category V1 additive fields ---
+    pricing_model: Optional[str] = None
+    pricing_config: Dict[str, Any] = Field(default_factory=dict)
+    category_id: Optional[str] = None
+    category_code: Optional[str] = None
+    subcategory: Optional[str] = None
+    line: Optional[str] = None
+    sale_unit: Optional[str] = None
+    minimum_billable_quantity: Optional[float] = None
+    compatible_packages: List[str] = Field(default_factory=list)
+    compatible_services: List[str] = Field(default_factory=list)
+    technical_recipe_id: Optional[str] = None
+    configurator_schema: Optional[Dict[str, Any]] = None
+    legacy: bool = False
+    new_quote_enabled: bool = False
+    classification_status: str = "TO_CONFIRM"  # CLASSIFIED | TO_CONFIRM | LEGACY_ONLY
 
 
 class ProductCatalogCreate(BaseModel):

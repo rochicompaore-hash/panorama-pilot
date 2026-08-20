@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Plus, Trash, PaperPlaneTilt, ArrowsClockwise, FileText, Check, Sparkle } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { ConflictModal } from "@/components/app/ConflictModal";
-import { ConfiguratorDialog } from "@/components/app/ConfiguratorDialog";
+import { MultiCategoryConfiguratorDialog } from "@/components/app/MultiCategoryConfiguratorDialog";
 import { AutosaveIndicator } from "@/components/app/AutosaveIndicator";
 import { useConflict, getVersion, withVersion, withForce } from "@/hooks/useConflict";
 import { useAutosave } from "@/hooks/useAutosave";
@@ -385,7 +385,7 @@ export default function QuoteEditorPage() {
               <div className="overline">Righe ({(q.lines || []).length})</div>
               {editable && (
                 <div className="flex gap-2">
-                  <Button size="sm" className="rounded-sm" onClick={() => setCfgOpen(true)} data-testid="cfg-open"><Sparkle size={12} className="mr-1" /> Configuratore</Button>
+                  <Button size="sm" className="rounded-sm" onClick={() => setCfgOpen(true)} data-testid="cfg-open"><Plus size={12} className="mr-1" /> Aggiungi prodotto</Button>
                 </div>
               )}
             </div>
@@ -476,7 +476,7 @@ export default function QuoteEditorPage() {
         </div>
       </div>
 
-      <ConfiguratorDialog open={cfgOpen} onOpenChange={setCfgOpen} onConfirm={onConfiguratorConfirm} canSeeCosts={canSeeCosts} />
+      <MultiCategoryConfiguratorDialog open={cfgOpen} onOpenChange={setCfgOpen} onConfirm={onConfiguratorConfirm} canSeeCosts={canSeeCosts} />
       <ConflictModal {...conflict.modalProps} />
 
       <PublicLinkDialog

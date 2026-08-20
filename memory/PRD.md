@@ -1,3 +1,64 @@
+## Iter 46 — Multi-Category Quote Configurator V1 (P0 UX — Ago 2026)
+
+**Autorizzato:** Messaggio "CORREZIONE P0 UX PREVENTIVATORE — CONFIGURATORE PRODOTTO MULTI-CATEGORIA"
+**Data implementazione:** 20 Ago 2026 · **Deliverable:** `/app/memory/MULTI_CATEGORY_QUOTE_CONFIGURATOR_V1.md`
+
+### Cosa è stato fatto
+- **Backend** — Nuovo flusso data-driven `Categoria → Prodotto → Configurazione`:
+    - `models_multi_category.py`: enum `PricingModel` (FORMULA_TECHNICAL, AREA, LINEAR_METER, PER_ITEM, FIXED_PRICE, FIXED_PLUS_VARIABLE, TIERED, MANUAL_REVIEW_REQUIRED), `ProductCategory`, `ConfigureRequest/Response`.
+    - `models_pricing.py` esteso additivo su `ProductCatalog`: `pricing_model`, `pricing_config`, `category_id/code`, `sale_unit`, `minimum_billable_quantity`, `compatible_packages/services`, `technical_recipe_id`, `legacy`, `new_quote_enabled`, `classification_status`, `is_test_fixture`.
+    - `services/multi_category_pricing.py`: `SimplePricingEngine` + `resolve_and_compute` fail-closed. `FORMULA_TECHNICAL` instrada al motore autorevole `POST /api/pricing/compute` (NO duplicazione).
+    - `routers/product_categories.py` + `routers/multi_category_configurator.py`: 8 nuovi endpoint sotto `/api`. RBAC: commerciale NON riceve `production_cost`/`internal_reference_price`/`technical_recipe_id`.
+    - `models_quote.py` esteso additivo su `QuoteLine` con marker `source=MULTI_CATEGORY_V1` + snapshot campi.
+- **Frontend**:
+    - `MultiCategoryConfiguratorDialog.jsx` (NEW) — dialog 3 step con card categorie data-driven, renderer condizionale per pricing_model, box "Prezzo live" con dettaglio area/ml/qty/forfait.
+    - `QuoteEditorPage.jsx` — swap import `ConfiguratorDialog → MultiCategoryConfiguratorDialog`, label pulsante "Aggiungi prodotto".
+    - Vecchio `ConfiguratorDialog.jsx` CONSERVATO ma NON referenziato dal nuovo flusso (§18).
+- **Seed idempotente** `app/scripts/seed_multi_category_v1.py`:
+    - 12 categorie (FINESTRE, PORTEFINESTRE, SCORREVOLI, ZANZARIERE, TAPPARELLE, CASSONETTI, PERSIANE_SCURI, PORTE_INTERNE, PORTE_BLINDATE, ACCESSORI, SERVIZI, MONTAGGI_POSA).
+    - Classificazione esplicita `PROEVOLUTION`, `PROEVOLUTION_RESTAURO` → `FORMULA_TECHNICAL`.
+    - 7 prodotti pre-esistenti marchiati `legacy=true / new_quote_enabled=false / classification_status=TO_CONFIRM`.
+    - 5 test fixtures (`TEST_AREA_100_MIN_150`, `TEST_ZANZARIERA_AREA_130`, `TEST_LINEAR_25`, `TEST_PER_ITEM_50`, `TEST_FIXED_120`) marcati `is_test_fixture=true`, nascosti di default (admin-only via `?include_test_fixtures=true`).
+- **Test**: 19 pytest verdi (`test_multi_category_pricing.py`) + testing_agent_v3_fork verde 100% backend (16/16) e frontend E2E happy-path.
+
+### Vincoli PO rispettati
+- ✅ NO migrazione automatica cieca `base_type → pricing_model` (§1)
+- ✅ Prodotti legacy conservati, non riclassificati (§2, §3)
+- ✅ `pricing_model=null` → risposta `missing_pricing_model` fail-closed (§6)
+- ✅ FORMULA_TECHNICAL non duplica il motore geometrico — chiama `POST /api/pricing/compute` (§7, §30)
+- ✅ `SimplePricingEngine` unico per AREA/LINEAR/PER_ITEM/FIXED/FIXED+VAR/TIERED (§8)
+- ✅ `minimum_billable_quantity` configurabile per prodotto, non hardcoded (§10)
+- ✅ Fixtures 130€/m² etichettate come `TEST_FIXTURE` — non source of truth commerciale (§11)
+- ✅ `simple_services` riutilizzato — nessuna collection duplicata (§12)
+- ✅ `QuoteLine` additivo, `source=MULTI_CATEGORY_V1`, legacy compatibility (§14, §15)
+- ✅ RBAC backend, non solo frontend (§25)
+- ✅ Dropdown misto ELIMINATO dal nuovo preventivatore (§33)
+
+### §36 ACCEPTANCE VERIFICATO
+`TEST_AREA_100_MIN_150` (100€/m² min 1.50), dims 1000×800 mm → real_area=0.80m², billable=1.50m², **sale_price=150.00€** ✅
+(Con dims 2000×1000 → real=2.0, billable=2.0, sale=200€ ✅)
+
+### STOP direttiva PO (§40)
+Fermarsi per collaudo. NON procedere con: PDF, Contratti, Rilievi, Produzione, Magazzino.
+Google Auth e Audit Generale restano congelati (verranno riattivati dopo il collaudo di questo flusso).
+
+### Known limitations (§15 deliverable)
+- Wire-up Servizi/Posa nel wizard: TO_CONFIRM (fuori scope V1, si prevede STEP 4 "Servizi" post-config).
+- Pacchetti (BASE/ADVANCED/PREMIUM) sul preventivo: TO_CONFIRM (integrazione con `commercial_packages` non parte del V1).
+- Editing di righe MULTI_CATEGORY_V1: prefill completo (§24) sarà rifinito nel test E2E.
+- Prodotti legacy `TO_CONFIRM`: 7 items richiedono classificazione esplicita del PO.
+
+### Backlog congelato (in ordine di priorità post-collaudo)
+- P0: Google Auth (Emergent-managed, allowlist, PENDING_TENANT_ASSIGNMENT) — direttiva Messaggio 368.
+- P0: Audit Generale PANORAMA_PILOT_FULL_STATE_AUDIT_2026_08.md — direttiva Messaggio 368.
+- P1: STOP 4 Servizi/Posa suggeriti nel wizard multi-cat.
+- P1: Wire-up Commercial Packages (multiplier, servizi inclusi/esclusi) sul preventivo.
+- P1: Golden Test M3 delta 28.34€ da chiarire (esclusivamente prezzi unitari?).
+- P2: Dismissione motori pricing duplicati (pricing_v3 vs commercial_perimeter vs Product Simulator).
+
+---
+
+
 ## Iter 44 — Milestone A: Configurazione tecnica amministrabile (Feb 2026)
 
 **Branch:** `feature/unified-pricing-phase1` — **Tag:** `milestone-A-tech-config-v1`  
