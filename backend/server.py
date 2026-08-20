@@ -53,6 +53,7 @@ from app.routers.customer_timeline import router as customer_timeline_router
 from app.routers.contacts import router as contacts_router
 from app.routers.simple_services import router as simple_services_router
 from app.routers.margin_control import router as margin_control_router
+from app.routers.commercial_packages import router as commercial_packages_router
 from app.routers.activities import router as activities_router
 from app.routers.tasks import router as tasks_router
 from app.routers.appointments import router as appointments_router
@@ -231,6 +232,7 @@ QUOTING_ROUTERS = [
     tech_config_router,  # Milestone A — Configurazione tecnica amministrabile
     simple_services_router,  # Milestone 2.14 — Servizi e prezzi semplici (dual pricing)
     margin_control_router,   # Margin & Cash Flow Control
+    commercial_packages_router,  # Commercial Packages V1 (BASE/ADVANCED/PREMIUM)
 ]
 OPS_ROUTERS = [
     surveys_router, sales_orders_router,

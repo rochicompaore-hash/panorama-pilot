@@ -1116,3 +1116,27 @@ Se target non configurati → `POLICY_NOT_CONFIGURED`, ma preventivo procede (§
 
 ### Vincoli rispettati
 Nessuna pubblicazione produzione · Nessun blocco M5 aggiuntivo · Nessuna modifica al motore pricing_v3 · M3 BUSINESS_GOLDEN rimane separato (§49)
+
+---
+
+## 2026-02-19 — Commercial Packages V1 (BASE/ADVANCED/PREMIUM)
+
+### Backend consegnato
+Nuovo router `/api/commercial-packages/*` + collection `commercial_packages`. Seed dei 3 pacchetti Enerhia (BASE/ADVANCED/PREMIUM) con **multiplier = null (NEEDS_PO_CONFIGURATION)** — nessun valore inventato (§25/§48).
+
+### Simulator §24
+`POST /api/commercial-packages/simulate` confronta contribution margin dei 3 pacchetti su stesso production_cost. Riusa `_compute_snapshot` del Margin Control (unica fonte di verità economica).
+
+### Verifica live
+Con TEMPORARY multiplier 2.5/3.0/3.5 e included_services 30/200/500 €: BASE 50.25%, ADVANCED 51.45%, **PREMIUM 48.60%** — dimostra §25 (Premium non automaticamente più marginale).
+
+### Deliverable
+`/app/memory/COMMERCIAL_PACKAGES_V1.md` con matrice completa delle policy per pacchetto (§5-§16): warranty, delivery, product_origin, floor_transport (Advanced fino al 3° piano), platform (Premium fino al 6° piano ma **disponibile anche sotto per protected_window_handling §14**), disposal, ENEA, cleaning, priority_support, Verisure 299 € display value.
+
+### STOP §47/§50
+- Nessun PDF avviato (esplicitamente vietato §47)
+- Fermato dopo PACKAGE_ENGINE = E2E_READY
+- UI Admin package configuration in backlog per prossima iterazione
+- Multiplier BASE/ADVANCED/PREMIUM restano null finché il PO non li imposta
+
+### Test — 17/17 verdi (invariati)
