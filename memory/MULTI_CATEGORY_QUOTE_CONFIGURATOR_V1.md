@@ -8,6 +8,151 @@ Data implementazione: 20 Ago 2026
 
 ---
 
+## 🚨 REAL QUOTE INTEGRATION BUG P0 — HOTFIX (20 Ago 2026)
+
+**Sintomo verificato in produzione (PRV-2026-01716)**:
+`FINESTRE → ProEvolution → 1200×1400` aggiunto al preventivo con
+`PREZZO = 0 €`, `SUBTOTALE = 0 €`, `TOTALE = 0 €`.
+
+### Root cause
+
+**API contract mismatch tra `pricing_v3.commercial_snapshot` e il frontend.**
+
+Il motore autorevole `POST /api/pricing/compute` restituisce:
+```json
+"commercial_snapshot": {
+  "pricing_method": "MULTIPLIER",
+  "multiplier": 3.0,
+  "unit_sale_price": 1016.7,
+  "final_unit_price": 1016.7,   ← AUTHORITATIVE
+  "discount": 0.0
+}
+```
+
+Il frontend `MultiCategoryConfiguratorDialog.submit()` cercava invece:
+```js
+preview.commercial_snapshot?.customer_price
+  ?? preview.commercial_snapshot?.customer_price_total
+  ?? preview.commercial_snapshot?.sale_price
+  ?? 0;    // ← FALLBACK 0 raggiunto sempre
+```
+
+Tutti e tre i field cercati **non esistono** in `pricing_v3`. Fallback `?? 0`
+propagato in `base_price=0` nel payload `POST /api/quotes/{id}/lines`, quindi
+`compute_line()` calcolava `unit_price_final=0, subtotal_line=0`.
+
+### Affected fields
+
+| Layer | Field errato (FE) | Field autorevole (BE) |
+|-------|-------------------|-----------------------|
+| Configure response | `commercial_snapshot.customer_price` | `commercial_snapshot.final_unit_price` |
+| Configure response | `commercial_snapshot.customer_price_total` | `commercial_snapshot.final_unit_price * qty` |
+| Configure response | `commercial_snapshot.sale_price` | `commercial_snapshot.unit_sale_price` (alias) |
+| Configure response | `commercial_snapshot.unit_price` | `commercial_snapshot.final_unit_price` |
+| Redaction RBAC | `production_cost` (non esiste) | `total_internal_cost` (nome vero) |
+
+### Fix applicati
+
+1. **Frontend `MultiCategoryConfiguratorDialog.jsx`**:
+   - `submit()`: legge `final_unit_price` / `unit_sale_price` come prime scelte.
+     Se `unit<=0` o `total<=0` **non aggiunge la riga** e mostra
+     `COMMERCIAL_PRICING_NOT_CONFIGURED` (fail-closed §6/§8).
+   - `PricingPreviewCard`: stesso set di field; se mancano mostra badge
+     `COMMERCIAL_PRICING_NOT_CONFIGURED` invece di "0 €".
+   - Dettaglio FORMULA_TECHNICAL: mostra `multiplier` e `final_unit_price`.
+
+2. **Backend `POST /api/quotes/{qid}/lines`**:
+   - Guard fail-closed lato server: righe con
+     `source=MULTI_CATEGORY_V1` + `pricing_model=FORMULA_TECHNICAL` +
+     `base_price<=0` **vengono rifiutate con HTTP 400**
+     `COMMERCIAL_PRICING_NOT_CONFIGURED`.
+   - Zero € non è mai un valore ammesso per FORMULA_TECHNICAL (§6/§8).
+
+3. **RBAC redaction `POST /api/multi-cat/products/{pid}/configure`**:
+   - Corretta la lista di redaction per non-admin. Ora rimuove i field
+     effettivi di `pricing_v3`: `total_internal_cost`, `material_cost`,
+     `glass_cost`, `hardware_cost`, `labor_cost`, `foil_surcharge`,
+     `additional_technical_costs`, `hourly_workshop_cost`,
+     `production_time_hours`, `components`, `glass_dimensions`
+     (+ alias legacy). Il commerciale NON riceve costi interni.
+
+### API Contract autorevole (nuovo standard)
+
+Per **FORMULA_TECHNICAL**:
+```
+POST /api/multi-cat/products/{pid}/configure
+  -> commercial_snapshot.final_unit_price          -> unit di riga
+     commercial_snapshot.unit_sale_price   (alias) -> stesso valore
+     commercial_snapshot.multiplier                -> es. 3.0
+     technical_snapshot.total_internal_cost        -> production_cost (ADMIN only)
+     calculation_hash                              -> stesso di /api/pricing/compute
+```
+
+Per **AREA / LINEAR / PER_ITEM / FIXED / FIXED_PLUS_VARIABLE / TIERED**:
+```
+  -> simple_snapshot.unit_price_final              -> unit di riga
+     simple_snapshot.sale_price_total              -> subtotale (unit × qty)
+     simple_snapshot.billable_* / real_*           -> dettaglio dimensionale
+```
+
+### Before / After
+
+| item | before | after |
+|------|--------|-------|
+| ProEvolution 1200×1400 add-to-quote | `unit_price_final=0`, `subtotal_line=0`, `total=0` | `unit_price_final=1016.70`, `subtotal_line=1016.70`, `total>0` ✅ |
+| Add con base_price=0 (bug) | riga creata a 0 € | HTTP 400 `COMMERCIAL_PRICING_NOT_CONFIGURED` ✅ |
+| Preview senza field commerciale | mostra "0 €" | badge `COMMERCIAL_PRICING_NOT_CONFIGURED` ✅ |
+| Commerciale riceveva `total_internal_cost`? | Sì (redaction su nome sbagliato) | No (redaction su field reali) ✅ |
+| §3 Identità motore `pricing_v3` vs `multi-cat` | Non verificato in test | Verificato via `calculation_hash` identico ✅ |
+| AREA §36 regression 100€/m² min1.50 1000×800 | 150 € | 150 € ✅ |
+
+### E2E evidence (verified via curl + pytest 20/8/2026)
+
+```
+=== §3 IDENTITÀ MOTORE ===
+pricing_v3 hash    = dd0d34d7c52df302da89707a5e2515c17f07979a34896eee24d683407b52dcfc
+multi-cat hash     = dd0d34d7c52df302da89707a5e2515c17f07979a34896eee24d683407b52dcfc
+IDENTITY: PASS
+
+=== CONFIGURE + ADD-LINE ===
+FROM CONFIGURE: unit=1016.7, multiplier=3.0, production_cost=338.9
+LINE OK: subtotal_line=1016.7 unit_price_final=1016.7
+
+=== FAIL-CLOSED ===
+POST /lines base_price=0 -> HTTP 400 COMMERCIAL_PRICING_NOT_CONFIGURED
+
+=== REGRESSION AREA §36 ===
+AREA 1000x800 min1.50: sale_price_total=150.0 (atteso 150.0)
+```
+
+Test regression: `tests/test_p0_formula_technical_quoteline.py` **5/5 PASS**.
+Test unit precedenti: `tests/test_multi_category_pricing.py` **19/19 PASS**.
+
+### Known issue non toccato (§14)
+
+- **Vano V1 con L/H vuoti** mentre la riga ha `1200×1400`. Documentato: le
+  dimensioni ora vivono in `QuoteLine.width_mm/height_mm`, mentre
+  `QuoteOpening.width_mm/height_mm` restano opzionali. Serve decidere quale è
+  la source-of-truth definitiva (position/configured product vs opening logico).
+  **Fuori scope hotfix P0**, aggiunto ai TO_CONFIRM.
+
+### Stato ufficiale post-hotfix
+
+- `CATEGORY_SELECTION_UI` = PASS
+- `PRODUCT_SELECTION_UI` = PASS
+- `SIMPLE_PRICING_ENGINE` = E2E_READY
+- `AREA_MINIMUM_BILLABLE` = PASS
+- `FORMULA_TECHNICAL_CONFIGURATION` = PASS
+- `FORMULA_TECHNICAL_PRICING_COMPUTE` = PASS (identità motore verificata)
+- `FORMULA_TECHNICAL_TO_QUOTELINE` = **FIXED** (backend curl PASS; **richiede tuo collaudo manuale UI**)
+- `QUOTE_TOTAL_RECOMPUTE` = **FIXED** (verified via `_recompute`)
+- `MULTI_CATEGORY_CONFIGURATOR` = PARTIAL (in attesa di ricollaudo UI)
+- `CATALOG_REAL_DATA` = PARTIAL
+- `M5` = BLOCKED (mancano Package/Services/Discount/Margin wiring UI)
+
+
+---
+
 ## 1. Obiettivo e criterio d'accettazione
 
 Sostituire il vecchio flusso

@@ -378,6 +378,21 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
     if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
     _assert_editable(doc)
     line_data = body.model_dump()
+    # Fail-closed §6/§8 — Multi-Category V1: righe FORMULA_TECHNICAL non possono
+    # essere aggiunte con base_price=0. Zero € NON è "pricing non configurato".
+    if line_data.get("source") == "MULTI_CATEGORY_V1" and line_data.get("pricing_model") == "FORMULA_TECHNICAL":
+        bp = float(line_data.get("base_price") or 0)
+        upf = float(line_data.get("unit_price_final") or 0)
+        if bp <= 0 and upf <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "COMMERCIAL_PRICING_NOT_CONFIGURED",
+                    "message": "Impossibile aggiungere una riga FORMULA_TECHNICAL con prezzo 0 €. Il motore commerciale non ha restituito un prezzo valido.",
+                    "product_key": line_data.get("product_key"),
+                    "hint": "Verificare pricing_v3 commercial_rule / package_multiplier per il tenant.",
+                },
+            )
     # Auto-fill dimensions from opening if not set
     if line_data.get("opening_id") and (not line_data.get("width_mm") or not line_data.get("height_mm")):
         op = next((o for o in doc.get("openings", []) if o["id"] == line_data["opening_id"]), None)

@@ -117,12 +117,24 @@ async def configure_product(
 
     result = await resolve_and_compute(product_dict, category, body, tenant_id=user["tenant_id"])
 
-    # Redaction per non-admin: nasconde production_cost/component-costs dai technical_snapshot
+    # Redaction per non-admin: nasconde production_cost/component-costs dai technical_snapshot.
+    # NOTA: i field name reali di pricing_v3 sono `total_internal_cost` (= production_cost),
+    # `material_cost`, `glass_cost`, `hardware_cost`, `labor_cost`, `foil_surcharge`,
+    # `additional_technical_costs`, `hourly_workshop_cost`, `production_time_hours`,
+    # `components` (BOM dettagliato).
     perms = await get_permission_keys_for_user(user)
     is_admin = "*" in perms or "products.manage" in perms or "quotes.view_costs" in perms or "quotes.view_margins" in perms
     if not is_admin and result.technical_snapshot:
         ts = dict(result.technical_snapshot)
-        for k in ("production_cost", "components_cost", "labor_cost", "hardware_cost", "glass_cost", "frame_cost", "sash_cost", "cost_breakdown", "internal_cost"):
+        for k in (
+            "total_internal_cost", "material_cost", "glass_cost", "hardware_cost",
+            "labor_cost", "foil_surcharge", "additional_technical_costs",
+            "hourly_workshop_cost", "production_time_hours",
+            "components", "glass_dimensions",
+            # legacy aliases (safety)
+            "production_cost", "components_cost", "internal_cost", "frame_cost",
+            "sash_cost", "cost_breakdown",
+        ):
             ts.pop(k, None)
         result.technical_snapshot = ts
 

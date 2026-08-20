@@ -136,14 +136,27 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
     if (preview.pricing_status !== "ok") {
       return toast.error(`Prezzo non calcolabile (${preview.pricing_status}). ${preview.blocking_errors?.join("; ") || ""}`);
     }
-    const total = preview.simple_snapshot?.sale_price_total
-      ?? preview.commercial_snapshot?.customer_price
-      ?? preview.commercial_snapshot?.customer_price_total
-      ?? preview.commercial_snapshot?.sale_price
-      ?? 0;
-    const unit = preview.simple_snapshot?.unit_price_final
-      ?? preview.commercial_snapshot?.unit_price
-      ?? total;
+    // Read AUTHORITATIVE fields from the compute response:
+    //  - Simple engine: simple_snapshot.sale_price_total / unit_price_final
+    //  - Technical engine (pricing_v3): commercial_snapshot.final_unit_price / unit_sale_price
+    // Fail-closed §6/§8: if we cannot extract a positive unit price we NEVER add
+    // the line with 0 €. Show explicit error with contract mismatch code.
+    const s = preview.simple_snapshot;
+    const c = preview.commercial_snapshot;
+    const unit = s?.unit_price_final
+      ?? c?.final_unit_price
+      ?? c?.unit_sale_price
+      ?? null;
+    const total = s?.sale_price_total
+      ?? (c?.final_unit_price != null ? c.final_unit_price * Number(inputs.quantity || 1) : null)
+      ?? (c?.unit_sale_price != null ? c.unit_sale_price * Number(inputs.quantity || 1) : null)
+      ?? null;
+    if (unit == null || total == null || unit <= 0 || total <= 0) {
+      return toast.error(
+        `COMMERCIAL_PRICING_NOT_CONFIGURED — prezzo commerciale non disponibile per ${selectedProduct.pricing_model}. Configura il moltiplicatore o listino.`,
+        { duration: 8000 }
+      );
+    }
     const qty = Number(inputs.quantity || 1);
     const desc = `${selectedProduct.name}${inputs.width_mm && inputs.height_mm ? ` · ${inputs.width_mm}×${inputs.height_mm} mm` : ""}${inputs.linear_meters ? ` · ${inputs.linear_meters} ml` : ""}`;
     onConfirm?.({
@@ -477,8 +490,9 @@ function PricingPreviewCard({ preview, product, canSeeCosts }) {
   const s = preview.simple_snapshot;
   const c = preview.commercial_snapshot;
   const t = preview.technical_snapshot;
-  const total = s?.sale_price_total ?? c?.customer_price ?? c?.customer_price_total ?? c?.sale_price ?? 0;
-  const unit = s?.unit_price_final ?? c?.unit_price ?? total;
+  const qty = Number(preview.inputs_echo?.technical_inputs?.quantity ?? preview.inputs_echo?.simple_inputs?.quantity ?? 1);
+  const unit = s?.unit_price_final ?? c?.final_unit_price ?? c?.unit_sale_price ?? null;
+  const total = s?.sale_price_total ?? (c?.final_unit_price != null ? c.final_unit_price * qty : null) ?? (c?.unit_sale_price != null ? c.unit_sale_price * qty : null) ?? null;
   const status = preview.pricing_status;
 
   if (status !== "ok") {
@@ -491,6 +505,15 @@ function PricingPreviewCard({ preview, product, canSeeCosts }) {
         {(preview.warnings || []).map((w, i) => (
           <div key={i} className="text-xs text-amber-700">{w}</div>
         ))}
+      </div>
+    );
+  }
+  // Fail-closed §8: se il pricing_status è ok ma i field commerciali mancano
+  if (unit == null || total == null || unit <= 0 || total <= 0) {
+    return (
+      <div className="space-y-2" data-testid="preview-missing-commercial">
+        <Badge className="rounded-sm bg-amber-500/20 text-amber-800">COMMERCIAL_PRICING_NOT_CONFIGURED</Badge>
+        <div className="text-xs text-amber-800">Prezzo commerciale non disponibile per {product.pricing_model}. Configura il moltiplicatore/listino.</div>
       </div>
     );
   }
@@ -533,10 +556,12 @@ function PricingPreviewCard({ preview, product, canSeeCosts }) {
       {product.pricing_model === "FORMULA_TECHNICAL" && t && (
         <div className="mt-3 space-y-1 text-xs font-mono-plex" data-testid="preview-technical-detail">
           <Row k="Motore" v="Technical Authoritative" />
-          {t.production_cost != null && canSeeCosts && (
-            <Row k="Costo produzione" v={fmt(t.production_cost)} />
+          {c?.multiplier != null && <Row k="Moltiplicatore" v={`× ${c.multiplier}`} />}
+          {c?.final_unit_price != null && <Row k="Prezzo unit. commerciale" v={fmt(c.final_unit_price)} />}
+          {t.total_internal_cost != null && canSeeCosts && (
+            <Row k="Costo produzione" v={fmt(t.total_internal_cost)} />
           )}
-          {preview.calculation_hash && <Row k="Hash calcolo" v={preview.calculation_hash} />}
+          {preview.calculation_hash && <Row k="Hash calcolo" v={preview.calculation_hash.slice(0,12)} />}
         </div>
       )}
     </div>
