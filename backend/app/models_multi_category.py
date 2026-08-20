@@ -45,6 +45,7 @@ class PricingModel(str, Enum):
     FIXED_PLUS_VARIABLE = "FIXED_PLUS_VARIABLE"
     TIERED = "TIERED"
     MANUAL_REVIEW_REQUIRED = "MANUAL_REVIEW_REQUIRED"
+    GRID = "GRID"
 
 
 VALID_PRICING_MODELS = {m.value for m in PricingModel}

@@ -8,6 +8,28 @@ Data implementazione: 20 Ago 2026
 
 ---
 
+## 🚀 F1 REAL CATALOG PRICING V1 — CONSEGNATO (20 Ago 2026)
+
+**Vedi documento completo**: `/app/memory/REAL_CATALOG_PRICING_V1.md`
+
+Sintesi F1:
+- **Gerarchia FINESTRE unica** (PORTEFINESTRE soft-deleted, TIPO SERRAMENTO chiesto dentro il configuratore)
+- **13 colori PVC** in `product_colors` con doppia classificazione (`pvc_color_category` + `cassonetti_price_family`)
+- **5 zanzariere reali** con `pricing_model=AREA` + `purchase_cost_table` × ×3
+- **Tapparella reale** con 3 varianti colore (RAL/LEGNO/RAFFAELLO, min 1.50 m²/pz, no ×3)
+- **Cassonetti** con nuovo `pricing_model=GRID` importato dal workbook ufficiale (4.464 celle, no ×3, no ricostruzione)
+- **ColorPicker data-driven** con hex swatch (F3 ready)
+- **Fail-closed** su dimensioni fuori griglia + colori senza mapping
+- **34/34 pytest verdi**
+
+**Backlog per F2/F3/F4** (STOP prima del ricollaudo manuale PO):
+- F2: `POSITION_TECHNICAL_DATA_V1` (sash_count, opening_per_sash[], handle_model+color, hinge_cover_color, trim_configuration, regola 003 BIANCO MASSA auto)
+- F3: `VISUAL_CONFIGURATOR_V1` (SVG deterministico doppia vista interna/esterna, renderer per zanzariere/tapparelle/cassonetti)
+- F4: `QUOTE_PDF_V2` + `CONTRACT_PDF_V2` + readiness check `MISSING_QUOTE_CONFIGURATION`
+
+
+---
+
 ## 🚨 REAL QUOTE INTEGRATION BUG P0 — HOTFIX (20 Ago 2026)
 
 **Sintomo verificato in produzione (PRV-2026-01716)**:

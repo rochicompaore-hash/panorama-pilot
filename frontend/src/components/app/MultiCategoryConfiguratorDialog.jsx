@@ -79,6 +79,10 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
       defaults.width_mm = 1200; defaults.height_mm = 1400;
     }
     if (p.pricing_model === "LINEAR_METER") defaults.linear_meters = 1;
+    if (p.pricing_model === "GRID") {
+      defaults.width_mm = 500; defaults.height_mm = 250;
+      defaults.depth_mm = 163; defaults.ceiling_liner = "SI";
+    }
     setInputs(defaults);
     setPreview(null);
     setStep(3);
@@ -115,6 +119,11 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
           linear_meters: inputs.linear_meters ? Number(inputs.linear_meters) : undefined,
           quantity: Number(inputs.quantity || 1),
           variant: inputs.variant || undefined,
+          options: {
+            ...(inputs.color_code ? { color_code: inputs.color_code } : {}),
+            ...(inputs.depth_mm ? { depth_mm: Number(inputs.depth_mm) } : {}),
+            ...(inputs.ceiling_liner ? { ceiling_liner: inputs.ceiling_liner } : {}),
+          },
         } };
       }
       const res = await api.post(`/multi-cat/products/${selectedProduct.id}/configure`, body);
@@ -282,6 +291,8 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
                 model={selectedProduct.pricing_model}
                 inputs={inputs}
                 setInputs={setInputs}
+                product={selectedProduct}
+                category={selectedCat}
               />
             </div>
             {/* RIGHT: live price */}
@@ -355,24 +366,30 @@ function CategoryIcon({ code }) {
   return <Icon size={18} className="text-primary" />;
 }
 
-function PricingModelRenderer({ model, inputs, setInputs }) {
+function PricingModelRenderer({ model, inputs, setInputs, product, category }) {
   const set = (k, v) => setInputs((s) => ({ ...s, [k]: v }));
+  // Inject product category context to ColorPicker via inputs field (no re-render impact)
+  React.useEffect(() => {
+    if (category?.code && inputs.__product_category !== category.code) {
+      setInputs((s) => ({ ...s, __product_category: category.code }));
+    }
+  }, [category?.code]);
 
   if (model === "FORMULA_TECHNICAL") {
     return (
       <Card className="rounded-sm border-border p-4 space-y-3" data-testid="cfg-technical">
         <div className="text-xs font-bold flex items-center gap-1"><Info size={12} /> Configurazione tecnica autorevole</div>
         <div className="grid grid-cols-2 gap-3">
-          <NumField label="Larghezza (mm)" value={inputs.width_mm} onChange={(v) => set("width_mm", v)} testid="cfg-tech-width" />
-          <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-tech-height" />
           <SelectField
-            label="Tipo"
+            label="TIPO SERRAMENTO"
             value={inputs.window_type || "WINDOW"}
             onChange={(v) => set("window_type", v)}
-            options={[["WINDOW","Finestra"],["DOOR_WINDOW","Portafinestra"],["SLIDING","Scorrevole"]]}
+            options={[["WINDOW","FINESTRA"],["DOOR_WINDOW","PORTAFINESTRA"]]}
             testid="cfg-tech-wtype"
           />
           <NumField label="N. ante" value={inputs.number_of_sashes || 1} onChange={(v) => set("number_of_sashes", v)} testid="cfg-tech-sashes" min={1} max={4} />
+          <NumField label="Larghezza (mm)" value={inputs.width_mm} onChange={(v) => set("width_mm", v)} testid="cfg-tech-width" />
+          <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-tech-height" />
           <SelectField label="Colore interno" value={inputs.color_internal || "WHITE_MASS"} onChange={(v) => set("color_internal", v)} options={[["WHITE_MASS","Bianco"],["ANTHRACITE","Antracite"],["OAK","Rovere"]]} testid="cfg-tech-cint" />
           <SelectField label="Colore esterno" value={inputs.color_external || "WHITE_MASS"} onChange={(v) => set("color_external", v)} options={[["WHITE_MASS","Bianco"],["ANTHRACITE","Antracite"],["OAK","Rovere"]]} testid="cfg-tech-cext" />
           <SelectField label="Vetro" value={inputs.glass_type || "DOUBLE_STANDARD"} onChange={(v) => set("glass_type", v)} options={[["DOUBLE_STANDARD","Doppio standard"],["TRIPLE_ACOUSTIC","Triplo acustico"],["DOUBLE_LOW_E","Basso emissivo"]]} testid="cfg-tech-glass" />
@@ -391,6 +408,23 @@ function PricingModelRenderer({ model, inputs, setInputs }) {
           <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-area-height" />
           <NumField label="Quantità" value={inputs.quantity || 1} onChange={(v) => set("quantity", v)} testid="cfg-qty" min={1} />
         </div>
+        <ColorPicker productCategory={inputs.__product_category} value={inputs.color_code} onChange={(v) => set("color_code", v)} testid="cfg-area-color" />
+      </Card>
+    );
+  }
+
+  if (model === "GRID") {
+    return (
+      <Card className="rounded-sm border-border p-4 space-y-3" data-testid="cfg-grid">
+        <div className="text-xs font-bold">Cassonetto — griglia ufficiale (L × H × profondità × cielino × colore)</div>
+        <div className="grid grid-cols-2 gap-3">
+          <NumField label="Larghezza (mm)" value={inputs.width_mm} onChange={(v) => set("width_mm", v)} testid="cfg-grid-width" min={500} step={100} />
+          <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-grid-height" min={250} step={100} />
+          <SelectField label="Profondità (mm)" value={String(inputs.depth_mm || 163)} onChange={(v) => set("depth_mm", Number(v))} options={[["163","163"],["326","326"],["489","489"],["652","652"]]} testid="cfg-grid-depth" />
+          <SelectField label="Cielino" value={inputs.ceiling_liner || "SI"} onChange={(v) => set("ceiling_liner", v)} options={[["SI","Con cielino"],["NO","Senza cielino"]]} testid="cfg-grid-ceiling" />
+          <NumField label="Quantità" value={inputs.quantity || 1} onChange={(v) => set("quantity", v)} testid="cfg-qty" min={1} />
+        </div>
+        <ColorPicker productCategory="CASSONETTI" value={inputs.color_code} onChange={(v) => set("color_code", v)} testid="cfg-grid-color" />
       </Card>
     );
   }
@@ -486,6 +520,62 @@ function SelectField({ label, value, onChange, options, testid }) {
   );
 }
 
+/**
+ * ColorPicker — data-driven color selector by product category.
+ * - CASSONETTI / FINESTRE / other PVC -> /api/product-colors (13 approved PVC colors)
+ * - ZANZARIERE -> /api/zanzariere-colors (separate taxonomy §7)
+ * - TAPPARELLE -> INTERNAL_MAP embedded in product.pricing_config.color_map
+ */
+function ColorPicker({ productCategory, value, onChange, testid, tapparellaMap }) {
+  const isZanzariera = productCategory === "ZANZARIERE";
+  const isTapparella = productCategory === "TAPPARELLE";
+  const { data } = useQuery({
+    queryKey: ["colors", isZanzariera ? "zanzariere" : "pvc"],
+    queryFn: async () => {
+      if (isTapparella) return { items: [
+        { code: "RAL_STANDARD", name: "COLORAZIONE RAL", price_category: "RAL",       visual_hex: "#B0B0B0" },
+        { code: "WOOD_EFFECT",  name: "EFFETTO LEGNO",   price_category: "LEGNO",     visual_hex: "#8B5A2B" },
+        { code: "RAFFAELLO",    name: "COLORI RAFFAELLO",price_category: "RAFFAELLO", visual_hex: "#7A3E2E" },
+      ] };
+      if (isZanzariera) return (await api.get(`/zanzariere-colors`)).data;
+      return (await api.get(`/product-colors?active=true`)).data;
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!productCategory,
+  });
+  const colors = data?.items || [];
+  return (
+    <div className="space-y-1" data-testid={testid}>
+      <Label className="text-xs">Colore</Label>
+      <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+        {colors.map((c) => {
+          const active = value === c.code;
+          const cat = c.pvc_color_category || c.price_category || c.cassonetti_price_family || "";
+          return (
+            <button
+              key={c.code}
+              type="button"
+              onClick={() => onChange(c.code)}
+              className={`text-left rounded-sm border p-2 transition-all ${active ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}
+              data-testid={`${testid}-${c.code}`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-6 h-6 rounded-sm border border-border shrink-0" style={{ backgroundColor: c.visual_hex || "#DDD" }} />
+                <div className="text-[11px] font-bold truncate">{c.code}</div>
+              </div>
+              <div className="text-[10px] text-muted-foreground truncate">{c.name}</div>
+              {cat && <div className="text-[9px] text-muted-foreground mt-0.5">{cat}</div>}
+            </button>
+          );
+        })}
+      </div>
+      {!colors.length && productCategory && (
+        <div className="text-[11px] text-muted-foreground">Nessun colore configurato per {productCategory}.</div>
+      )}
+    </div>
+  );
+}
+
 function PricingPreviewCard({ preview, product, canSeeCosts }) {
   const s = preview.simple_snapshot;
   const c = preview.commercial_snapshot;
@@ -528,9 +618,14 @@ function PricingPreviewCard({ preview, product, canSeeCosts }) {
       {product.pricing_model === "AREA" && s && (
         <div className="mt-3 space-y-1 text-xs font-mono-plex" data-testid="preview-area-detail">
           <Row k="Area reale" v={`${s.real_area_m2} m²`} />
-          {s.minimum_billable_area_m2 && <Row k="Minimo fatturabile" v={`${s.minimum_billable_area_m2} m²`} />}
-          <Row k="Area fatturata" v={`${s.billable_area_m2} m²`} />
-          <Row k="Prezzo/m²" v={fmt(s.unit_sale_price)} />
+          {(s.minimum_billable_area_m2) && <Row k="Minimo fatturabile" v={`${s.minimum_billable_area_m2} m²`} />}
+          <Row k="Area fatturata (pz)" v={`${s.billable_area_m2 ?? s.billable_area_m2_per_item} m²`} />
+          {s.color_price_category && <Row k="Categoria colore" v={s.color_price_category} />}
+          <Row k="Prezzo/m²" v={fmt(s.unit_sale_price ?? s.unit_sale_price_per_m2)} />
+          {s.purchase_unit_cost_per_m2 != null && canSeeCosts && (
+            <Row k="Costo acquisto/m²" v={fmt(s.purchase_unit_cost_per_m2)} />
+          )}
+          {s.commercial_multiplier && canSeeCosts && <Row k="Moltiplicatore" v={`× ${s.commercial_multiplier}`} />}
           <Row k="Quantità" v={s.quantity} />
         </div>
       )}
@@ -551,6 +646,20 @@ function PricingPreviewCard({ preview, product, canSeeCosts }) {
       {product.pricing_model === "FIXED_PRICE" && s && (
         <div className="mt-3 space-y-1 text-xs font-mono-plex" data-testid="preview-fixed-detail">
           <Row k="Prezzo forfait" v={fmt(s.fixed_sale_price)} />
+        </div>
+      )}
+      {product.pricing_model === "GRID" && s && (
+        <div className="mt-3 space-y-1 text-xs font-mono-plex" data-testid="preview-grid-detail">
+          <Row k="Dimensioni" v={`${s.width_mm}×${s.height_mm} mm`} />
+          <Row k="Profondità" v={`${s.depth_mm} mm`} />
+          <Row k="Cielino" v={s.ceiling_liner === "SI" ? "Con cielino" : "Senza cielino"} />
+          <Row k="Famiglia" v={s.finish_family} />
+          {s.color_code && <Row k="Colore" v={s.color_code} />}
+          <Row k="Prezzo vendita" v={fmt(s.customer_sale_price_per_item)} />
+          {s.internal_production_cost_per_item != null && canSeeCosts && (
+            <Row k="Costo produzione" v={fmt(s.internal_production_cost_per_item)} />
+          )}
+          <Row k="Quantità" v={s.quantity} />
         </div>
       )}
       {product.pricing_model === "FORMULA_TECHNICAL" && t && (

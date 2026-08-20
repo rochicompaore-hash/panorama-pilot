@@ -56,6 +56,7 @@ from app.routers.margin_control import router as margin_control_router
 from app.routers.commercial_packages import router as commercial_packages_router
 from app.routers.product_categories import router as product_categories_router
 from app.routers.multi_category_configurator import router as multi_category_configurator_router
+from app.routers.product_colors import router as product_colors_router, z_router as zanzariere_colors_router
 from app.routers.activities import router as activities_router
 from app.routers.tasks import router as tasks_router
 from app.routers.appointments import router as appointments_router
@@ -237,6 +238,8 @@ QUOTING_ROUTERS = [
     commercial_packages_router,  # Commercial Packages V1 (BASE/ADVANCED/PREMIUM)
     product_categories_router,   # Multi-Category V1 — categorie commerciali data-driven
     multi_category_configurator_router,  # Multi-Category V1 — resolver + configure endpoint
+    product_colors_router,       # F1 Real Catalog — anagrafica colori PVC
+    zanzariere_colors_router,    # F1 Real Catalog — colori zanzariere (tassonomia separata)
 ]
 OPS_ROUTERS = [
     surveys_router, sales_orders_router,

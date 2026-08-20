@@ -1,3 +1,48 @@
+## Iter 47 — F1 REAL CATALOG PRICING V1 (P0 — Ago 2026)
+
+**Autorizzato:** Messaggio "P0 — COMPLETAMENTO REALE PREVENTIVATORE + CATALOGO + VISUAL CONFIGURATOR + PDF" (modalità 1a: F1 completa poi STOP).
+**Deliverable primario:** `/app/memory/REAL_CATALOG_PRICING_V1.md`
+
+### Consegnato (F1 backend + parte UI del configuratore)
+- **Gerarchia FINESTRE unica**: PORTEFINESTRE `active=false` (soft-delete). TIPO SERRAMENTO chiesto dentro ProEvolution: `WINDOW / DOOR_WINDOW` come primo campo del `cfg-technical`.
+- **Anagrafica colori PVC** (`product_colors`): 13 colori seedati con doppia classificazione esplicita `pvc_color_category ∈ {MASS_COLOR, STANDARD, SPECIAL}` + `cassonetti_price_family ∈ {BIANCO_MASSA, STANDARD, NON_STANDARD}`. Router CRUD + `visual_hex` per F3. `003` e `100` (stesso RAL 9016) → famiglie diverse verificate.
+- **Zanzariere reali** (5 modelli): `SWITCH_5 / SKAT / UNIKLAT / UNIKVER / UNIKCAT` con `pricing_model=AREA` + `purchase_cost_table_per_m2` per {BASE, WOOD_EFFECT, MARBLE, SPECIAL} × `commercial_multiplier=3.00`. Fixture `TEST_ZANZARIERA_AREA_130` disattivata. `zanzariere_colors` collection separata (§7 mapping) con placeholder `ZC_*_DEFAULT` (colori reali TO_CONFIRM).
+- **Tapparelle reali**: `TAPPARELLA_STANDARD` con 3 varianti colore (RAL 35 / LEGNO 40 / RAFFAELLO 45 €/m²), min 1.50 m²/pz, NO ×3. `direct_product_cost=NEEDS_PO_CONFIGURATION`.
+- **Cassonetti — nuovo `pricing_model=GRID`**: importato da workbook `listino_completo_con_costi.xlsx` (3 famiglie × 8 sotto-griglie × 186 dimensioni = 4.464 celle prezzo con `{internal, sale}`). Il file vince — nessun ricalcolo dal costo. Fail-closed `DIMENSION_TO_CONFIRM` + `MISSING_CASSONETTO_COLOR_PRICE_FAMILY`. Il colore selezionato risolve `finish_family` via `product_colors.cassonetti_price_family` (mapping esplicito). NO ×3.
+- **Frontend**: `MultiCategoryConfiguratorDialog` esteso con: (1) TIPO SERRAMENTO in `cfg-technical`, (2) ColorPicker data-driven con swatch hex per Zanzariere/PVC/Tapparelle, (3) `cfg-grid` renderer per cassonetti (L/H/depth/ceiling/color), (4) preview esteso con dettagli condizionali per AREA e GRID + campi `canSeeCosts` per admin.
+
+### Vincoli PO rispettati (§1-40)
+- ✅ Categoria FINESTRE unica, no dropdown misto (§1)
+- ✅ TIPO in configurazione, no prodotti duplicati (§2)
+- ✅ Numero ante configurabile (§4)
+- ✅ Anagrafica colori PVC 13 (§9-10)
+- ✅ Zanzariere reali 5 modelli con min per pezzo (§19-25)
+- ✅ Tapparelle 3 varianti no ×3 (§34-37)
+- ✅ Cassonetti GRID no ×3 no formula (§29-33)
+- ✅ Fail-closed su tutti i pricing (§16, §33)
+- ✅ Snapshot con pricing_version (§25 direttiva master)
+- ✅ Distinzione REAL_CATALOG_DATA vs TEST_FIXTURE vs LEGACY (§18)
+
+### Test
+- **34/34 pytest verdi**: `test_multi_category_pricing.py` (19) + `test_p0_formula_technical_quoteline.py` (5) + `test_f1_real_catalog.py` (10)
+- Acceptance verificati: §21 UNIKVER 97,02€ · §22 tapparelle 52,50/60/67,50€ · §23 cassonetti 3 celle (329,01€/422,38€/296,20€ con relativi costi interni)
+
+### Stato ufficiale post-F1
+- `FINESTRE_REAL_CATALOG` = **E2E_READY (backend)** — richiede tuo ricollaudo UI
+- `ZANZARIERE_REAL_CATALOG` = **E2E_READY (backend)** — richiede tuo ricollaudo UI
+- `TAPPARELLE_REAL_CATALOG` = **E2E_READY (backend)** — richiede tuo ricollaudo UI
+- `CASSONETTI_REAL_CATALOG` = **E2E_READY (backend)** — richiede tuo ricollaudo UI
+- `POSITION_TECHNICAL_DATA_V1` = **NOT_STARTED** (F2)
+- `VISUAL_CONFIGURATOR_V1` = **NOT_STARTED** (F3)
+- `QUOTE_PDF_V2` = **NOT_STARTED** (F4)
+- `M5` = **BLOCKED**
+
+### STOP §30
+Ricollaudo manuale PO su Finestre / Zanzariere / Tapparelle / Cassonetti. F2/F3/F4 in sessioni successive.
+
+---
+
+
 ## Iter 46 — Multi-Category Quote Configurator V1 (P0 UX — Ago 2026)
 
 **Autorizzato:** Messaggio "CORREZIONE P0 UX PREVENTIVATORE — CONFIGURATORE PRODOTTO MULTI-CATEGORIA"

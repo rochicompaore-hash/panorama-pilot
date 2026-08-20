@@ -253,7 +253,141 @@ class SimplePricingEngine:
             return cls.compute_fixed_plus_variable(product, inputs)
         if model == PricingModel.TIERED.value:
             return cls.compute_tiered(product, inputs)
+        if model == "GRID":
+            return cls.compute_grid(product, inputs)
         raise ValueError(f"UNSUPPORTED_SIMPLE_MODEL:{model}")
+
+    # -------- extended: AREA with color category table (Zanzariere/Tapparelle) --------
+    @staticmethod
+    def compute_area_by_color(product: Dict[str, Any], inputs: SimplePricingInputs, color_lookup: Dict[str, str]) -> Dict[str, Any]:
+        """AREA con tabella prezzi per categoria colore.
+
+        Args:
+          product: pricing_config deve avere ``purchase_cost_table_per_m2`` (§20 zanzariere)
+                    o ``sale_price_table_per_m2`` (§34 tapparelle).
+          inputs: options.color_code obbligatorio.
+          color_lookup: dict {color_code: price_category}.
+
+        Vincolo §3 zanzariere: minimo per pezzo, MOLTIPLICAZIONE per quantity SOLO dopo
+        avere calcolato il billable_area del singolo pezzo.
+        """
+        cfg = product.get("pricing_config") or {}
+        color_code = (inputs.options or {}).get("color_code")
+        if not color_code:
+            raise ValueError("MISSING_COLOR_CODE")
+        category = color_lookup.get(color_code)
+        if not category or category == "NEEDS_PO_MAPPING":
+            raise ValueError("MISSING_COLOR_PRICE_CATEGORY")
+
+        real_area = _real_area_m2(inputs.width_mm, inputs.height_mm)
+        if real_area is None or real_area <= 0:
+            raise ValueError("INVALID_DIMENSIONS")
+        min_bill = product.get("minimum_billable_quantity") or cfg.get("minimum_billable_area_m2") or 0.0
+        billable_area = max(real_area, float(min_bill)) if min_bill else real_area
+        qty = max(float(inputs.quantity or 1), 1.0)
+        multiplier = float(cfg.get("commercial_multiplier") or 1.0)
+
+        # Two supported price sources:
+        purchase_tbl = cfg.get("purchase_cost_table_per_m2") or {}
+        sale_tbl = cfg.get("sale_price_table_per_m2") or {}
+
+        if purchase_tbl:
+            purchase_unit_cost = purchase_tbl.get(category)
+            if purchase_unit_cost is None:
+                raise ValueError(f"MISSING_PURCHASE_PRICE_FOR_CATEGORY:{category}")
+            purchase_cost_per_item = _round2(billable_area * float(purchase_unit_cost))
+            sale_price_per_item = _round2(purchase_cost_per_item * multiplier)
+            unit_sale_per_m2 = _round2(float(purchase_unit_cost) * multiplier)
+        else:
+            unit_sale = sale_tbl.get(category)
+            if unit_sale is None:
+                raise ValueError(f"MISSING_SALE_PRICE_FOR_CATEGORY:{category}")
+            purchase_unit_cost = None
+            purchase_cost_per_item = None
+            sale_price_per_item = _round2(billable_area * float(unit_sale))
+            unit_sale_per_m2 = float(unit_sale)
+
+        sale_price_total = _round2(sale_price_per_item * qty)
+        return {
+            "pricing_model": PricingModel.AREA.value,
+            "color_code": color_code,
+            "color_price_category": category,
+            "width_mm": inputs.width_mm,
+            "height_mm": inputs.height_mm,
+            "real_area_m2": real_area,
+            "minimum_billable_area_m2": float(min_bill) if min_bill else None,
+            "billable_area_m2_per_item": billable_area,
+            "purchase_unit_cost_per_m2": purchase_unit_cost,
+            "purchase_cost_per_item": purchase_cost_per_item,
+            "commercial_multiplier": multiplier if purchase_tbl else None,
+            "unit_sale_price_per_m2": unit_sale_per_m2,
+            "sale_price_per_item": sale_price_per_item,
+            "quantity": qty,
+            "sale_price_total": sale_price_total,
+            "sale_unit": "m2",
+            "pricing_version": cfg.get("pricing_version"),
+        }
+
+    # -------- GRID (cassonetti) --------
+    @staticmethod
+    def compute_grid(product: Dict[str, Any], inputs: SimplePricingInputs, finish_family: Optional[str] = None) -> Dict[str, Any]:
+        """DIMENSIONAL_PRICE_GRID lookup for cassonetti (§29-33).
+
+        Args:
+          product.pricing_config = {
+            grid_version, depths_mm[], grid: {family: {"{depth}_{ciel}": {"WxH": {internal, sale}}}}
+          }
+          inputs.options = {
+            depth_mm ∈ {163,326,489,652},
+            ceiling_liner ∈ {SI,NO},
+            finish_family passed as arg (resolved from color_code by caller)
+          }
+        """
+        cfg = product.get("pricing_config") or {}
+        grid = cfg.get("grid") or {}
+        opts = inputs.options or {}
+        depth = int(opts.get("depth_mm") or 0)
+        ceiling = str(opts.get("ceiling_liner") or "").upper()
+        w = int(inputs.width_mm or 0)
+        h = int(inputs.height_mm or 0)
+        if depth not in (163, 326, 489, 652):
+            raise ValueError("INVALID_DEPTH")
+        if ceiling not in ("SI", "NO"):
+            raise ValueError("INVALID_CEILING_LINER")
+        if w <= 0 or h <= 0:
+            raise ValueError("INVALID_DIMENSIONS")
+        if not finish_family:
+            raise ValueError("MISSING_CASSONETTO_COLOR_PRICE_FAMILY")
+        if finish_family not in grid:
+            raise ValueError(f"UNKNOWN_FINISH_FAMILY:{finish_family}")
+
+        col_key = f"{depth}_{'c' if ceiling == 'SI' else 'nc'}"
+        subgrid = grid[finish_family].get(col_key) or {}
+        dim_key = f"{w}x{h}"
+        cell = subgrid.get(dim_key)
+        if not cell:
+            raise ValueError("DIMENSION_TO_CONFIRM")
+        internal_cost = float(cell.get("internal") or 0)
+        sale = float(cell.get("sale") or 0)
+        if sale <= 0:
+            raise ValueError("MISSING_CASSONETTO_SALE_PRICE")
+        qty = max(float(inputs.quantity or 1), 1.0)
+        sale_price_total = _round2(sale * qty)
+        return {
+            "pricing_model": "GRID",
+            "width_mm": w, "height_mm": h,
+            "depth_mm": depth,
+            "ceiling_liner": ceiling,
+            "finish_family": finish_family,
+            "color_code": opts.get("color_code"),
+            "internal_production_cost_per_item": _round2(internal_cost) if internal_cost else None,
+            "customer_sale_price_per_item": _round2(sale),
+            "unit_price_final": _round2(sale),
+            "quantity": qty,
+            "sale_price_total": sale_price_total,
+            "sale_unit": "pz",
+            "grid_version": cfg.get("grid_version"),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +529,41 @@ async def resolve_and_compute(
             blocking_errors=["simple_inputs richiesti per questo pricing_model."],
         )
     try:
-        snap = SimplePricingEngine.compute(product, req.simple_inputs)
+        # Router extension F1: AREA con tabella colori (Zanzariere/Tapparelle) e GRID (Cassonetti)
+        pcfg = product.get("pricing_config") or {}
+        has_color_table = bool(pcfg.get("purchase_cost_table_per_m2") or pcfg.get("sale_price_table_per_m2"))
+        color_code = (req.simple_inputs.options or {}).get("color_code")
+
+        if model == "GRID":
+            # Cassonetti: risolvi finish_family dal color_code via product_colors
+            from app.db import get_db
+            db = get_db()
+            finish_family = None
+            if color_code:
+                cdoc = await db.product_colors.find_one({"tenant_id": tenant_id, "code": color_code, "deleted_at": None, "active": True})
+                if cdoc:
+                    finish_family = cdoc.get("cassonetti_price_family")
+            if not finish_family or finish_family == "NEEDS_PO_MAPPING":
+                raise ValueError("MISSING_CASSONETTO_COLOR_PRICE_FAMILY")
+            snap = SimplePricingEngine.compute_grid(product, req.simple_inputs, finish_family=finish_family)
+        elif model == PricingModel.AREA.value and has_color_table and color_code:
+            # Zanzariere: risolvi da zanzariere_colors. Tapparelle: risolvi da product.pricing_config.color_lookup
+            from app.db import get_db
+            db = get_db()
+            color_domain = pcfg.get("color_domain") or "PVC"  # PVC | ZANZARIERE | INTERNAL_MAP
+            lookup: dict = {}
+            if color_domain == "ZANZARIERE":
+                async for cdoc in db.zanzariere_colors.find({"tenant_id": tenant_id, "deleted_at": None, "active": True}):
+                    lookup[cdoc.get("code")] = cdoc.get("price_category")
+            elif color_domain == "INTERNAL_MAP":
+                # product-embedded map for TAPPARELLE-like (RAL/LEGNO/RAFFAELLO)
+                lookup = pcfg.get("color_map") or {}
+            else:
+                async for cdoc in db.product_colors.find({"tenant_id": tenant_id, "deleted_at": None, "active": True}):
+                    lookup[cdoc.get("code")] = cdoc.get("pvc_color_category")
+            snap = SimplePricingEngine.compute_area_by_color(product, req.simple_inputs, lookup)
+        else:
+            snap = SimplePricingEngine.compute(product, req.simple_inputs)
     except ValueError as e:
         return ConfigureResponse(
             pricing_status="invalid_inputs",
