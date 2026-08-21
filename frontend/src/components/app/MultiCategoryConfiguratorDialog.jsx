@@ -146,17 +146,20 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
       return toast.error(`Prezzo non calcolabile (${preview.pricing_status}). ${preview.blocking_errors?.join("; ") || ""}`);
     }
     // Read AUTHORITATIVE fields from the compute response:
-    //  - Simple engine: simple_snapshot.sale_price_total / unit_price_final
+    //  - Simple engine (all variants): simple_snapshot.unit_price_final / sale_price_total
+    //    (alias per AREA-by-color: sale_price_per_item)
     //  - Technical engine (pricing_v3): commercial_snapshot.final_unit_price / unit_sale_price
     // Fail-closed §6/§8: if we cannot extract a positive unit price we NEVER add
     // the line with 0 €. Show explicit error with contract mismatch code.
     const s = preview.simple_snapshot;
     const c = preview.commercial_snapshot;
     const unit = s?.unit_price_final
+      ?? s?.sale_price_per_item
       ?? c?.final_unit_price
       ?? c?.unit_sale_price
       ?? null;
     const total = s?.sale_price_total
+      ?? (s?.sale_price_per_item != null ? s.sale_price_per_item * Number(inputs.quantity || 1) : null)
       ?? (c?.final_unit_price != null ? c.final_unit_price * Number(inputs.quantity || 1) : null)
       ?? (c?.unit_sale_price != null ? c.unit_sale_price * Number(inputs.quantity || 1) : null)
       ?? null;
@@ -581,8 +584,8 @@ function PricingPreviewCard({ preview, product, canSeeCosts }) {
   const c = preview.commercial_snapshot;
   const t = preview.technical_snapshot;
   const qty = Number(preview.inputs_echo?.technical_inputs?.quantity ?? preview.inputs_echo?.simple_inputs?.quantity ?? 1);
-  const unit = s?.unit_price_final ?? c?.final_unit_price ?? c?.unit_sale_price ?? null;
-  const total = s?.sale_price_total ?? (c?.final_unit_price != null ? c.final_unit_price * qty : null) ?? (c?.unit_sale_price != null ? c.unit_sale_price * qty : null) ?? null;
+  const unit = s?.unit_price_final ?? s?.sale_price_per_item ?? c?.final_unit_price ?? c?.unit_sale_price ?? null;
+  const total = s?.sale_price_total ?? (s?.sale_price_per_item != null ? s.sale_price_per_item * qty : null) ?? (c?.final_unit_price != null ? c.final_unit_price * qty : null) ?? (c?.unit_sale_price != null ? c.unit_sale_price * qty : null) ?? null;
   const status = preview.pricing_status;
 
   if (status !== "ok") {

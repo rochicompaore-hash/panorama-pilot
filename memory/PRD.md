@@ -1,3 +1,33 @@
+## Iter 48 — P0 HOTFIX Live Price Tapparelle/Zanzariere (Feb 2026)
+
+**Autorizzato:** Messaggio 391 §1-10 — bug live price nel configuratore multi-categoria da chiudere PRIMA del Margin Tachometer.
+
+### Bug
+`COMMERCIAL_PRICING_NOT_CONFIGURED` / `MISSING_UNIT_SALE_PRICE` visualizzato in `PricingPreviewCard` per Tapparelle e Zanzariere anche con calcolo backend corretto. Root cause: `compute_area_by_color` esponeva `sale_price_per_item` ma NON `unit_price_final`, mentre tutte le altre engine (compute_area basic, compute_grid, compute_per_item…) e il frontend leggono `unit_price_final`. Contract mismatch, non regressione RBAC.
+
+### Fix (msg 391 §6 — contratto canonico)
+1. `backend/app/services/multi_category_pricing.py::compute_area_by_color`: aggiunto `unit_price_final = sale_price_per_item` allo snapshot (per-billed-unit).
+2. `frontend/src/components/app/MultiCategoryConfiguratorDialog.jsx`: submit() e PricingPreviewCard leggono anche `sale_price_per_item` come alias canonico → catena `unit_price_final ?? sale_price_per_item ?? c.final_unit_price ?? c.unit_sale_price`.
+3. NO fallback, NO default, NO 0 — pura normalizzazione di contratto.
+
+### Test
+- `backend/tests/test_p0_area_color_contract.py` — 8/8 pytest verdi (contract + valori attesi 176.40/201.60/226.80 tapparella 1200×1400; 97.02 UNIKVER 800×800 con min 1.5 m²).
+- `testing_agent iter_31.json`: **backend 100% (13/13), frontend E2E 100%**, RBAC OK (commerciale vede `unit_price_final`/`sale_price_total`, NON vede `purchase_*`/`commercial_multiplier`), add-to-quote + save + reload persistono.
+
+### Vincoli PO rispettati (msg 391)
+- ✅ §2 — nessun fallback, nessun default, nessun placeholder
+- ✅ §6 — contratto canonico `unit_price_final` / `sale_price_total`
+- ✅ §7-8 — commerciale riceve solo campi di vendita, no leak costi/multiplier
+- ✅ §10 — acceptance browser PASS via testing_agent
+
+### Aperto per prossimo giro
+- Margin Tachometer V1 (msg 391 §11-19): sbloccato ora che hotfix P0 è chiuso.
+  - Fasce: ≥30%=15% · ≥20%=10% · ≥15%=8% · ≥8%=5% · <8% NEEDS_AUTHORIZATION (non 0%).
+  - Base commissione: NET_REVENUE_EX_VAT (§11 risposta 1=B).
+  - Include OTHER_DIRECT_COSTS (§12 risposta 2=A).
+
+---
+
 ## Iter 47 — F1 REAL CATALOG PRICING V1 (P0 — Ago 2026)
 
 **Autorizzato:** Messaggio "P0 — COMPLETAMENTO REALE PREVENTIVATORE + CATALOGO + VISUAL CONFIGURATOR + PDF" (modalità 1a: F1 completa poi STOP).

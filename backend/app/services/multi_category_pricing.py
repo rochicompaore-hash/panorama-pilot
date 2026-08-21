@@ -322,6 +322,10 @@ class SimplePricingEngine:
             "commercial_multiplier": multiplier if purchase_tbl else None,
             "unit_sale_price_per_m2": unit_sale_per_m2,
             "sale_price_per_item": sale_price_per_item,
+            # Canonical contract (§6 PO): every simple engine MUST expose
+            # ``unit_price_final`` (per billed unit) and ``sale_price_total``.
+            # Here billed unit == item, so unit_price_final == sale_price_per_item.
+            "unit_price_final": sale_price_per_item,
             "quantity": qty,
             "sale_price_total": sale_price_total,
             "sale_unit": "m2",

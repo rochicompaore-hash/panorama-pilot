@@ -1,0 +1,41 @@
+{
+  "summary": "P0 HOTFIX Live Price Tapparelle/Zanzariere — VERIFIED. Backend contract fix (unit_price_final in simple_snapshot) works end-to-end: Tapparella RAL/LEGNO/RAFFAELLO -> 176.40/201.60/226.80 €, UNIKVER 800x800 BASE -> 97.02 €. RBAC redaction OK for Commerciale (unit_price_final visible; purchase_unit_cost_per_m2 / purchase_cost_per_item / commercial_multiplier redacted to None both in API and in UI PricingPreviewCard). Frontend E2E: PricingPreviewCard shows 176,40 € (no COMMERCIAL_PRICING_NOT_CONFIGURED banner), add-to-quote succeeds and persists after reload. Commerciale UI hides 'Costo acquisto/m²' and 'Moltiplicatore' rows.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Quote detail — Righe table",
+        "issues": [
+          "Line PREZZO/SUBTOTAL columns render values as integer euros (e.g. '176 €' instead of '176,40 €' for a 176.40 € line; '2504 €' for a 2503.65 € line). Persistence itself is correct (Imponibile reflects the sum), but the row-level column formatting looses 2 decimals — visual only. Recommend using Intl.NumberFormat(it-IT, {minimumFractionDigits:2}) for prezzo_unitario and subtotal cells in the RigheTable component (not part of this P0 scope)."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_p0_area_color_contract.py",
+    "/app/backend/tests/test_p0_livepricing_integration.py"
+  ],
+  "action_items": [
+    "OPTIONAL (non-blocking, not P0): fix quote-line row PREZZO/SUBTOTAL cell formatting to always show 2 decimals (currently truncated to integer euros)."
+  ],
+  "critical_code_review_comments": [
+    "compute_area_by_color now correctly exposes both canonical `unit_price_final` and legacy `sale_price_per_item` — good backward-compat.",
+    "MultiCategoryConfiguratorDialog.jsx submit() fallback chain (unit_price_final ?? sale_price_per_item ?? final_unit_price ?? unit_sale_price) is defensible: it reads only canonical fields calculated by the backend, no client-side default/zero — matches PO fail-closed directive.",
+    "PricingPreviewCard: RBAC gating via `canSeeCosts` prop correctly hides purchase_unit_cost_per_m2/multiplier rows for Commerciale — consistent with backend redaction."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_p0_livepricing_integration.py (new integration test — 5 tests passing)"
+  ],
+  "success_rate": {"backend": "100% (13/13: 8 unit + 5 integration)", "frontend": "100% (all E2E scenarios PASS)"},
+  "test_credentials": "Admin admin@infissiexpress.com / Admin!2025; Commerciale commercial_test@infissiexpress.com / Commercial!2025",
+  "seed_data_creation": "None — used existing DRAFT quote PRV-2026-01723-R00. One extra Tapparella line was added during E2E on this quote (176 € subtotal).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "P0 live-price contract for AREA-by-color engine is closed. Backend integration test file test_p0_livepricing_integration.py verifies both admin snapshot values and RBAC redaction via public API. FORMULA_TECHNICAL and GRID regression were NOT re-tested end-to-end in this run (out of scope for contract fix — but the frontend fallback chain also reads commercial_snapshot.final_unit_price so no regression expected). Only cosmetic issue: quote-row prezzo column truncates decimals.",
+  "rca of the issue": "Contract mismatch: SimplePricingEngine.compute_area_by_color previously exposed only sale_price_per_item (per-item sale) in the snapshot, but MultiCategoryConfiguratorDialog.jsx (PricingPreviewCard + submit()) read `unit_price_final` as the canonical field. Result: unit resolved to null => fail-closed banner COMMERCIAL_PRICING_NOT_CONFIGURED even though backend calculation was correct. Fix: (a) backend adds unit_price_final = sale_price_per_item into the snapshot dict (§6 canonical contract); (b) frontend fallback chain now includes sale_price_per_item as legacy alias. Verified: Tapparella 1200x1400 RAL/LEGNO/RAFFAELLO -> 176.40/201.60/226.80 €, UNIKVER 800x800 BASE -> 97.02 € (min 1.5 m² applied), RBAC redaction preserved."
+}
