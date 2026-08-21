@@ -12,6 +12,47 @@ Stato al termine di F1:
 - `POSITION_TECHNICAL_DATA_V1` = NOT_STARTED (F2)
 - `VISUAL_CONFIGURATOR_V1` = NOT_STARTED (F3)
 - `QUOTE_PDF_V2` = NOT_STARTED (F4)
+
+---
+
+## 🚨 HOTFIX F1 — 20 Ago 2026 (post-collaudo PO)
+
+### 1. TAPPARELLE — NUOVA POLICY ×3 (supera la precedente "NO ×3")
+- `pricing_config.purchase_cost_table_per_m2 = {RAL: 35, LEGNO: 40, RAFFAELLO: 45}` (costi acquisto)
+- `commercial_multiplier = 3.00`
+- Sale €/m² risultanti: RAL **105** / LEGNO **120** / RAFFAELLO **135**
+- Pricing version: `tapparelle_2026_08_v2_x3`
+- Acceptance 800×1000 (billable 1.50 m²): RAL **157,50€** / LEGNO **180€** / RAFFAELLO **202,50€**
+
+### 2. RBAC hotfix — redaction estesa a `simple_snapshot` e `pricing_config.grid`
+Prima del fix, il commerciale riceveva ancora `internal_production_cost_per_item`,
+`purchase_unit_cost_per_m2`, `purchase_cost_per_item`, `commercial_multiplier`
+sui prodotti AREA/GRID. Ora la redaction è applicata:
+- **`configure` response**: rimuove tutti i field `purchase_*`, `internal_*`,
+  `commercial_multiplier`, `margin`, `contribution_margin` dal `simple_snapshot`.
+- **`list_products` response**: rimuove dal `pricing_config` sia
+  `purchase_cost_table_per_m2` (Zanzariere/Tapparelle) sia
+  `pricing_formula_metadata` (Cassonetti). La `grid` viene redatta cella per
+  cella tenendo solo `{sale}` (nessun `internal`).
+
+### 3. Utente COMMERCIAL_TEST creato per verifica RBAC browser
+- `commercial_test@infissiexpress.com` / `CommTest!2026` (documentato in test_credentials.md)
+- Nessun permesso admin
+- Test suite dedicata: `tests/test_f1_rbac_commercial.py` — **7/7 PASS**
+
+### 4. Confermato D3 cassonetto
+L=700 H=250 D=326 c/ciel BIANCO_MASSA → **276,13€** (cella `Bianco massa!E17`),
+internal 110,43€ (cella `Costo prod. Bianco!E17`). Il valore 296,20€ precedente
+si riferiva a s/ciel — errore documentale corretto.
+
+### 5. AUTO_003_RULE ancora NOT_IMPLEMENTED (backlog F2)
+
+### 6. Test suite complessiva post-hotfix: **41/41 pytest verdi**
+- `test_multi_category_pricing.py` (19)
+- `test_p0_formula_technical_quoteline.py` (5)
+- `test_f1_real_catalog.py` (10, con tapparelle ×3 aggiornati)
+- `test_f1_rbac_commercial.py` (7, nuovo)
+
 - `M5` = BLOCKED
 
 ---

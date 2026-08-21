@@ -61,8 +61,12 @@ class TestF1RealCatalog:
         assert r["simple_snapshot"]["billable_area_m2_per_item"] == 1.50
 
     def test_tapparella_three_variants(self, headers):
+        """Policy AGGIORNATA 20 Ago 2026: TAPPARELLE ×3.
+        Purchase 35/40/45 → Sale 105/120/135 €/m². Billable 1.50 m² per pz.
+        Atteso: 800×1000 → sale_price_total = billable × sale_rate.
+        """
         pid = _product_id_by_key(headers, "TAPPARELLE", "TAPPARELLA_STANDARD")
-        expected = {"RAL_STANDARD": 52.50, "WOOD_EFFECT": 60.00, "RAFFAELLO": 67.50}
+        expected = {"RAL_STANDARD": 157.50, "WOOD_EFFECT": 180.00, "RAFFAELLO": 202.50}
         for cc, exp in expected.items():
             r = requests.post(
                 f"{BASE_URL}/api/multi-cat/products/{pid}/configure",

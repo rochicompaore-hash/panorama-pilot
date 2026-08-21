@@ -66,8 +66,23 @@ async def list_products_for_new_quote(
         for it in items:
             cfg = it.get("pricing_config") or {}
             if isinstance(cfg, dict):
-                for k in ("internal_reference_price", "production_cost_seed", "internal_cost", "cost_config"):
+                # Rimuove costi interni diretti
+                for k in ("internal_reference_price", "production_cost_seed", "internal_cost", "cost_config",
+                          "purchase_cost_table_per_m2", "commercial_multiplier",
+                          "pricing_formula_metadata"):
                     cfg.pop(k, None)
+                # GRID: rimuove i costi interni dalla griglia (redige cella {internal,sale} -> {sale})
+                grid = cfg.get("grid")
+                if isinstance(grid, dict):
+                    redacted_grid = {}
+                    for family, subgrids in grid.items():
+                        redacted_grid[family] = {}
+                        for depth_ceil, cells in (subgrids or {}).items():
+                            redacted_grid[family][depth_ceil] = {}
+                            for dim_key, cell in (cells or {}).items():
+                                if isinstance(cell, dict):
+                                    redacted_grid[family][depth_ceil][dim_key] = {"sale": cell.get("sale")}
+                    cfg["grid"] = redacted_grid
             it.pop("technical_recipe_id", None)
     return {"items": items, "is_admin_view": is_admin}
 
@@ -137,5 +152,21 @@ async def configure_product(
         ):
             ts.pop(k, None)
         result.technical_snapshot = ts
+    # Redaction simple_snapshot per non-admin (§5 direttiva RBAC F1):
+    # nasconde purchase_cost, internal_production_cost, commercial_multiplier, margin.
+    if not is_admin and result.simple_snapshot:
+        ss = dict(result.simple_snapshot)
+        for k in (
+            "purchase_unit_cost_per_m2", "purchase_cost_per_item", "purchase_total_cost",
+            "internal_production_cost_per_item", "internal_reference_price",
+            "commercial_multiplier", "margin", "contribution_margin",
+            # safety legacy
+            "internal_cost", "production_cost",
+        ):
+            ss.pop(k, None)
+        result.simple_snapshot = ss
+    # Redaction list_products pricing_config per non-admin (già filtrata su list route,
+    # ma il configure ritorna anche pricing_config indirettamente in inputs_echo — non
+    # contiene però i costi; safety check sul pricing_config del prodotto non applicabile qui)
 
     return result

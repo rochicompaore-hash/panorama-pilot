@@ -178,16 +178,19 @@ async def seed_tapparella_product(db, tenant_id: str, dry: bool) -> int:
     cat = await db.product_categories.find_one({"tenant_id": tenant_id, "code": "TAPPARELLE", "deleted_at": None})
     if not cat:
         return 0
+    # Policy AGGIORNATA 20 Ago 2026: TAPPARELLE ×3 (superata la vecchia "NO ×3").
+    # 35/40/45 sono PURCHASE COST €/m². Sale = purchase × 3 = 105/120/135 €/m².
     pricing_config = {
-        "sale_price_table_per_m2": {"RAL": 35.00, "LEGNO": 40.00, "RAFFAELLO": 45.00},
+        "purchase_cost_table_per_m2": {"RAL": 35.00, "LEGNO": 40.00, "RAFFAELLO": 45.00},
         "minimum_billable_area_m2": 1.50,
+        "commercial_multiplier": 3.00,
         "color_domain": "INTERNAL_MAP",
         "color_map": {"RAL_STANDARD": "RAL", "WOOD_EFFECT": "LEGNO", "RAFFAELLO": "RAFFAELLO"},
-        "pricing_version": "tapparelle_2026_08",
-        "direct_product_cost_status": "NEEDS_PO_CONFIGURATION",  # §38 direttiva
+        "pricing_version": "tapparelle_2026_08_v2_x3",
+        "policy_note": "Aggiornata policy ×3 il 20 Ago 2026. Posa separata via simple_services.",
     }
     base = {
-        "name": "Tapparella PVC (3 varianti)",
+        "name": "Tapparella PVC (3 varianti — ×3)",
         "pricing_model": "AREA", "pricing_config": pricing_config,
         "category_id": cat["_id"], "category_code": "TAPPARELLE",
         "sale_unit": "m2", "minimum_billable_quantity": 1.50,
@@ -202,7 +205,8 @@ async def seed_tapparella_product(db, tenant_id: str, dry: bool) -> int:
         return 0
     doc = {
         "_id": new_id(), "tenant_id": tenant_id, "key": "TAPPARELLA_STANDARD",
-        "category": "roller", "description": "Tapparella — RAL 35€/m² · LEGNO 40€/m² · RAFFAELLO 45€/m² · min 1.50 m²/pz",
+        "category": "roller",
+        "description": "Tapparella — purchase €/m² × 3 (RAL 105 / LEGNO 120 / RAFFAELLO 135 €/m² sale) · min 1.50 m²/pz",
         "base_price": 0.0, "base_type": "sqm", "min_billable_sqm": 1.50,
         "order_index": 200, "compatible_packages": ["BASE","ADVANCED","PREMIUM"],
         "compatible_services": [], "created_at": _iso(), "deleted_at": None, "version": 1, **base,
