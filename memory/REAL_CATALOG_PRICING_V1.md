@@ -4,14 +4,15 @@
 **Deliverable §29** · **Scope**: F1 (Real Catalog Data) — F2/F3/F4 in coda.
 
 Stato al termine di F1:
-- `FINESTRE_REAL_CATALOG` = **E2E_READY (backend)** · UI ricollaudo manuale richiesto
-- `ZANZARIERE_REAL_CATALOG` = **E2E_READY (backend)** · UI ricollaudo manuale richiesto
-- `TAPPARELLE_REAL_CATALOG` = **E2E_READY (backend)** · UI ricollaudo manuale richiesto
-- `CASSONETTI_REAL_CATALOG` = **E2E_READY (backend)** · UI ricollaudo manuale richiesto
-- `POSITION_TECHNICAL_DATA_V1` = **NOT_STARTED** (F2 successiva)
-- `VISUAL_CONFIGURATOR_V1` = **NOT_STARTED** (F3 successiva)
-- `QUOTE_PDF_V2` = **NOT_STARTED** (F4 successiva)
-- `M5` = **BLOCKED** (mancano Package/Services/Discount/Margin wiring UI + PDF)
+- `FINESTRE_REAL_CATALOG` = **BACKEND_READY + UI_IMPLEMENTED + MANUAL_E2E_PENDING**
+- `ZANZARIERE_REAL_CATALOG` = **BACKEND_READY + UI_IMPLEMENTED + MANUAL_E2E_PENDING**
+- `TAPPARELLE_REAL_CATALOG` = **BACKEND_READY + UI_IMPLEMENTED + MANUAL_E2E_PENDING**
+- `CASSONETTI_REAL_CATALOG` = **BACKEND_READY + UI_IMPLEMENTED + MANUAL_E2E_PENDING**
+- `COLORS_PVC_ANAGRAPHIC_V1` = **ANAGRAPHIC_READY; AUTO_003_RULE=NOT_IMPLEMENTED** (backlog F2)
+- `POSITION_TECHNICAL_DATA_V1` = NOT_STARTED (F2)
+- `VISUAL_CONFIGURATOR_V1` = NOT_STARTED (F3)
+- `QUOTE_PDF_V2` = NOT_STARTED (F4)
+- `M5` = BLOCKED
 
 ---
 
