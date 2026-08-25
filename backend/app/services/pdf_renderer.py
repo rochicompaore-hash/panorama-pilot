@@ -191,7 +191,14 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "certifications": company.get("certifications") if show.get("certifications", True) else [],
         "legal_notes": company.get("legal_notes"),
     }
-    # Quote subset — strip internal cost/margin
+    # Quote subset — strip internal cost/margin + margin engine snapshots (§19 msg 392).
+    # Never leak: financial_snapshot, technical_snapshot (contains total_internal_cost,
+    # components, glass_cost...), pricing_snapshot (contains technical_snapshot too),
+    # nor any margin/commission field. Applies at both quote and line level.
+    _FORBIDDEN_LINE_KEYS = (
+        "internal_cost", "margin", "margin_abs", "margin_pct", "cost_price",
+        "technical_snapshot", "financial_snapshot", "pricing_snapshot",
+    )
     quote_snap = {
         "id": quote.get("id") or quote.get("_id"),
         "number": quote.get("number"),
@@ -207,7 +214,7 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "openings": quote.get("openings") or [],
         "environments": quote.get("environments") or [],
         "lines": [
-            {k: v for k, v in l.items() if k not in ("internal_cost", "margin_abs", "margin_pct", "cost_price")}
+            {k: v for k, v in l.items() if k not in _FORBIDDEN_LINE_KEYS}
             for l in (quote.get("lines") or [])
         ],
         "subtotal": quote.get("subtotal"),

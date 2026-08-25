@@ -1,3 +1,41 @@
+## Iter 49 — QUOTE MARGIN TACHOMETER V1 (Feb 2026)
+
+**Autorizzato:** Messaggio 392 §29 — E1 + E2 + 2 decimal UI fix.
+**Deliverable primario:** `/app/memory/QUOTE_MARGIN_TACHOMETER_V1.md`.
+
+### Consegnato
+- **E1 Backend**: `app/services/margin_engine.py` (pure consumer, no pricing recompute §25). Fasce esatte ≥30/≥20/≥15/≥8/<8 (CRITICO=AUTHORIZATION_REQUIRED, rate=None). Financial snapshot 17 campi (§16). Commission base = NET_REVENUE_EX_VAT (§4). Include OTHER_DIRECT_COSTS (§5). Freeze on ACCEPTED (§18).
+- **Router quotes**: agganciato `_financial_totals_patch` in add_line/update_line/delete_line/delete_opening, endpoint `GET /api/quotes/{qid}/financial-snapshot` con RBAC redaction (§20), freeze automatico su status→accepted.
+- **PDF guard §19**: `pdf_renderer.build_snapshot` strippa `financial_snapshot`/`technical_snapshot`/`pricing_snapshot`/`internal_cost`/`margin_*` sia top-level sia per line.
+- **E2 Frontend**: `MarginTachometer.jsx` SVG semicircolare scala 0-40% (§13) con 5 zone colorate. `MarginPanel` nel QuoteEditor con vista commerciale (§10: margin+band+commission) e admin breakdown Riservato Direzione (§12). Live recalc via `useQuery` invalidato su `q.version` (§14). Banner rosso "PREVENTIVO DA AUTORIZZARE" se CRITICO (§15).
+- **Formattazione 2 decimali §21**: `fmtEUR` ora usa `minimumFractionDigits: 2` — applicato a prezzo/subtotale/imponibile/IVA/totale/commissione/breakdown.
+
+### Test
+- **38 pytest verdi** in `test_margin_engine.py` (boundary §3 · resolve_band · cost aggregation §6 · golden §23/§24 · CRITICO §15 · live recalc band flip §14 · RBAC §20 · PDF guard §19 · policy versioning).
+- **Testing agent iter_32** — backend 100%, frontend 100%, 0 blocker (RBAC OK, freeze OK, PDF guard OK, 2-decimali applicato). Golden §23 confermato E2E via curl su quote `3b4fd98a-fc62-457d-9d66-494742e5fc90`.
+
+### Vincoli PO rispettati (msg 392)
+- ✅ §1 formule + NO circolari
+- ✅ §2/§3 fasce ESATTE con 8 boundary verificati
+- ✅ §4 base = NET_REVENUE_EX_VAT
+- ✅ §5 OTHER_DIRECT_COSTS incluso
+- ✅ §6/§7 motore CONSUMER di snapshot
+- ✅ §9 NESSUN overhead gestionale fittizio
+- ✅ §11/§20 RBAC backend-side (commerciale vede solo 7 chiavi safe)
+- ✅ §13 tachimetro leggibile con readout numerico
+- ✅ §14 live recalc su ogni mutazione
+- ✅ §15 CRITICO ≠ 0% (rate=None)
+- ✅ §18 freeze on ACCEPTED
+- ✅ §19 PDF guard rinforzato
+- ✅ §21/§22 2 decimali sempre in UI, calcolo interno full precision
+- ✅ §25 no duplicazione pricing engines
+- ✅ §26/§29 VANO MODEL V2 NON iniziato (stop rispettato)
+
+### Stato ufficiale
+- `QUOTE_MARGIN_TACHOMETER_V1` = **BACKEND_READY + UI_READY + MANUAL_E2E_PENDING** (§28).
+
+---
+
 ## Iter 48 — P0 HOTFIX Live Price Tapparelle/Zanzariere (Feb 2026)
 
 **Autorizzato:** Messaggio 391 §1-10 — bug live price nel configuratore multi-categoria da chiudere PRIMA del Margin Tachometer.

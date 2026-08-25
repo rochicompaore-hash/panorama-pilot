@@ -18,6 +18,10 @@ from app.mongo_utils import to_mongo, from_mongo
 from app.services.audit import record_audit
 from app.services.timeline import record_activity
 from app.services.pricing import compute_line, compute_quote_totals
+from app.services.margin_engine import (
+    compute_financial_snapshot,
+    redact_financial_snapshot_for_role,
+)
 from app.services.concurrency import (
     update_with_version, get_if_match_version, user_has_permission,
     ConflictError, CONSOLIDATED_QUOTE_STATUSES,
@@ -69,15 +73,44 @@ def _recompute(quote: dict) -> dict:
     quote["lines"] = lines
     totals = compute_quote_totals(lines)
     quote.update(totals)
+    # Margin Engine V1 (msg 392) — recompute financial snapshot from authoritative
+    # line snapshots. NEVER runs while quote is ACCEPTED (see _is_frozen).
+    if not _is_frozen(quote):
+        quote["financial_snapshot"] = compute_financial_snapshot(quote)
     return quote
+
+
+def _is_frozen(quote: dict) -> bool:
+    """Financial snapshot is frozen once a quote reaches ACCEPTED or beyond (§18 msg 392)."""
+    return (quote or {}).get("quote_status") in {"accepted", "converted"}
+
+
+def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
+    """Compute pricing totals + financial snapshot and return a $set patch.
+
+    Callers pass the *proposed* line list plus the current quote (for status
+    check). If the quote is frozen (accepted/converted) the financial_snapshot
+    is left untouched (§18).
+    """
+    totals = compute_quote_totals(lines)
+    if _is_frozen(existing_quote):
+        return totals
+    proposed = dict(existing_quote)
+    proposed["lines"] = lines
+    proposed.update(totals)
+    fs = compute_financial_snapshot(proposed)
+    return {**totals, "financial_snapshot": fs}
 
 
 def _strip_costs_if_needed(doc: dict, perms: set) -> dict:
     d = dict(doc)
-    if "*" not in perms and "quotes.view_costs" not in perms and "quotes.view_margins" not in perms:
+    is_admin = "*" in perms or "quotes.view_costs" in perms or "quotes.view_margins" in perms
+    if not is_admin:
         for k in ("internal_cost", "margin_abs", "margin_pct"):
             d[k] = None
         d["lines"] = [{**l, "internal_cost": None, "margin": None} for l in (d.get("lines") or [])]
+    # Financial snapshot RBAC (§20 msg 392): commerciale riceve solo il subset safe.
+    d["financial_snapshot"] = redact_financial_snapshot_for_role(d.get("financial_snapshot"), is_admin)
     return d
 
 
@@ -399,12 +432,12 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
         if op:
             line_data["width_mm"] = line_data.get("width_mm") or op.get("width_mm")
             line_data["height_mm"] = line_data.get("height_mm") or op.get("height_mm")
-    ql = QuoteLine(**line_data)
+    ql = QuoteLine(**{k: v for k, v in line_data.items() if v is not None or k in ("opening_id", "product_key", "image_url", "source", "category_id", "category_code", "product_id", "product_code", "pricing_model", "configuration_snapshot", "pricing_snapshot", "technical_snapshot", "commercial_snapshot", "financial_snapshot", "width_mm", "height_mm")})
     lines = doc.get("lines") or []
     ql.order_index = len(lines)
     lines.append(compute_line(ql.model_dump()))
-    totals = compute_quote_totals(lines)
-    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **totals, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
+    patch = _financial_totals_patch(lines, doc)
+    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
     await record_audit(action="quotes.line_add", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=qid, after={"category": ql.category, "price": ql.base_price})
     return lines[-1]
 
@@ -445,8 +478,8 @@ async def update_line(
     for k, v in payload.items():
         lines[idx][k] = v
     lines[idx] = compute_line(lines[idx])
-    totals = compute_quote_totals(lines)
-    update = {"lines": lines, **totals, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}
+    patch = _financial_totals_patch(lines, doc)
+    update = {"lines": lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}
     if needs_approval and doc.get("quote_status") in ("draft", "to_complete"):
         update["quote_status"] = "to_approve"
         update["approval"] = {"required": True, "status": "pending", "requested_by": user["id"], "requested_at": datetime.now(timezone.utc).isoformat(), "reason": f"Sconto {payload.get('discount_pct')}% oltre soglia"}
@@ -470,8 +503,8 @@ async def delete_line(qid: str, lid: str, user: dict = Depends(require_permissio
     if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
     _assert_editable(doc)
     lines = [l for l in (doc.get("lines") or []) if l["id"] != lid]
-    totals = compute_quote_totals(lines)
-    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **totals, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
+    patch = _financial_totals_patch(lines, doc)
+    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
     return {"ok": True}
 
 
@@ -556,6 +589,13 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
         update["viewed_at"] = now
     elif new == "accepted":
         update["accepted_at"] = now
+        # Margin Engine V1 (§18 msg 392) — freeze financial snapshot on ACCEPTED.
+        # If a fresh snapshot is missing, compute it once from current state so the
+        # frozen fotografia economica is always present.
+        fs = doc.get("financial_snapshot")
+        if not fs:
+            fs = compute_financial_snapshot(doc)
+        update["financial_snapshot"] = {**fs, "frozen_at": now, "frozen_by": user["id"]}
     elif new == "rejected":
         update["rejected_at"] = now
     elif new == "cancelled":
@@ -571,6 +611,37 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
                           lead_id=doc.get("lead_id"), customer_id=doc.get("customer_id"), quote_id=qid,
                           user_id=user["id"], user_email=user["email"])
     return {"ok": True, "new_status": new}
+
+
+@router.get("/{qid}/financial-snapshot")
+async def get_financial_snapshot(qid: str, user: dict = Depends(require_permission("quotes.view"))):
+    """Return the quote financial snapshot (Margin Tachometer V1).
+
+    RBAC (§20 msg 392):
+      * ADMIN (``quotes.view_costs`` / ``quotes.view_margins`` / ``*``) — full breakdown.
+      * Otherwise (Commerciale) — commercial-safe subset only
+        (margin %, band, commission %, commission €, status).
+    Always up-to-date: for DRAFT quotes it recomputes on read to reflect any
+    unsaved backend recompute delta; for ACCEPTED/CONVERTED returns the frozen
+    stored snapshot untouched (§18).
+    """
+    db = get_db()
+    doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Preventivo non trovato")
+    if _is_frozen(doc):
+        snap = doc.get("financial_snapshot") or compute_financial_snapshot(doc)
+    else:
+        snap = compute_financial_snapshot(doc)
+    perms = await _get_perms(user)
+    is_admin = "*" in perms or "quotes.view_costs" in perms or "quotes.view_margins" in perms
+    return {
+        "quote_id": qid,
+        "quote_status": doc.get("quote_status"),
+        "frozen": _is_frozen(doc),
+        "is_admin_view": is_admin,
+        "financial_snapshot": redact_financial_snapshot_for_role(snap, is_admin),
+    }
 
 
 @router.post("/{qid}/approve")

@@ -1,0 +1,45 @@
+{
+  "summary": "MARGIN TACHOMETER V1 — full E2E backend+frontend verification. All boundary/golden/RBAC/freeze/PDF-guard/2-decimals checks PASS on both API and UI. 30/30 unit tests + 5/5 new E2E API tests + all UI data-testid checks pass.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Editor preventivo — Marginalità panel", "issues": ["Riservato Direzione shows costs without thousands separator (e.g. '6000,00 €', '1500,00 €') while other totals in the same view use '10.000,00 €'. Cosmetic inconsistency — fmtEUR appears not applied to admin breakdown values, or values <10000 aren't grouped. Not a blocker."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_margin_engine.py",
+    "/app/backend/tests/test_margin_tachometer_e2e.py"
+  ],
+  "action_items": [
+    "OPTIONAL: apply fmtEUR consistently in MarginPanel admin breakdown for thousands separator (cosmetic only)."
+  ],
+  "critical_code_review_comments": [
+    "margin_engine.py is a pure consumer of authoritative snapshots (no pricing recompute) — matches §25 requirement.",
+    "CRITICO is correctly modeled as commission_rate=None (not 0) with commission_status=AUTHORIZATION_REQUIRED (§15).",
+    "pdf_renderer.build_snapshot uses a whitelist for quote payload + explicit line strip — robust against future field additions.",
+    "Freeze semantics: _financial_totals_patch skips FS overwrite when quote is accepted/converted; change_status stamps frozen_at/frozen_by. Verified in DB.",
+    "RBAC redaction on /financial-snapshot exposes exactly the 7 COMMERCIAL_SAFE_KEYS as per §20 — no leak of costs, base, or final_company_*."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_margin_tachometer_e2e.py (new — 5 tests)"
+  ],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "test_credentials": "admin@infissiexpress.com/Admin!2025 (Super Admin) + commercial_test@infissiexpress.com/Commercial!2025",
+  "seed_data_creation": "Test creates ephemeral customer+quote per run for §24 BUONO, §15 CRITICO, §18 FREEZE. Golden §23 uses precreated 3b4fd98a-fc62-457d-9d66-494742e5fc90.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Margin Tachometer V1 fully green. E1+E2 cycle chiuso, ready for PO collaudo (§29). Do NOT proceed to VANO MODEL V2 / F2 / F3 / F4 per §29 STOP. Test files to reuse: /app/backend/tests/test_margin_engine.py (30 unit), /app/backend/tests/test_margin_tachometer_e2e.py (5 E2E API). UI data-testids to leverage: margin-panel, margin-panel-admin, margin-panel-commercial, margin-tachometer, tachometer-margin-pct, tachometer-band-label-{OTTIMO|BUONO|SUFFICIENTE|SCARSO|CRITICO}, margin-panel-commission-rate, margin-panel-commission-gross, margin-critical-banner.",
+  "verified_e2e_matrix": {
+    "§23 golden OTTIMO 30% admin (qid=3b4fd98a...)": "PASS (net=10000, margin=30.00, band=OTTIMO, rate=0.15, gross=1500, final=1500 / 15%)",
+    "§24 golden BUONO 25%": "PASS (net=10000, margin=25.00, band=BUONO, rate=0.10, gross=1000, final=1500 / 15%)",
+    "§15 CRITICO 5%": "PASS (band=CRITICO, rate=None, gross=None, status=AUTHORIZATION_REQUIRED, final_company=None)",
+    "§20 RBAC commercial redaction": "PASS (exactly 7 safe keys, no admin-only leak)",
+    "§18 freeze on accepted": "PASS (financial_snapshot.frozen_at + frozen_by persisted; endpoint returns frozen=true)",
+    "§21 2-decimali UI": "PASS (rows '9000,00 €' / '1000,00 €'; totals '10.000,00 €' / '2200,00 €' / '12.200,00 €'; commission '15,00 %' / '1500,00 €')",
+    "§11/§20 UI RBAC": "PASS (commercial does not render margin-panel-admin section but renders tachometer + commercial subset)",
+    "§19 PDF guard (code review)": "PASS (build_snapshot whitelists quote fields; lines strip internal_cost/margin*/technical_snapshot/pricing_snapshot/financial_snapshot)",
+    "§3 boundaries 30/29.99/20/19.99/15/14.99/8/7.99": "PASS (parametric unit tests)"
+  }
+}

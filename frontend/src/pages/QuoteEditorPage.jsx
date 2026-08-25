@@ -15,6 +15,7 @@ import { ArrowLeft, Plus, Trash, PaperPlaneTilt, ArrowsClockwise, FileText, Chec
 import { toast } from "sonner";
 import { ConflictModal } from "@/components/app/ConflictModal";
 import { MultiCategoryConfiguratorDialog } from "@/components/app/MultiCategoryConfiguratorDialog";
+import { MarginTachometer } from "@/components/app/MarginTachometer";
 import { AutosaveIndicator } from "@/components/app/AutosaveIndicator";
 import { useConflict, getVersion, withVersion, withForce } from "@/hooks/useConflict";
 import { useAutosave } from "@/hooks/useAutosave";
@@ -22,7 +23,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { FilePdf, Download, Eye, CaretDown, Link, Copy, XCircle } from "@phosphor-icons/react";
 
-function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0); } catch { return "€ 0"; } }
+function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0); } catch { return "€ 0,00"; } }
+function fmtPct(n) { return typeof n === "number" ? `${n.toFixed(2).replace(".", ",")} %` : "—"; }
 
 const CATEGORY_LABELS = { window: "Serramento", shutter: "Persiana/Scuro", roller: "Tapparella", persian: "Persiana", screen: "Zanzariera", box: "Cassonetto", sill: "Davanzale", trim: "Coprifilo", accessory: "Accessorio", installation: "Posa", disposal: "Smaltimento", extra: "Extra" };
 
@@ -36,6 +38,13 @@ export default function QuoteEditorPage() {
 
   const { data: q } = useQuery({ queryKey: ["quote", id], queryFn: async () => (await api.get(`/quotes/${id}`)).data });
   const { data: history } = useQuery({ queryKey: ["quote-history", id], queryFn: async () => (await api.get(`/quotes/${id}/history`)).data });
+  // Margin Engine V1 — Tachimetro live: dedicated endpoint applies RBAC redaction backend-side.
+  const { data: financial } = useQuery({
+    queryKey: ["quote-financial", id, q?.version],
+    queryFn: async () => (await api.get(`/quotes/${id}/financial-snapshot`)).data,
+    enabled: !!q,
+    refetchOnWindowFocus: false,
+  });
 
   const reload = () => qc.invalidateQueries({ queryKey: ["quote", id] });
   const canForce = has("records.force_override");
@@ -430,15 +439,11 @@ export default function QuoteEditorPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Imponibile</span><span className="font-mono-plex">{fmtEUR(q.subtotal)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">IVA</span><span className="font-mono-plex">{fmtEUR(q.vat_amount)}</span></div>
               <div className="flex justify-between pt-2 border-t"><span className="font-bold">Totale</span><span className="font-mono-plex text-lg font-black">{fmtEUR(q.total)}</span></div>
-              {canSeeCosts && q.margin_abs != null && (
-                <div className="mt-4 pt-3 border-t border-dashed">
-                  <div className="text-[10px] font-mono-plex text-muted-foreground uppercase">Riservato</div>
-                  <div className="flex justify-between mt-1"><span className="text-muted-foreground text-xs">Costo interno</span><span className="font-mono-plex text-xs">{fmtEUR(q.internal_cost)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground text-xs">Margine</span><span className="font-mono-plex text-xs text-[hsl(var(--brand-red))]">{fmtEUR(q.margin_abs)} ({q.margin_pct}%)</span></div>
-                </div>
-              )}
             </div>
           </Card>
+
+          {/* --- Marginalità (Margin Tachometer V1 — msg 392) --- */}
+          <MarginPanel financial={financial} isAdmin={canSeeCosts} />
 
           <Card className="rounded-sm border-border p-6" data-testid="revisions-card">
             <div className="overline mb-3">Revisioni</div>
@@ -591,5 +596,88 @@ function OpeningRow({ quoteId, opening, editable, parentVersion, onConflict, can
       <Input type="number" placeholder="H (mm)" value={h} onChange={(e) => setH(e.target.value)} onBlur={() => patch({ height_mm: Number(h) || null })} className="rounded-sm h-8 w-24 text-xs font-mono-plex" disabled={!editable} data-testid={`opening-h-${opening.id}`} />
       {editable && <Button variant="ghost" size="sm" onClick={() => del.mutate()} className="text-destructive"><Trash size={12} /></Button>}
     </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// Margin Panel — Tachimetro + breakdown differenziato per ruolo (§10/§12 msg 392)
+// ---------------------------------------------------------------------------
+function MarginPanel({ financial, isAdmin }) {
+  const fs = financial?.financial_snapshot;
+  const frozen = !!financial?.frozen;
+  if (!fs) {
+    return (
+      <Card className="rounded-sm border-border p-6" data-testid="margin-panel-empty">
+        <div className="overline mb-2">Marginalità</div>
+        <div className="text-xs text-muted-foreground">Aggiungi almeno una riga per calcolare il margine.</div>
+      </Card>
+    );
+  }
+  const pct = fs.pre_commission_margin;
+  const band = fs.margin_band;
+  const commRate = fs.commission_rate;
+  const commGross = fs.commission_gross;
+  const status = fs.commission_status;
+  const isCritical = status === "AUTHORIZATION_REQUIRED";
+
+  return (
+    <Card className="rounded-sm border-border p-6" data-testid="margin-panel">
+      <div className="flex items-center justify-between mb-2">
+        <div className="overline">Marginalità</div>
+        {frozen && <Badge className="rounded-sm bg-slate-500/20 text-slate-700 text-[10px]">CONGELATA</Badge>}
+      </div>
+      <MarginTachometer marginPct={pct} band={band} />
+
+      {isCritical && (
+        <div className="mt-3 rounded-sm border border-destructive bg-destructive/10 p-3" data-testid="margin-critical-banner">
+          <div className="text-xs font-bold text-destructive">PREVENTIVO DA AUTORIZZARE</div>
+          <div className="text-[11px] text-destructive/80 mt-0.5">Margine sotto la soglia minima (8%). La commissione non è definita automaticamente.</div>
+        </div>
+      )}
+
+      {/* Commercial view (ALWAYS visible — commercial sees this subset even as admin) */}
+      <div className="mt-4 pt-3 border-t space-y-1.5 text-sm" data-testid="margin-panel-commercial">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Ricavo netto</span>
+          <span className="font-mono-plex">{fmtEUR(fs.net_revenue_ex_vat)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Commissione</span>
+          <span className="font-mono-plex" data-testid="margin-panel-commission-rate">
+            {commRate != null ? fmtPct(commRate * 100) : "n/d"}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="font-bold">Commissione lorda stimata</span>
+          <span className="font-mono-plex font-black" data-testid="margin-panel-commission-gross">
+            {commGross != null ? fmtEUR(commGross) : "—"}
+          </span>
+        </div>
+      </div>
+
+      {/* Admin-only breakdown (§12) */}
+      {isAdmin && fs.supply_cost != null && (
+        <div className="mt-4 pt-3 border-t border-dashed space-y-1 text-xs" data-testid="margin-panel-admin">
+          <div className="text-[10px] font-mono-plex text-muted-foreground uppercase mb-1">Riservato Direzione</div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Valore contratto IVA incl.</span><span className="font-mono-plex">{fmtEUR(fs.gross_contract_value)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Costo fornitura</span><span className="font-mono-plex">− {fmtEUR(fs.supply_cost)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Costo posa</span><span className="font-mono-plex">− {fmtEUR(fs.installation_cost)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Altri costi diretti</span><span className="font-mono-plex">− {fmtEUR(fs.other_direct_costs)}</span></div>
+          <div className="flex justify-between pt-1 border-t"><span className="font-bold">Margine pre-commissione</span>
+            <span className="font-mono-plex font-bold">{fmtEUR(fs.pre_commission_contribution)}</span></div>
+          {commGross != null && (
+            <div className="flex justify-between"><span className="text-muted-foreground">− Commissione commerciale</span><span className="font-mono-plex">− {fmtEUR(commGross)}</span></div>
+          )}
+          {fs.final_company_contribution != null && (
+            <>
+              <div className="flex justify-between pt-1 border-t"><span className="font-bold">Restante azienda</span>
+                <span className="font-mono-plex font-black text-[hsl(200_82%_45%)]">{fmtEUR(fs.final_company_contribution)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Margine post-commissione</span><span className="font-mono-plex">{fmtPct(fs.final_company_margin)}</span></div>
+            </>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
