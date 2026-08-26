@@ -300,6 +300,9 @@ export default function QuoteEditorPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          {/* --- Installation Mode V1 (msg 393) --- */}
+          <InstallationModeCard q={q} editable={editable} onChange={reload} />
+
           <Card className="rounded-sm border-border p-4" data-testid="quote-details-card">
             <div className="flex items-center justify-between mb-3">
               <div className="overline">Dettagli commerciali</div>
@@ -409,7 +412,8 @@ export default function QuoteEditorPage() {
               </TableRow></TableHeader>
               <TableBody>
                 {(q.lines || []).map((l) => (
-                  <TableRow key={l.id} data-testid={`line-row-${l.id}`}>
+                  <React.Fragment key={l.id}>
+                  <TableRow data-testid={`line-row-${l.id}`}>
                     <TableCell>
                       <Badge variant="outline" className="rounded-sm text-[10px] mr-2">{CATEGORY_LABELS[l.category] || l.category}</Badge>
                       <span className="text-sm">{l.description || "—"}</span>
@@ -425,6 +429,22 @@ export default function QuoteEditorPage() {
                     <TableCell className="font-mono-plex text-xs font-bold">{fmtEUR(l.subtotal_line)}</TableCell>
                     <TableCell>{editable && <Button variant="ghost" size="sm" onClick={() => delLine.mutate(l.id)} className="text-destructive" data-testid={`line-delete-${l.id}`}><Trash size={12} /></Button>}</TableCell>
                   </TableRow>
+                  {(l.automatic_services || []).length > 0 && (
+                    <TableRow className="bg-muted/30" data-testid={`line-services-${l.id}`}>
+                      <TableCell colSpan={6} className="py-1.5">
+                        <div className="text-[10px] font-mono-plex text-muted-foreground pl-4">
+                          Servizi standard inclusi:{" "}
+                          {l.automatic_services.map((s, i) => (
+                            <span key={s.id || i} className="mr-3">
+                              <Badge variant="outline" className="rounded-sm text-[9px] mr-1">{s.service_type}</Badge>
+                              {s.service_name} · <span className="font-bold">{fmtEUR(s.sale_price_total)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  </React.Fragment>
                 ))}
                 {(q.lines || []).length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-6 text-sm text-muted-foreground">Nessuna riga. Usa il <b>Configuratore</b> per aggiungere prodotti.</TableCell></TableRow>}
               </TableBody>
@@ -681,3 +701,90 @@ function MarginPanel({ financial, isAdmin }) {
     </Card>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Installation Mode V1 (msg 393 §17) — selector top-preventivo
+// ---------------------------------------------------------------------------
+function InstallationModeCard({ q, editable, onChange }) {
+  const [pending, setPending] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const mode = q.installation_mode || null;
+  const dm = q.dismantling_mode || "EXCLUDED";
+  const dpm = q.disposal_mode || "EXCLUDED";
+
+  const patch = async (payload) => {
+    setErr(null); setPending(true);
+    try {
+      await api.patch(`/quotes/${q.id}`, payload);
+      toast.success("Modalità aggiornata");
+      onChange?.();
+    } catch (e) {
+      const detail = e.response?.data?.detail;
+      const msg = formatApiError(detail) || e.message;
+      setErr(msg);
+      toast.error(msg);
+    } finally { setPending(false); }
+  };
+
+  return (
+    <Card className="rounded-sm border-border p-4" data-testid="installation-mode-card">
+      <div className="overline mb-3">Tipo fornitura</div>
+      <div className="flex flex-wrap gap-2 mb-3">
+        <Button
+          variant={mode === "SUPPLY_ONLY" ? "default" : "outline"}
+          size="sm"
+          disabled={!editable || pending}
+          onClick={() => patch({ installation_mode: "SUPPLY_ONLY" })}
+          className="rounded-sm"
+          data-testid="installation-mode-supply-only"
+        >Solo fornitura</Button>
+        <Button
+          variant={mode === "SUPPLY_AND_INSTALLATION" ? "default" : "outline"}
+          size="sm"
+          disabled={!editable || pending}
+          onClick={() => patch({ installation_mode: "SUPPLY_AND_INSTALLATION" })}
+          className="rounded-sm"
+          data-testid="installation-mode-supply-and-installation"
+        >Fornitura + posa</Button>
+        {mode == null && <Badge className="rounded-sm bg-amber-500/20 text-amber-800 text-[10px] self-center">Da selezionare</Badge>}
+      </div>
+      {mode === "SUPPLY_AND_INSTALLATION" && (
+        <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+          <PolicySelect label="Smontaggio" value={dm} editable={editable && !pending} testid="dismantling-mode"
+                        onChange={(v) => patch({ dismantling_mode: v })} />
+          <PolicySelect label="Smaltimento" value={dpm} editable={editable && !pending} testid="disposal-mode"
+                        onChange={(v) => patch({ disposal_mode: v })} disableIncluded />
+        </div>
+      )}
+      {err && <div className="text-xs text-destructive mt-2" data-testid="installation-mode-error">{err}</div>}
+      <div className="text-[10px] text-muted-foreground mt-2">
+        {mode === "SUPPLY_AND_INSTALLATION"
+          ? "I servizi di posa vengono aggiunti automaticamente per ogni prodotto compatibile."
+          : mode === "SUPPLY_ONLY"
+          ? "Nessun servizio di posa automatico. Solo prodotti."
+          : "Seleziona il tipo fornitura per iniziare la configurazione."}
+      </div>
+    </Card>
+  );
+}
+
+function PolicySelect({ label, value, onChange, editable, testid, disableIncluded }) {
+  return (
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <Select value={value} onValueChange={onChange} disabled={!editable}>
+        <SelectTrigger className="rounded-sm h-9" data-testid={testid}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="INCLUDED" disabled={disableIncluded} data-testid={`${testid}-included`}>
+            Incluso{disableIncluded ? " (prezzo da configurare)" : ""}
+          </SelectItem>
+          <SelectItem value="EXCLUDED" data-testid={`${testid}-excluded`}>Escluso</SelectItem>
+          <SelectItem value="NOT_APPLICABLE" data-testid={`${testid}-not-applicable`}>Non applicabile</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+

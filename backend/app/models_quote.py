@@ -40,6 +40,14 @@ class QuoteLine(BaseModel):
     technical_snapshot: Optional[Dict[str, Any]] = None
     commercial_snapshot: Optional[Dict[str, Any]] = None
     financial_snapshot: Optional[Dict[str, Any]] = None
+    # --- Installation Mode V1 (msg 393) ---
+    automatic_services: List[Dict[str, Any]] = Field(default_factory=list)
+    manual_extra_services: List[Dict[str, Any]] = Field(default_factory=list)
+    standard_services_sale_total: float = 0.0
+    standard_services_internal_cost_total: float = 0.0
+    position_sale_total: float = 0.0
+    position_internal_cost_total: float = 0.0
+    service_policy_version: Optional[str] = None
 
 
 class QuoteOpening(BaseModel):
@@ -138,6 +146,11 @@ class Quote(BaseDoc):
     disclaimer: Optional[str] = None
     pdf_storage_key: Optional[str] = None
 
+    # --- Installation Mode V1 (msg 393) ---
+    installation_mode: Optional[str] = None   # SUPPLY_ONLY | SUPPLY_AND_INSTALLATION
+    dismantling_mode: str = "EXCLUDED"        # INCLUDED | EXCLUDED | NOT_APPLICABLE
+    disposal_mode: str = "EXCLUDED"           # INCLUDED | EXCLUDED | NOT_APPLICABLE
+
 
 class QuoteCreate(BaseModel):
     lead_id: Optional[str] = None
@@ -165,6 +178,10 @@ class QuoteUpdate(BaseModel):
     notes_internal: Optional[str] = None
     next_action_at: Optional[datetime] = None
     next_action_note: Optional[str] = None
+    # --- Installation Mode V1 (msg 393) ---
+    installation_mode: Optional[str] = None
+    dismantling_mode: Optional[str] = None
+    disposal_mode: Optional[str] = None
 
 
 class QuoteLineCreate(BaseModel):

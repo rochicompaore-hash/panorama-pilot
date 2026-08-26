@@ -22,6 +22,12 @@ from app.services.margin_engine import (
     compute_financial_snapshot,
     redact_financial_snapshot_for_role,
 )
+from app.services.service_resolver import (
+    resolve_line_services,
+    seed_disposal_services,
+    INSTALLATION_MODES,
+    POLICY_MODES,
+)
 from app.services.concurrency import (
     update_with_version, get_if_match_version, user_has_permission,
     ConflictError, CONSOLIDATED_QUOTE_STATUSES,
@@ -250,6 +256,18 @@ async def update_quote(
     user: dict = Depends(require_permission("quotes.edit")),
 ):
     payload = body.model_dump(exclude_unset=True)
+    # Installation Mode V1 (msg 393 §12): validate enums fail-closed.
+    if "installation_mode" in payload:
+        v = (payload["installation_mode"] or "").upper()
+        if v and v not in INSTALLATION_MODES:
+            raise HTTPException(status_code=400, detail=f"installation_mode non valido: {v}")
+        payload["installation_mode"] = v or None
+    for f in ("dismantling_mode", "disposal_mode"):
+        if f in payload and payload[f]:
+            v = payload[f].upper()
+            if v not in POLICY_MODES:
+                raise HTTPException(status_code=400, detail=f"{f} non valido: {v}")
+            payload[f] = v
     if "site_address" in payload and payload["site_address"] is not None:
         payload["site_address"] = payload["site_address"] if isinstance(payload["site_address"], dict) else payload["site_address"].model_dump()
 
@@ -265,6 +283,46 @@ async def update_quote(
         set_fields=payload, user=user, request=request,
         force_override=force, override_reason=force_reason,
     )
+    # Installation Mode V1 (msg 393 §19-§20): se cambia installation_mode /
+    # dismantling_mode / disposal_mode, ri-risolvi i servizi automatici su TUTTE
+    # le righe e aggiorna financial_snapshot + totali.
+    if any(k in payload for k in ("installation_mode", "dismantling_mode", "disposal_mode")):
+        db = get_db()
+        fresh = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
+        if fresh and not _is_frozen(fresh):
+            mode = fresh.get("installation_mode")
+            dm = fresh.get("dismantling_mode") or "EXCLUDED"
+            dpm = fresh.get("disposal_mode") or "EXCLUDED"
+            it = fresh.get("intervention_type") or "new"
+            new_lines = []
+            all_errors: list = []
+            for l in fresh.get("lines") or []:
+                new_l = dict(l)
+                # Preserva manual_extra_services (§20). Rimuove sempre i vecchi automatic.
+                new_l["automatic_services"] = []
+                if mode == "SUPPLY_AND_INSTALLATION":
+                    auto_svcs, errs = await resolve_line_services(
+                        db, user["tenant_id"], new_l,
+                        installation_mode=mode, dismantling_mode=dm, disposal_mode=dpm,
+                        intervention_type=it,
+                    )
+                    new_l["automatic_services"] = auto_svcs
+                    if auto_svcs:
+                        new_l["service_policy_version"] = auto_svcs[0]["service_policy_version"]
+                    all_errors.extend(errs)
+                new_lines.append(compute_line(new_l))
+            if any(e.startswith("MISSING_DISPOSAL_PRICING") for e in all_errors):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"code": "MISSING_DISPOSAL_PRICING", "message": "Smaltimento incluso ma prezzo non configurato.", "errors": all_errors},
+                )
+            patch = _financial_totals_patch(new_lines, fresh)
+            await db.quotes.update_one(
+                {"_id": qid},
+                {"$set": {"lines": new_lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}},
+            )
+            updated = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"]})
+            updated = from_mongo(updated)
     await record_audit(action="quotes.update", tenant_id=user["tenant_id"], user_id=user["id"],
                        user_email=user["email"], ip=get_client_ip(request),
                        entity_type="quote", entity_id=qid, after=payload)
@@ -435,6 +493,24 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
     ql = QuoteLine(**{k: v for k, v in line_data.items() if v is not None or k in ("opening_id", "product_key", "image_url", "source", "category_id", "category_code", "product_id", "product_code", "pricing_model", "configuration_snapshot", "pricing_snapshot", "technical_snapshot", "commercial_snapshot", "financial_snapshot", "width_mm", "height_mm")})
     lines = doc.get("lines") or []
     ql.order_index = len(lines)
+    # Installation Mode V1 (msg 393 §13): auto-resolve standard services if the quote
+    # is in SUPPLY_AND_INSTALLATION. Idempotent — same inputs → same output.
+    if doc.get("installation_mode") == "SUPPLY_AND_INSTALLATION":
+        auto_svcs, errors = await resolve_line_services(
+            db, user["tenant_id"], ql.model_dump(),
+            installation_mode="SUPPLY_AND_INSTALLATION",
+            dismantling_mode=doc.get("dismantling_mode") or "EXCLUDED",
+            disposal_mode=doc.get("disposal_mode") or "EXCLUDED",
+            intervention_type=doc.get("intervention_type") or "new",
+        )
+        # Fail-closed §8: se disposal INCLUDED ma pricing non definito, blocca.
+        if any(e.startswith("MISSING_DISPOSAL_PRICING") for e in errors):
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "MISSING_DISPOSAL_PRICING", "message": "Smaltimento incluso ma prezzo non configurato.", "errors": errors},
+            )
+        ql.automatic_services = auto_svcs
+        ql.service_policy_version = auto_svcs[0]["service_policy_version"] if auto_svcs else None
     lines.append(compute_line(ql.model_dump()))
     patch = _financial_totals_patch(lines, doc)
     await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
@@ -611,6 +687,14 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
                           lead_id=doc.get("lead_id"), customer_id=doc.get("customer_id"), quote_id=qid,
                           user_id=user["id"], user_email=user["email"])
     return {"ok": True, "new_status": new}
+
+
+@router.post("/admin/seed-disposal-services")
+async def admin_seed_disposal(user: dict = Depends(require_permission("products.manage"))):
+    """Seed dei 5 servizi DISPOSAL_* con NEEDS_PO_PRICING (msg 393 §7). Idempotente."""
+    db = get_db()
+    inserted = await seed_disposal_services(db, user["tenant_id"])
+    return {"ok": True, "inserted": inserted, "policy_version": "installation_v1_2026_02"}
 
 
 @router.get("/{qid}/financial-snapshot")

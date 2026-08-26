@@ -65,11 +65,24 @@ def compute_line(line: dict, rules: List[dict] | None = None) -> dict:
         running_unit -= damt
 
     unit_final = max(running_unit, 0.0)
-    subtotal = _round(unit_final * qty, line.get("rounding_rule"))
+    product_subtotal = _round(unit_final * qty, line.get("rounding_rule"))
 
+    # Installation Mode V1 (msg 393 §4): la POSITION può contenere
+    # automatic_services[] + manual_extra_services[]. Il subtotal_line della
+    # QuoteLine include l'aggregato dei servizi standard (fatturato + IVA).
+    auto_svc = line.get("automatic_services") or []
+    manual_svc = line.get("manual_extra_services") or []
+    svc_sale = sum(float(s.get("sale_price_total") or 0) for s in auto_svc + manual_svc)
+    svc_cost = sum(float(s.get("internal_cost_total") or 0) for s in auto_svc + manual_svc)
+    line["standard_services_sale_total"] = round(svc_sale + 1e-9, 2)
+    line["standard_services_internal_cost_total"] = round(svc_cost + 1e-9, 2)
+
+    subtotal = round(product_subtotal + svc_sale + 1e-9, 2)
     line["unit_price_final"] = round(unit_final, 2)
     line["subtotal_line"] = subtotal
-    line["margin"] = round(subtotal - (float(line.get("internal_cost") or 0) * qty), 2)
+    line["position_sale_total"] = subtotal
+    line["position_internal_cost_total"] = round(float(line.get("internal_cost") or 0) * qty + svc_cost + 1e-9, 2)
+    line["margin"] = round(subtotal - (float(line.get("internal_cost") or 0) * qty) - svc_cost, 2)
     return line
 
 

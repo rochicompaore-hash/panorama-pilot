@@ -1,3 +1,39 @@
+## Iter 50 — QUOTE INSTALLATION MODE + AUTO SERVICE BUNDLE V1 (Feb 2026)
+
+**Autorizzato:** Messaggio 393 §28 — parallelo al collaudo Tachimetro senza modifiche al Margin Engine.
+**Deliverable:** `/app/memory/QUOTE_INSTALLATION_MODE_V1.md`.
+
+### Consegnato
+- **Modello Quote esteso**: `installation_mode` (SUPPLY_ONLY | SUPPLY_AND_INSTALLATION), `dismantling_mode`, `disposal_mode` (INCLUDED | EXCLUDED | NOT_APPLICABLE).
+- **Modello QuoteLine esteso** (additive): `automatic_services[]`, `manual_extra_services[]`, `standard_services_sale_total`, `standard_services_internal_cost_total`, `position_sale_total`, `position_internal_cost_total`, `service_policy_version`.
+- **`app/services/service_resolver.py`** — StandardServiceResolver deterministico. Priorità finestre: underlight DOUBLE → SINGLE → SLIDING → FIXED → VASISTAS → 4 ante → 3 ante → 1/2 ante. Mapping deterministico anche per Cassonetti (single/double), Zanzariere (single/double), Tapparelle, Persiane, Porte.
+- **Seed 5 DISPOSAL_\*** con `pricing_status=NEEDS_PO_PRICING` — fail-closed §8 su INCLUDED se prezzo mancante.
+- **Router quotes esteso**: `PATCH /quotes/{qid}` valida enum e ri-risolve tutte le righe su cambio mode (§19-§20, preserva `manual_extra_services`). `POST /quotes/{qid}/lines` auto-resolve on add. `POST /quotes/admin/seed-disposal-services`.
+- **`compute_line` esteso**: `subtotal_line = product + automatic_services + manual_extra_services`. Nessuna modifica alle engine pricing prodotto (§25).
+- **`margin_engine.aggregate_costs_from_lines` esteso**: POSA/MOTORIZZAZIONE → INSTALLATION_COST, SMONTAGGIO/SMALTIMENTO → OTHER_DIRECT_COSTS (§22).
+- **UI `InstallationModeCard`** in QuoteEditor: toggle Solo fornitura / Fornitura + posa + selettori Smontaggio/Smaltimento. Riga preventivo mostra sotto-riga "Servizi standard inclusi" quando `automatic_services` non vuoto.
+
+### Test
+- **28 pytest verdi** in `test_installation_mode_v1.py` (priorità resolver + bucket mapping + wiring Margin Engine).
+- **75/75 totali** dopo integrazione (Installation + Margin + P0 area color).
+- **E2E curl verificato**: quote `c322c398-...` — Finestra 2 ante 1250€ + `INSTALL_WINDOW_1_2_SASH` 150€ + Tapparella 176.40€ + `INSTALL_ROLLER_KIT` 120€ → net 1696.40€, supply 858.80€, install 230€, margin 35.82% OTTIMO 15% = 254.46€.
+
+### Vincoli PO rispettati (msg 393)
+- ✅ §1-§5 Resolver deterministico con underlight priority
+- ✅ §7-§8 Disposal seed NEEDS_PO_PRICING + fail-closed
+- ✅ §10 Dismantling ≠ Disposal
+- ✅ §14 POSA fuori dai multiplier prodotto
+- ✅ §17-§18 UI card dedicata, no refactor QuoteEditor
+- ✅ §19-§20 Cambio mode ricalcola + preserva manual
+- ✅ §22 Wiring Margin Engine automatico
+- ✅ §25 Engine CONSUMER, no modifiche alle pricing engines
+- ✅ §28 STOP F2/F3/F4 rispettato
+
+### Stato ufficiale
+- `QUOTE_INSTALLATION_MODE_V1` = **BACKEND_READY + UI_READY + MANUAL_E2E_PENDING**.
+
+---
+
 ## Iter 49 — QUOTE MARGIN TACHOMETER V1 (Feb 2026)
 
 **Autorizzato:** Messaggio 392 §29 — E1 + E2 + 2 decimal UI fix.

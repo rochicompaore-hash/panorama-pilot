@@ -93,16 +93,13 @@ def _extract_line_cost(line: Dict[str, Any]) -> float:
     if isinstance(ts, dict):
         tic = ts.get("total_internal_cost")
         if tic is not None:
-            # pricing_v3 total_internal_cost is per-line (already sized).
-            # But in most snapshots it's per-item so multiply by qty when a
-            # ``per_item`` flag isn't explicitly set. pricing_v3 v3 stores per unit.
             return float(tic) * qty
 
     ss = line.get("simple_snapshot") or {}
     if isinstance(ss, dict):
         ptc = ss.get("purchase_total_cost")
         if ptc is not None:
-            return float(ptc)  # already qty-multiplied
+            return float(ptc)
         pcpi = ss.get("purchase_cost_per_item")
         if pcpi is not None:
             return float(pcpi) * qty
@@ -111,6 +108,25 @@ def _extract_line_cost(line: Dict[str, Any]) -> float:
             return float(ipc) * qty
 
     return float(line.get("internal_cost") or 0) * qty
+
+
+def _extract_line_services_split(line: Dict[str, Any]) -> Dict[str, float]:
+    """Split automatic_services + manual_extra_services costs into
+    INSTALLATION vs OTHER buckets (msg 393 §22 wiring to Margin Engine).
+
+    - POSA / MOTORIZZAZIONE  → INSTALLATION
+    - SMONTAGGIO / SMALTIMENTO / ACCESSORIO / *  → OTHER
+    """
+    install = 0.0
+    other = 0.0
+    for s in (line.get("automatic_services") or []) + (line.get("manual_extra_services") or []):
+        t = str(s.get("service_type") or "").upper()
+        c = float(s.get("internal_cost_total") or 0)
+        if t in ("POSA", "MOTORIZZAZIONE"):
+            install += c
+        else:
+            other += c
+    return {"installation": install, "other": other}
 
 
 def _line_bucket(line: Dict[str, Any]) -> str:
@@ -133,6 +149,9 @@ def aggregate_costs_from_lines(lines: Iterable[Dict[str, Any]]) -> Dict[str, flo
     """Aggregate SUPPLY_COST, INSTALLATION_COST, OTHER_DIRECT_COSTS from lines.
 
     NEVER recomputes prices — only reads snapshots + legacy ``internal_cost``.
+    Installation Mode V1 (msg 393): also folds automatic_services[] +
+    manual_extra_services[] into INSTALLATION (POSA/MOTORIZZAZIONE) or OTHER
+    (SMONTAGGIO/SMALTIMENTO/…), on top of the product cost.
     """
     supply = 0.0
     install = 0.0
@@ -146,6 +165,10 @@ def aggregate_costs_from_lines(lines: Iterable[Dict[str, Any]]) -> Dict[str, flo
             other += c
         else:
             supply += c
+        # Split embedded services on the line (V1 auto-bundle)
+        svc_split = _extract_line_services_split(l)
+        install += svc_split["installation"]
+        other += svc_split["other"]
     return {
         "supply_cost": _r2(supply) or 0.0,
         "installation_cost": _r2(install) or 0.0,
