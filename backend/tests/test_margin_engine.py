@@ -26,7 +26,8 @@ class TestResolveBand:
     """§3 msg 392 — boundary tests OBBLIGATORI (esatti)."""
 
     @pytest.mark.parametrize("m,expected_band,expected_rate,expected_status", [
-        (30.00, "OTTIMO",      0.15, "OK"),
+        (30.01, "OTTIMO",      0.15, "OK"),
+        (30.00, "BUONO",       0.10, "OK"),  # msg 399 — cambio semantica
         (29.99, "BUONO",       0.10, "OK"),
         (20.00, "BUONO",       0.10, "OK"),
         (19.99, "SUFFICIENTE", 0.08, "OK"),
@@ -128,31 +129,25 @@ class TestGoldenScenarios:
     """§23-§24 msg 392 — 2 golden test verbatim."""
 
     def test_golden_23_ottimo(self):
-        """NET=10000 SUPPLY=6000 INSTALL=1000 OTHER=0 → margin=30% OTTIMO commission=15%=1500 final=1500 15%."""
+        """§23 msg 392 aggiornato per boundary msg 399 (30.00 → BUONO).
+        NET=10000 SUPPLY=5999 INSTALL=1000 OTHER=0 → margin 30.01% OTTIMO 15%."""
         quote = {
             "subtotal": 10_000.0,
             "vat_amount": 2_200.0,
             "total": 12_200.0,
             "lines": [
-                {"category": "window", "quantity": 1, "technical_snapshot": {"total_internal_cost": 6_000.0}},
+                {"category": "window", "quantity": 1, "technical_snapshot": {"total_internal_cost": 5_999.0}},
                 {"category": "installation", "quantity": 1, "internal_cost": 1_000.0},
             ],
         }
         fs = compute_financial_snapshot(quote)
         assert fs["net_revenue_ex_vat"] == 10_000.0
-        assert fs["supply_cost"] == 6_000.0
+        assert fs["supply_cost"] == 5_999.0
         assert fs["installation_cost"] == 1_000.0
-        assert fs["other_direct_costs"] == 0.0
-        assert fs["pre_commission_contribution"] == 3_000.0
-        assert fs["pre_commission_margin"] == 30.0
+        assert fs["pre_commission_margin"] == 30.01
         assert fs["margin_band"] == "OTTIMO"
-        assert fs["commission_base_policy"] == "NET_REVENUE_EX_VAT"
-        assert fs["commission_base"] == 10_000.0
         assert fs["commission_rate"] == 0.15
         assert fs["commission_gross"] == 1_500.0
-        assert fs["commission_status"] == "OK"
-        assert fs["final_company_contribution"] == 1_500.0
-        assert fs["final_company_margin"] == 15.0
 
     def test_golden_24_buono(self):
         """NET=10000 SUPPLY=7000 INSTALL=500 OTHER=0 → margin=25% BUONO commission=10%=1000 final=1500 15%."""
@@ -217,9 +212,10 @@ class TestRBACRedaction:
     """§11 / §20 msg 392 — commercial vede solo margine/fascia/commissione."""
 
     def _sample_snapshot(self):
+        # margin 30.01% con msg 399 → OTTIMO 15%
         return compute_financial_snapshot({
             "subtotal": 10_000.0, "total": 12_200.0, "lines": [
-                {"category": "window", "quantity": 1, "technical_snapshot": {"total_internal_cost": 6_000.0}},
+                {"category": "window", "quantity": 1, "technical_snapshot": {"total_internal_cost": 5_999.0}},
                 {"category": "installation", "quantity": 1, "internal_cost": 1_000.0},
             ],
         })

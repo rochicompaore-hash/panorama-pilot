@@ -1,0 +1,17 @@
+bringing up nodes...
+bringing up nodes...
+
+..........F...........F
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/m3_quotes_test.py::test_quote_sequence_at_least_1349 - assert 50...
+FAILED tests/m3_2_concurrency_pricing_test.py::test_preview_win_pvc_film_diff
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 2 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!! xdist.dsession.Interrupted: stopping after 1 failures !!!!!!!!!!!!!
+2 failed, 21 passed, 2 warnings in 4.91s

@@ -242,8 +242,10 @@ async def resolve_line_services(
         else:
             services.append(_materialize(svc, "POSA", qty, is_auto=True))
 
-    # ---- SMONTAGGIO (§11) ----
-    if dismantling_mode == "INCLUDED" and intervention_type in ("replacement", "renovation", "sostituzione"):
+    # ---- SMONTAGGIO — msg 399 §8: si applica ad ogni prodotto su misura
+    # quando dismantling_mode=INCLUDED, indipendentemente dall'intervention_type.
+    # La quantità del servizio segue la quantità della QuoteLine (§3, §5).
+    if dismantling_mode == "INCLUDED":
         dcode = resolve_dismantling_code_for_line(line)
         if dcode:
             svc = await _find_service(db, tenant_id, dcode)

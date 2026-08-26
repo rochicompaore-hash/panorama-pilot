@@ -56,12 +56,19 @@ def _r4(x: Optional[float]) -> Optional[float]:
 def resolve_band(margin_pct: Optional[float]) -> Tuple[str, Optional[float], str]:
     """Return (band_code, commission_rate_fraction, commission_status).
 
-    ``commission_rate_fraction`` is None for CRITICO (§15 msg 392).
+    Msg 399 — nuove fasce commissionali definitive (boundary test §boundary):
+      >30.00  → OTTIMO 15%
+      20-30   → BUONO 10%
+      15-19.99→ SUFFICIENTE 8%
+      8-14.99 → SCARSO 5%
+      <8      → CRITICO AUTHORIZATION_REQUIRED
+
+    Il boundary 30.00 esatto → BUONO 10% (§boundary 30.00% → 10%).
     """
     if margin_pct is None:
         return ("UNKNOWN", None, "NO_DATA")
     m = float(margin_pct)
-    if m >= 30.0:
+    if m > 30.0:
         return ("OTTIMO", 0.15, "OK")
     if m >= 20.0:
         return ("BUONO", 0.10, "OK")
