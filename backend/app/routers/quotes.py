@@ -276,6 +276,16 @@ async def update_quote(
         if v not in ("ENEA_STANDARD", "ENEA_INSURED"):
             raise HTTPException(status_code=400, detail=f"enea_practice_code non valido: {v}")
         payload["enea_practice_code"] = v
+    # msg 397 — tax_deduction_requested è la single source of truth:
+    #   * True  → forza withholding_applicable=true; ENEA obbligatoria
+    #   * False → forza withholding_applicable=false; ENEA facoltativa
+    if "tax_deduction_requested" in payload:
+        if payload["tax_deduction_requested"]:
+            payload["withholding_applicable"] = True
+            # Enforce ENEA required §5 msg 397. La check finale è dopo il PATCH
+            # (potrebbe essere passato contestualmente insieme al code)
+        else:
+            payload["withholding_applicable"] = False
     if "site_address" in payload and payload["site_address"] is not None:
         payload["site_address"] = payload["site_address"] if isinstance(payload["site_address"], dict) else payload["site_address"].model_dump()
 
@@ -299,6 +309,13 @@ async def update_quote(
         db = get_db()
         fresh = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
         if fresh and not _is_frozen(fresh):
+            # msg 397 §5 — fail-closed ENEA required when tax deduction requested
+            if fresh.get("tax_deduction_requested") and not fresh.get("enea_practice_code"):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"code": "ENEA_REQUIRED_FOR_TAX_DEDUCTION",
+                            "message": "Per un preventivo con detrazione fiscale è necessario selezionare la pratica ENEA."},
+                )
             # ENEA materialization (msg 395 §4/§6): sincronizza una hidden line
             # con la pratica selezionata (mutua esclusione — one_per_quote).
             enea_code = fresh.get("enea_practice_code")

@@ -769,23 +769,26 @@ function InstallationModeCard({ q, editable, onChange }) {
                         onChange={(v) => patch({ disposal_mode: v })} disableIncluded />
         </div>
       )}
-      {/* Ritenuta d'acconto (msg 395) + Pratica ENEA */}
+      {/* Detrazione fiscale — single source (msg 397) + Pratica ENEA */}
       <div className="grid grid-cols-2 gap-3 pt-3 border-t mt-3">
         <div>
-          <Label className="text-xs">Ritenuta d'acconto</Label>
+          <Label className="text-xs">Detrazione fiscale</Label>
           <div className="mt-1 flex gap-2">
-            <Button variant={!q.withholding_applicable ? "default" : "outline"} size="sm" className="rounded-sm flex-1"
+            <Button variant={!q.tax_deduction_requested ? "default" : "outline"} size="sm" className="rounded-sm flex-1"
                     disabled={!editable || pending}
-                    onClick={() => patch({ withholding_applicable: false })}
-                    data-testid="withholding-off">No</Button>
-            <Button variant={q.withholding_applicable ? "default" : "outline"} size="sm" className="rounded-sm flex-1"
+                    onClick={() => patch({ tax_deduction_requested: false })}
+                    data-testid="tax-deduction-no">No</Button>
+            <Button variant={q.tax_deduction_requested ? "default" : "outline"} size="sm" className="rounded-sm flex-1"
                     disabled={!editable || pending}
-                    onClick={() => patch({ withholding_applicable: true })}
-                    data-testid="withholding-on">11%</Button>
+                    onClick={() => patch({ tax_deduction_requested: true, enea_practice_code: q.enea_practice_code || "ENEA_STANDARD" })}
+                    data-testid="tax-deduction-yes">Sì</Button>
           </div>
+          {q.tax_deduction_requested && (
+            <div className="text-[10px] text-muted-foreground mt-1">Ritenuta d'acconto 11% applicata al pagamento.</div>
+          )}
         </div>
         <div>
-          <Label className="text-xs">Pratica ENEA</Label>
+          <Label className="text-xs">Pratica ENEA {q.tax_deduction_requested && <span className="text-destructive">*</span>}</Label>
           <Select value={q.enea_practice_code || "NONE"}
                   disabled={!editable || pending}
                   onValueChange={(v) => patch({ enea_practice_code: v === "NONE" ? null : v })}>
@@ -793,7 +796,9 @@ function InstallationModeCard({ q, editable, onChange }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="NONE" data-testid="enea-none">Nessuna</SelectItem>
+              <SelectItem value="NONE" disabled={q.tax_deduction_requested} data-testid="enea-none">
+                Nessuna{q.tax_deduction_requested ? " (richiesta con detrazione)" : ""}
+              </SelectItem>
               <SelectItem value="ENEA_STANDARD" data-testid="enea-standard">Standard — 100,00 €</SelectItem>
               <SelectItem value="ENEA_INSURED" data-testid="enea-insured">Assicurata — 350,00 €</SelectItem>
             </SelectContent>

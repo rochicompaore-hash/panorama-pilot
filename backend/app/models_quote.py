@@ -154,10 +154,13 @@ class Quote(BaseDoc):
     dismantling_mode: str = "EXCLUDED"        # INCLUDED | EXCLUDED | NOT_APPLICABLE
     disposal_mode: str = "EXCLUDED"           # INCLUDED | EXCLUDED | NOT_APPLICABLE
 
-    # --- Withholding + ENEA (msg 395) ---
+    # --- Withholding + ENEA (msg 395/397) ---
+    # ⇐ msg 397: withholding non è più una scelta autonoma.
+    # Deriva da tax_deduction_requested (single source of truth).
+    tax_deduction_requested: bool = False
     withholding_applicable: bool = False
-    withholding_rate: float = 0.11             # default 11% se applicabile
-    enea_practice_code: Optional[str] = None   # ENEA_STANDARD | ENEA_INSURED | None
+    withholding_rate: float = 0.11
+    enea_practice_code: Optional[str] = None
 
 
 class QuoteCreate(BaseModel):
@@ -190,7 +193,8 @@ class QuoteUpdate(BaseModel):
     installation_mode: Optional[str] = None
     dismantling_mode: Optional[str] = None
     disposal_mode: Optional[str] = None
-    # --- Withholding + ENEA (msg 395) ---
+    # --- Withholding + ENEA (msg 395/397) ---
+    tax_deduction_requested: Optional[bool] = None
     withholding_applicable: Optional[bool] = None
     withholding_rate: Optional[float] = None
     enea_practice_code: Optional[str] = None
