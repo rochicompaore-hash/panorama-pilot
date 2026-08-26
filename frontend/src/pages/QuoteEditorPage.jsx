@@ -634,20 +634,29 @@ function MarginPanel({ financial, isAdmin }) {
       </Card>
     );
   }
-  const pct = fs.pre_commission_margin;
+  const pct = fs.tachometer_value;   // msg 396 §4/§13 — FINAL_COMPANY_MARGIN
   const band = fs.margin_band;
   const commRate = fs.commission_rate;
   const commGross = fs.commission_gross;
   const status = fs.commission_status;
   const isCritical = status === "AUTHORIZATION_REQUIRED";
+  const isEneaIncomplete = fs.financial_snapshot_status === "INCOMPLETE"
+    && (fs.financial_snapshot_errors || []).includes("MISSING_INTERNAL_COST_ENEA");
 
   return (
     <Card className="rounded-sm border-border p-6" data-testid="margin-panel">
       <div className="flex items-center justify-between mb-2">
-        <div className="overline">Marginalità</div>
+        <div className="overline">Margine aziendale</div>
         {frozen && <Badge className="rounded-sm bg-slate-500/20 text-slate-700 text-[10px]">CONGELATA</Badge>}
       </div>
       <MarginTachometer marginPct={pct} band={band} />
+
+      {isEneaIncomplete && (
+        <div className="mt-3 rounded-sm border border-amber-500 bg-amber-500/10 p-3" data-testid="margin-enea-incomplete">
+          <div className="text-xs font-bold text-amber-800">MARGINE NON DEFINITIVO</div>
+          <div className="text-[11px] text-amber-800/90 mt-0.5">Costo interno Pratica ENEA non configurato. La commissione mostrata non è finale.</div>
+        </div>
+      )}
 
       {isCritical && (
         <div className="mt-3 rounded-sm border border-destructive bg-destructive/10 p-3" data-testid="margin-critical-banner">
@@ -676,16 +685,20 @@ function MarginPanel({ financial, isAdmin }) {
         </div>
       </div>
 
-      {/* Admin-only breakdown (§12) */}
+      {/* Admin-only breakdown (§8 msg 395 + §7 msg 396) */}
       {isAdmin && fs.supply_cost != null && (
         <div className="mt-4 pt-3 border-t border-dashed space-y-1 text-xs" data-testid="margin-panel-admin">
           <div className="text-[10px] font-mono-plex text-muted-foreground uppercase mb-1">Riservato Direzione</div>
           <div className="flex justify-between"><span className="text-muted-foreground">Valore contratto IVA incl.</span><span className="font-mono-plex">{fmtEUR(fs.gross_contract_value)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Ricavo netto</span><span className="font-mono-plex">{fmtEUR(fs.net_revenue_ex_vat)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Costo fornitura</span><span className="font-mono-plex">− {fmtEUR(fs.supply_cost)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Costo posa</span><span className="font-mono-plex">− {fmtEUR(fs.installation_cost)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Altri costi diretti</span><span className="font-mono-plex">− {fmtEUR(fs.other_direct_costs)}</span></div>
+          {fs.withholding_applicable && (
+            <div className="flex justify-between" data-testid="margin-panel-withholding"><span className="text-muted-foreground">Ritenuta d'acconto ({(fs.withholding_rate * 100).toFixed(0)}%)</span><span className="font-mono-plex">− {fmtEUR(fs.withholding_cost)}</span></div>
+          )}
           <div className="flex justify-between pt-1 border-t"><span className="font-bold">Margine pre-commissione</span>
-            <span className="font-mono-plex font-bold">{fmtEUR(fs.pre_commission_contribution)}</span></div>
+            <span className="font-mono-plex font-bold">{fmtEUR(fs.pre_commission_contribution)} <span className="text-muted-foreground">({fmtPct(fs.pre_commission_margin)})</span></span></div>
           {commGross != null && (
             <div className="flex justify-between"><span className="text-muted-foreground">− Commissione commerciale</span><span className="font-mono-plex">− {fmtEUR(commGross)}</span></div>
           )}
@@ -693,7 +706,7 @@ function MarginPanel({ financial, isAdmin }) {
             <>
               <div className="flex justify-between pt-1 border-t"><span className="font-bold">Restante azienda</span>
                 <span className="font-mono-plex font-black text-[hsl(200_82%_45%)]">{fmtEUR(fs.final_company_contribution)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Margine post-commissione</span><span className="font-mono-plex">{fmtPct(fs.final_company_margin)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Margine aziendale finale</span><span className="font-mono-plex font-bold">{fmtPct(fs.final_company_margin)}</span></div>
             </>
           )}
         </div>
@@ -756,6 +769,37 @@ function InstallationModeCard({ q, editable, onChange }) {
                         onChange={(v) => patch({ disposal_mode: v })} disableIncluded />
         </div>
       )}
+      {/* Ritenuta d'acconto (msg 395) + Pratica ENEA */}
+      <div className="grid grid-cols-2 gap-3 pt-3 border-t mt-3">
+        <div>
+          <Label className="text-xs">Ritenuta d'acconto</Label>
+          <div className="mt-1 flex gap-2">
+            <Button variant={!q.withholding_applicable ? "default" : "outline"} size="sm" className="rounded-sm flex-1"
+                    disabled={!editable || pending}
+                    onClick={() => patch({ withholding_applicable: false })}
+                    data-testid="withholding-off">No</Button>
+            <Button variant={q.withholding_applicable ? "default" : "outline"} size="sm" className="rounded-sm flex-1"
+                    disabled={!editable || pending}
+                    onClick={() => patch({ withholding_applicable: true })}
+                    data-testid="withholding-on">11%</Button>
+          </div>
+        </div>
+        <div>
+          <Label className="text-xs">Pratica ENEA</Label>
+          <Select value={q.enea_practice_code || "NONE"}
+                  disabled={!editable || pending}
+                  onValueChange={(v) => patch({ enea_practice_code: v === "NONE" ? null : v })}>
+            <SelectTrigger className="rounded-sm h-9 mt-1" data-testid="enea-practice">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="NONE" data-testid="enea-none">Nessuna</SelectItem>
+              <SelectItem value="ENEA_STANDARD" data-testid="enea-standard">Standard — 100,00 €</SelectItem>
+              <SelectItem value="ENEA_INSURED" data-testid="enea-insured">Assicurata — 350,00 €</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
       {err && <div className="text-xs text-destructive mt-2" data-testid="installation-mode-error">{err}</div>}
       <div className="text-[10px] text-muted-foreground mt-2">
         {mode === "SUPPLY_AND_INSTALLATION"

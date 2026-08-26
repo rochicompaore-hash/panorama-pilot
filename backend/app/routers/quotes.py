@@ -270,6 +270,12 @@ async def update_quote(
             if v not in POLICY_MODES:
                 raise HTTPException(status_code=400, detail=f"{f} non valido: {v}")
             payload[f] = v
+    # ENEA guard (msg 395 §2): validate code fail-closed.
+    if "enea_practice_code" in payload and payload["enea_practice_code"]:
+        v = payload["enea_practice_code"].upper()
+        if v not in ("ENEA_STANDARD", "ENEA_INSURED"):
+            raise HTTPException(status_code=400, detail=f"enea_practice_code non valido: {v}")
+        payload["enea_practice_code"] = v
     if "site_address" in payload and payload["site_address"] is not None:
         payload["site_address"] = payload["site_address"] if isinstance(payload["site_address"], dict) else payload["site_address"].model_dump()
 
@@ -286,12 +292,38 @@ async def update_quote(
         force_override=force, override_reason=force_reason,
     )
     # Installation Mode V1 (msg 393 §19-§20): se cambia installation_mode /
-    # dismantling_mode / disposal_mode, ri-risolvi i servizi automatici su TUTTE
-    # le righe e aggiorna financial_snapshot + totali.
-    if any(k in payload for k in ("installation_mode", "dismantling_mode", "disposal_mode")):
+    # dismantling_mode / disposal_mode / withholding / enea_practice_code
+    # ri-risolvi i servizi automatici + ricomputa il financial_snapshot.
+    if any(k in payload for k in ("installation_mode", "dismantling_mode", "disposal_mode",
+                                  "withholding_applicable", "withholding_rate", "enea_practice_code")):
         db = get_db()
         fresh = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
         if fresh and not _is_frozen(fresh):
+            # ENEA materialization (msg 395 §4/§6): sincronizza una hidden line
+            # con la pratica selezionata (mutua esclusione — one_per_quote).
+            enea_code = fresh.get("enea_practice_code")
+            lines_pre = [l for l in (fresh.get("lines") or []) if not l.get("enea_practice")]
+            if enea_code:
+                svc = await db.simple_services.find_one({
+                    "tenant_id": user["tenant_id"], "code": enea_code, "deleted_at": None,
+                })
+                if svc:
+                    from app.services.pricing import compute_line as _cl
+                    enea_line = _cl({
+                        "id": f"enea-{enea_code.lower()}",
+                        "category": "extra", "category_code": "ENEA_PRACTICE",
+                        "description": svc.get("name", enea_code),
+                        "quantity": 1,
+                        "base_price": float(svc.get("customer_sale_price") or 0),
+                        "vat_rate": 0.22,
+                        "internal_cost": svc.get("internal_reference_price") or 0,
+                        "enea_practice": True,
+                        "simple_snapshot": {
+                            "internal_cost_status": svc.get("internal_cost_status") or "NEEDS_PO_COSTING",
+                        },
+                    })
+                    lines_pre.append(enea_line)
+            fresh["lines"] = lines_pre
             mode = fresh.get("installation_mode")
             dm = fresh.get("dismantling_mode") or "EXCLUDED"
             dpm = fresh.get("disposal_mode") or "EXCLUDED"
@@ -300,7 +332,9 @@ async def update_quote(
             all_errors: list = []
             for l in fresh.get("lines") or []:
                 new_l = dict(l)
-                # Preserva manual_extra_services (§20). Rimuove sempre i vecchi automatic.
+                if l.get("enea_practice"):
+                    new_lines.append(new_l)  # ENEA line non ha auto-services
+                    continue
                 new_l["automatic_services"] = []
                 if mode == "SUPPLY_AND_INSTALLATION":
                     auto_svcs, errs = await resolve_line_services(

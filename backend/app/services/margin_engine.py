@@ -21,9 +21,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-MARGIN_POLICY_VERSION = "margin_policy_v1_2026_02"
+MARGIN_POLICY_VERSION = "margin_policy_v2_2026_02"
 COMMISSION_POLICY_VERSION = "commission_policy_v1_2026_02"
+WITHHOLDING_POLICY_VERSION = "withholding_policy_v1_2026_02"
 COMMISSION_BASE_POLICY = "NET_REVENUE_EX_VAT"
+WITHHOLDING_BASE_POLICY = "NET_REVENUE_EX_VAT"
+DEFAULT_WITHHOLDING_RATE = 0.11   # msg 395 §2 — 11% ritenuta d'acconto
 
 # Categories that count as installation service (msg 392 §7).
 INSTALLATION_CATEGORIES = {"installation", "posa", "montaggio", "montaggi_posa"}
@@ -179,11 +182,18 @@ def aggregate_costs_from_lines(lines: Iterable[Dict[str, Any]]) -> Dict[str, flo
 def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
     """Build the ``financial_snapshot`` for a quote document.
 
-    Contract (§16 msg 392): 17 fields, all present (may be None for CRITICO or empty quotes).
-    Amounts rounded to 2 decimals for presentation; % rounded to 4dp.
+    Msg 394-396 policy stack:
+      * §3 (394) SUPPLY/INSTALL/OTHER buckets sempre separati.
+      * §1-§5 (395) Ritenuta d'acconto sottratta prima della commissione se
+        ``withholding_applicable=True``.
+      * §4-§10 (396) Tachimetro visualizza FINAL_COMPANY_MARGIN (post-commissione)
+        → esposto anche come ``tachometer_value``.
+      * §4-§5 (post-supply-cost) ENEA safety: se manca internal cost su una
+        pratica ENEA selezionata, ``commission_status=NEEDS_COST_CONFIGURATION``
+        e ``financial_snapshot_status="INCOMPLETE"``.
     """
     lines = quote.get("lines") or []
-    subtotal = float(quote.get("subtotal") or quote.get("taxable_amount") or 0)  # NET_REVENUE_EX_VAT
+    subtotal = float(quote.get("subtotal") or quote.get("taxable_amount") or 0)
     vat = float(quote.get("vat_amount") or 0)
     total = float(quote.get("total") or (subtotal + vat))
 
@@ -191,19 +201,52 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
     supply = float(costs["supply_cost"])
     install = float(costs["installation_cost"])
     other = float(costs["other_direct_costs"])
+    net_revenue = subtotal
 
-    net_revenue = subtotal  # policy §4 msg 392
-    pre_commission_contribution = net_revenue - supply - install - other
+    # --- Withholding (msg 395) ---
+    wh_applicable = bool(quote.get("withholding_applicable"))
+    wh_rate = float(quote.get("withholding_rate") or DEFAULT_WITHHOLDING_RATE) if wh_applicable else 0.0
+    wh_cost = _r2(net_revenue * wh_rate) if wh_applicable else 0.0
+
+    # --- ENEA safety guard (msg 395 §3-§5) ---
+    # Se esiste una riga con ``enea_practice=True`` e nessun internal cost
+    # configurato ⇒ snapshot INCOMPLETE.
+    enea_missing_cost = False
+    for l in lines:
+        if not l.get("enea_practice"):
+            continue
+        # ENEA line: internal_cost None or explicit NEEDS_PO_COSTING flag
+        ss = l.get("simple_snapshot") or {}
+        if (l.get("internal_cost") in (None, 0, 0.0)
+                and ss.get("internal_cost_status") in (None, "NEEDS_PO_COSTING")):
+            enea_missing_cost = True
+            break
+
+    pre_commission_contribution = net_revenue - supply - install - other - float(wh_cost or 0)
     pre_commission_margin = (pre_commission_contribution / net_revenue * 100.0) if net_revenue > 0 else None
 
     band, rate, status = resolve_band(pre_commission_margin)
 
-    commission_base = net_revenue  # §4
+    # Se ENEA cost mancante ⇒ commissione non definitiva (§5 msg 395).
+    fs_status = "COMPLETE"
+    fs_errors: List[str] = []
+    if enea_missing_cost:
+        fs_status = "INCOMPLETE"
+        fs_errors.append("MISSING_INTERNAL_COST_ENEA")
+        # non azzero la commission_rate ma la marchiamo come non finale
+        if status == "OK":
+            status = "NEEDS_COST_CONFIGURATION"
+
+    commission_base = net_revenue
     commission_gross = _r2(commission_base * rate) if rate is not None else None
     final_company_contribution = _r2(pre_commission_contribution - (commission_gross or 0.0)) if rate is not None else None
     final_company_margin = None
     if final_company_contribution is not None and net_revenue > 0:
         final_company_margin = _r4(final_company_contribution / net_revenue * 100.0)
+
+    # --- Tachometer value (msg 396 §4) ---
+    # Il tachimetro DEVE mostrare esclusivamente FINAL_COMPANY_MARGIN.
+    tachometer_value = final_company_margin
 
     return {
         "gross_contract_value": _r2(total),
@@ -211,16 +254,28 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
         "supply_cost": _r2(supply),
         "installation_cost": _r2(install),
         "other_direct_costs": _r2(other),
+        # Withholding (msg 395)
+        "withholding_applicable": wh_applicable,
+        "withholding_base": _r2(net_revenue) if wh_applicable else None,
+        "withholding_rate": wh_rate if wh_applicable else None,
+        "withholding_cost": _r2(wh_cost) if wh_applicable else 0.0,
+        "withholding_policy_version": WITHHOLDING_POLICY_VERSION if wh_applicable else None,
+        # Margin + commission
         "pre_commission_contribution": _r2(pre_commission_contribution),
         "pre_commission_margin": _r4(pre_commission_margin),
         "margin_band": band,
         "commission_base_policy": COMMISSION_BASE_POLICY,
         "commission_base": _r2(commission_base),
-        "commission_rate": rate,  # fraction (0.15 = 15%) or None
+        "commission_rate": rate,
         "commission_gross": commission_gross,
         "commission_status": status,
         "final_company_contribution": final_company_contribution,
-        "final_company_margin": final_company_margin,  # % or None
+        "final_company_margin": final_company_margin,
+        # Tachometer authoritative value (msg 396 §4/§13)
+        "tachometer_value": tachometer_value,
+        # Financial snapshot completeness (msg 395 §5)
+        "financial_snapshot_status": fs_status,
+        "financial_snapshot_errors": fs_errors,
         "margin_policy_version": MARGIN_POLICY_VERSION,
         "commission_policy_version": COMMISSION_POLICY_VERSION,
     }
@@ -233,13 +288,17 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
 # status. Nothing else — no costs, no company contribution, no policy versions.
 COMMERCIAL_SAFE_KEYS = {
     "net_revenue_ex_vat",
-    "pre_commission_margin",
+    # msg 396 §6 — commerciale vede TACHIMETRO (final_company_margin) e commissione
+    "final_company_margin",
+    "tachometer_value",
     "margin_band",
     "commission_rate",
     "commission_gross",
     "commission_status",
-    # policy version is a public string, useful for UI legend
+    # policy version + snapshot health hint
     "commission_policy_version",
+    "financial_snapshot_status",
+    "financial_snapshot_errors",
 }
 
 

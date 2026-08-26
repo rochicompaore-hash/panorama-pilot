@@ -235,17 +235,19 @@ class TestRBACRedaction:
         snap = self._sample_snapshot()
         red = redact_financial_snapshot_for_role(snap, is_admin=False)
         assert set(red.keys()) == COMMERCIAL_SAFE_KEYS
-        # Verified: no cost or company margin leaks
+        # Verified: no cost or margin breakdown leaks
         for forbidden in ("supply_cost", "installation_cost", "other_direct_costs",
-                          "pre_commission_contribution", "commission_base",
-                          "final_company_contribution", "final_company_margin",
+                          "pre_commission_contribution", "pre_commission_margin",
+                          "commission_base", "withholding_cost", "withholding_rate",
+                          "final_company_contribution",
                           "margin_policy_version"):
             assert forbidden not in red, f"LEAK: {forbidden} exposed to Commerciale"
 
     def test_commerciale_sees_margin_and_commission(self):
         snap = self._sample_snapshot()
         red = redact_financial_snapshot_for_role(snap, is_admin=False)
-        assert red["pre_commission_margin"] == 30.0
+        # msg 396 §6 — commerciale vede TACHOMETER (final_company_margin), non pre_commission
+        assert red["tachometer_value"] == snap["final_company_margin"]
         assert red["margin_band"] == "OTTIMO"
         assert red["commission_rate"] == 0.15
         assert red["commission_gross"] == 1_500.0
@@ -302,6 +304,7 @@ class TestPolicyVersioning:
         fs = compute_financial_snapshot({"subtotal": 10_000.0, "total": 10_000.0, "lines": [
             {"category": "window", "quantity": 1, "technical_snapshot": {"total_internal_cost": 6_000.0}},
         ]})
-        assert fs["margin_policy_version"] == "margin_policy_v1_2026_02"
+        # msg 395 bump: v2 include ritenuta d'acconto
+        assert fs["margin_policy_version"] == "margin_policy_v2_2026_02"
         assert fs["commission_policy_version"] == "commission_policy_v1_2026_02"
         assert fs["commission_base_policy"] == COMMISSION_BASE_POLICY == "NET_REVENUE_EX_VAT"

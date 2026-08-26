@@ -1,3 +1,46 @@
+## Iter 52 — Margin Engine V2 (Ritenuta + Tachometer=Final + ENEA Guard) (Feb 2026)
+
+**Autorizzato:** Msg 395 + 396 + ENEA UI (post-P0 SUPPLY_COST).
+
+### Consegnato
+- **Withholding V1 (msg 395)**: `withholding_applicable` + `withholding_rate` (default 11%) sulla Quote; nuovo bucket `WITHHOLDING_COST` sottratto in `PRE_COMMISSION_CONTRIBUTION`. Snapshot esteso: `withholding_applicable/base/rate/cost/policy_version`. Bucket SEPARATO da SUPPLY/INSTALL/OTHER (§14).
+- **Tachometer semantica corretta (msg 396)**: aggiunto `tachometer_value = final_company_margin` nel snapshot; frontend `MarginTachometer` legge `fs.tachometer_value` invece di `pre_commission_margin`. Label UI "MARGINE AZIENDALE". Il PO chiedeva §11 verificato E2E: NET=10000 SUPPLY=4000 INSTALL=1000 WH=1100 → pre 39% OTTIMO 15% (commission engine input) → **tachometer = 24%** (post-commission).
+- **ENEA safety guard**: PATCH `enea_practice_code` (ENEA_STANDARD/ENEA_INSURED/null) materializza hidden line con `enea_practice=True`. Se `internal_cost` mancante ⇒ `financial_snapshot_status="INCOMPLETE"` + `MISSING_INTERNAL_COST_ENEA` + `commission_status="NEEDS_COST_CONFIGURATION"`. UI Admin mostra banner giallo "MARGINE NON DEFINITIVO — Costo interno Pratica ENEA non configurato".
+- **UI card Installation Mode** estesa: toggle Ritenuta [No / 11%], select Pratica ENEA [Nessuna / Standard / Assicurata] con mutua esclusione.
+- **RBAC aggiornato (msg 396 §6)**: `COMMERCIAL_SAFE_KEYS` ora contiene `tachometer_value` + `financial_snapshot_status/errors`. **NON contiene** `pre_commission_margin` (valore tecnico solo per Direzione).
+- **Bumped**: `margin_policy_version = margin_policy_v2_2026_02`.
+
+### Test
+- **21 pytest nuovi** in `test_margin_v2_msg395_396.py` (§13 msg 395 withholding band flip, §11 msg 396 tachometer≠pre, ENEA guard 3 casi, RBAC tachometer visibility, WITHHOLDING bucket separato).
+- **97/97 totali verdi** dopo aggiornamento suite pre-esistente.
+- **E2E curl completo** su quote `8d2efe76-3719-4922-a9fb-e5cceba6378f`: baseline 50%/35%, con ritenuta 39%/**24%**, con ENEA fs_status=INCOMPLETE + tachometer=24.495%. RBAC commerciale: NESSUN LEAK breakdown.
+- **Screenshot UI verificato**: "MARGINE AZIENDALE 24,50 % OTTIMO" + banner "MARGINE NON DEFINITIVO" + breakdown Riservato Direzione con `Ritenuta d'acconto (11%) −1.111,00 €`.
+
+### Vincoli PO rispettati
+- ✅ 395 §1-§4 formula con WITHHOLDING sottratta
+- ✅ 395 §2-§3 default 11%, applicabile solo se `withholding_applicable=true`
+- ✅ 395 §5-§7 esempi verificati
+- ✅ 395 §8 UI Direzione mostra ritenuta separata
+- ✅ 395 §9 commerciale NON vede l'importo ritenuta
+- ✅ 395 §10-§11 snapshot esteso + freeze on accepted
+- ✅ 395 §12 PDF cliente non contiene ritenuta interna (già stripped da `strip_margin_from_pdf_payload`)
+- ✅ 395 §14 bucket SEPARATO (test dedicato)
+- ✅ 396 §4/§13 tachometer_value = final_company_margin
+- ✅ 396 §6-§7 UI commerciale/direzione differenziata
+- ✅ 396 §12 pre_commission = commission engine input, final = tachometer output
+- ✅ ENEA §3-§5 safety guard su costi mancanti
+- ✅ ENEA §7 DISPOSAL_* rimane NEEDS_PO_PRICING, no INCLUDED sbloccabile
+
+### Aperto
+- Costi interni ENEA (2 valori dal PO) → sbloccheranno `commission_status="OK"` con contributo `OTHER_DIRECT_COSTS` a costo reale.
+- Prezzi Smaltimento (5 coppie int_ref/customer_sale) → sbloccheranno `disposal_mode=INCLUDED`.
+- Collaudo manuale post-regression PO (Vano V2 in attesa).
+
+### Stato ufficiale
+- `MARGIN_ENGINE_V2` = **BACKEND_READY + UI_READY + MANUAL_E2E_PENDING**.
+
+---
+
 ## Iter 51 — P0 REGRESSION SUPPLY_COST + ENEA services (Feb 2026)
 
 **Autorizzato:** Messaggio 394 §21 — STOP Vano V2, fix immediato marginalità.

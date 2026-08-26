@@ -49,6 +49,8 @@ class QuoteLine(BaseModel):
     position_sale_total: float = 0.0
     position_internal_cost_total: float = 0.0
     service_policy_version: Optional[str] = None
+    # ENEA hidden line marker (msg 395 §4)
+    enea_practice: bool = False
 
 
 class QuoteOpening(BaseModel):
@@ -152,6 +154,11 @@ class Quote(BaseDoc):
     dismantling_mode: str = "EXCLUDED"        # INCLUDED | EXCLUDED | NOT_APPLICABLE
     disposal_mode: str = "EXCLUDED"           # INCLUDED | EXCLUDED | NOT_APPLICABLE
 
+    # --- Withholding + ENEA (msg 395) ---
+    withholding_applicable: bool = False
+    withholding_rate: float = 0.11             # default 11% se applicabile
+    enea_practice_code: Optional[str] = None   # ENEA_STANDARD | ENEA_INSURED | None
+
 
 class QuoteCreate(BaseModel):
     lead_id: Optional[str] = None
@@ -183,6 +190,10 @@ class QuoteUpdate(BaseModel):
     installation_mode: Optional[str] = None
     dismantling_mode: Optional[str] = None
     disposal_mode: Optional[str] = None
+    # --- Withholding + ENEA (msg 395) ---
+    withholding_applicable: Optional[bool] = None
+    withholding_rate: Optional[float] = None
+    enea_practice_code: Optional[str] = None
 
 
 class QuoteLineCreate(BaseModel):
