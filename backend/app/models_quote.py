@@ -39,6 +39,7 @@ class QuoteLine(BaseModel):
     pricing_snapshot: Optional[Dict[str, Any]] = None
     technical_snapshot: Optional[Dict[str, Any]] = None
     commercial_snapshot: Optional[Dict[str, Any]] = None
+    simple_snapshot: Optional[Dict[str, Any]] = None
     financial_snapshot: Optional[Dict[str, Any]] = None
     # --- Installation Mode V1 (msg 393) ---
     automatic_services: List[Dict[str, Any]] = Field(default_factory=list)

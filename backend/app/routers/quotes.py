@@ -22,6 +22,8 @@ from app.services.margin_engine import (
     compute_financial_snapshot,
     redact_financial_snapshot_for_role,
 )
+from app.services.multi_category_pricing import resolve_and_compute
+from app.models_multi_category import ConfigureRequest, SimplePricingInputs
 from app.services.service_resolver import (
     resolve_line_services,
     seed_disposal_services,
@@ -469,6 +471,52 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
     if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
     _assert_editable(doc)
     line_data = body.model_dump()
+    # P0 §19 msg 394 — AUTHORITATIVE PRICING RECOMPUTE.
+    # Il payload del frontend può arrivare RBAC-redacted (commerciale non vede i
+    # costi nel preview). Il backend è source-of-truth economica: se abbiamo
+    # product_id + configuration_snapshot, ricomputiamo con snapshot COMPLETI
+    # (non redacted) e sovrascriviamo i campi costo.
+    prod_id = line_data.get("product_id")
+    cfg_snap = line_data.get("configuration_snapshot") or line_data.get("product_config") or {}
+    if prod_id and cfg_snap and line_data.get("pricing_model"):
+        prod = await db.products.find_one({"_id": prod_id, "tenant_id": user["tenant_id"], "deleted_at": None})
+        if prod:
+            try:
+                simple_inp = SimplePricingInputs(
+                    width_mm=cfg_snap.get("width_mm"),
+                    height_mm=cfg_snap.get("height_mm"),
+                    linear_meters=cfg_snap.get("linear_meters"),
+                    quantity=int(line_data.get("quantity") or 1),
+                    options={k: v for k, v in cfg_snap.items() if k not in ("width_mm", "height_mm", "linear_meters", "quantity")},
+                )
+                req = ConfigureRequest(product_id=prod_id, simple_inputs=simple_inp)
+                cat = None
+                if prod.get("category_id"):
+                    cat = await db.product_categories.find_one({"_id": prod["category_id"]})
+                resp = await resolve_and_compute(prod, cat or {}, req, user["tenant_id"])
+                if getattr(resp, "pricing_status", None) == "ok":
+                    resp_dict = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
+                    if resp_dict.get("technical_snapshot"):
+                        line_data["technical_snapshot"] = resp_dict["technical_snapshot"]
+                    if resp_dict.get("commercial_snapshot"):
+                        line_data["commercial_snapshot"] = resp_dict["commercial_snapshot"]
+                    if resp_dict.get("simple_snapshot"):
+                        line_data["simple_snapshot"] = resp_dict["simple_snapshot"]
+                    ss = resp_dict.get("simple_snapshot") or {}
+                    ts = resp_dict.get("technical_snapshot") or {}
+                    qty = float(line_data.get("quantity") or 1)
+                    if ts.get("total_internal_cost") is not None:
+                        line_data["internal_cost"] = float(ts["total_internal_cost"])
+                    elif ss.get("purchase_total_cost") is not None:
+                        line_data["internal_cost"] = float(ss["purchase_total_cost"]) / max(qty, 1)
+                    elif ss.get("purchase_cost_per_item") is not None:
+                        line_data["internal_cost"] = float(ss["purchase_cost_per_item"])
+                    elif ss.get("internal_production_cost_per_item") is not None:
+                        line_data["internal_cost"] = float(ss["internal_production_cost_per_item"])
+            except Exception as _pricing_err:
+                import logging
+                logging.getLogger(__name__).error(f"authoritative_pricing_recompute failed for pid={prod_id}: {_pricing_err}")
+
     # Fail-closed §6/§8 — Multi-Category V1: righe FORMULA_TECHNICAL non possono
     # essere aggiunte con base_price=0. Zero € NON è "pricing non configurato".
     if line_data.get("source") == "MULTI_CATEGORY_V1" and line_data.get("pricing_model") == "FORMULA_TECHNICAL":
@@ -490,7 +538,7 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
         if op:
             line_data["width_mm"] = line_data.get("width_mm") or op.get("width_mm")
             line_data["height_mm"] = line_data.get("height_mm") or op.get("height_mm")
-    ql = QuoteLine(**{k: v for k, v in line_data.items() if v is not None or k in ("opening_id", "product_key", "image_url", "source", "category_id", "category_code", "product_id", "product_code", "pricing_model", "configuration_snapshot", "pricing_snapshot", "technical_snapshot", "commercial_snapshot", "financial_snapshot", "width_mm", "height_mm")})
+    ql = QuoteLine(**{k: v for k, v in line_data.items() if v is not None or k in ("opening_id", "product_key", "image_url", "source", "category_id", "category_code", "product_id", "product_code", "pricing_model", "configuration_snapshot", "pricing_snapshot", "technical_snapshot", "commercial_snapshot", "simple_snapshot", "financial_snapshot", "width_mm", "height_mm")})
     lines = doc.get("lines") or []
     ql.order_index = len(lines)
     # Installation Mode V1 (msg 393 §13): auto-resolve standard services if the quote

@@ -1,3 +1,71 @@
+## Iter 51 — P0 REGRESSION SUPPLY_COST + ENEA services (Feb 2026)
+
+**Autorizzato:** Messaggio 394 §21 — STOP Vano V2, fix immediato marginalità.
+
+### Root cause (§19 msg 394)
+Il preview `/multi-cat/products/{pid}/configure` applica RBAC redaction (nasconde `purchase_cost_per_item` / `total_internal_cost` ai commerciali). Il frontend `MultiCategoryConfiguratorDialog.submit()` inoltrava quel payload **redacted** al `POST /quotes/{qid}/lines`, che lo salvava così com'era. Risultato: `simple_snapshot.purchase_cost_per_item=None`, `internal_cost=0` → **SUPPLY_COST=0** anche per prodotti con costo reale >0.
+
+Trace §19 documentato via script diretto contro `_extract_line_cost` / `_line_bucket` / `aggregate_costs_from_lines` su 6 preventivi reali.
+
+### Fix architetturale (§4/§7/§9 msg 394)
+`app/routers/quotes.py::add_line` ora fa un **AUTHORITATIVE PRICING RECOMPUTE lato backend** ogni volta che riceve `product_id + configuration_snapshot + pricing_model`:
+1. Fetch prodotto + categoria dal DB
+2. Chiama `resolve_and_compute(product, category, req, tenant_id)` — bypass RBAC (backend è source-of-truth)
+3. Sovrascrive `simple_snapshot`, `technical_snapshot`, `commercial_snapshot` con i valori COMPLETI (non redacted)
+4. Popola `internal_cost` autoritativo dal snapshot appena computato (fallback ordinato tra `technical.total_internal_cost` / `simple.purchase_total_cost` / `simple.purchase_cost_per_item` / `simple.internal_production_cost_per_item`)
+
+Bonus: aggiunto campo `simple_snapshot` mancante al modello `QuoteLine` (era esposto solo come dict opaco).
+
+### Verifica E2E msg 394 §13
+Preventivo `PRV-2026-01748-R00` (creato via Commercial user con payload redacted):
+- Tapparella 1200×1400 RAL → `simple_snapshot.purchase_cost_per_item=58.80` ✅
+- UNIKVER 800×800 BASE → `simple_snapshot.purchase_cost_per_item=32.34` ✅
+- Financial: net 483.42€, **supply 91.14€** (58.80+32.34), install 170€, other 0€
+- Margin 45.98% OTTIMO 15%
+
+### Test regressione (§12 msg 394 assert obbligatorio)
+`tests/test_p0_supply_cost_regression_msg394.py` — 12 pytest verdi:
+- Legacy internal_cost path
+- Simple snapshot per Tapparella/Zanzariera
+- Technical snapshot per Finestra
+- POSA aggiuntiva NON sostituisce SUPPLY
+- SUPPLY_ONLY mantiene SUPPLY
+- Assert strutturale "product with cost>0 → SUPPLY>0"
+- E2E full snapshot §13
+
+**Totale suite: 86/86 pytest verdi** (12 nuovi + 28 Installation Mode + 38 Margin Engine + 8 P0 area color).
+
+### ENEA services seedati (msg 394)
+Anagrafiche `simple_services` create su tenant Infissi Express:
+- `ENEA_STANDARD` — Pratica ENEA Standard — 100.00 € (customer_sale_price)
+- `ENEA_INSURED` — Pratica ENEA Assicurata — 350.00 € (customer_sale_price)
+- Entrambe con `internal_cost_status = "NEEDS_PO_COSTING"`, `internal_reference_price = null`, `pricing_unit = FIXED_PRICE`, `quantity_rule = ONE_PER_QUOTE`.
+- NO commercial multiplier applicato: sono prezzi finali cliente.
+- Quando entreranno nel preventivo: contribuiscono a NET_REVENUE_EX_VAT ma NON a OTHER_DIRECT_COSTS finché il PO non definisce l'`internal_reference_price`.
+
+### Vincoli PO rispettati (msg 394)
+- ✅ §1 formula PRE_COMMISSION invariata
+- ✅ §2 SUPPLY_COST = costo interno prodotti (mai vendita)
+- ✅ §3 tre bucket separati (SUPPLY / INSTALLATION / OTHER)
+- ✅ §4 ogni QuoteLine contribuisce a SUPPLY_COST
+- ✅ §5-§6 posizione espone product/service costs separatamente
+- ✅ §7 no product_sale_price come cost
+- ✅ §8-§10 esempi verificati Tapparella/Zanzariera/Finestra/Cassonetto
+- ✅ §11-§13 test E2E completo
+- ✅ §14 SUPPLY_ONLY mantiene SUPPLY
+- ✅ §15 SUPPLY_AND_INSTALL somma i costi
+- ✅ §17 fasce commissione invariate
+- ✅ §19 root cause trace fornito, NO workaround
+- ✅ §20 acceptance 10/10
+- ✅ §21 STOP Vano V2 rispettato
+
+### Stato aggiornato
+- `QUOTE_MARGIN_TACHOMETER_V1` = BACKEND_READY + UI_READY + **REGRESSION_FIXED** + MANUAL_E2E_PENDING.
+- `QUOTE_INSTALLATION_MODE_V1` = BACKEND_READY + UI_READY + MANUAL_E2E_PENDING.
+- `ENEA services` = SEEDED (prezzi vendita) + NEEDS_PO_COSTING (costi interni).
+
+---
+
 ## Iter 50 — QUOTE INSTALLATION MODE + AUTO SERVICE BUNDLE V1 (Feb 2026)
 
 **Autorizzato:** Messaggio 393 §28 — parallelo al collaudo Tachimetro senza modifiche al Margin Engine.
