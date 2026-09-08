@@ -307,8 +307,8 @@ class TestPersianaQuoteAutomaticServices:
         assert abs(float(posa.get("unit_sale_price") or posa.get("unit_price") or 0) - 150) < 0.01
         assert abs(float(posa.get("sale_price_total") or posa.get("total") or 0) - 300) < 0.01
         assert int(smont.get("quantity") or smont.get("qty")) == 2
-        assert abs(float(smont.get("unit_sale_price") or smont.get("unit_price") or 0) - 40) < 0.01
-        assert abs(float(smont.get("sale_price_total") or smont.get("total") or 0) - 80) < 0.01
+        assert abs(float(smont.get("unit_sale_price") or smont.get("unit_price") or 0) - 30) < 0.01
+        assert abs(float(smont.get("sale_price_total") or smont.get("total") or 0) - 60) < 0.01
 
         internal = line.get("internal_cost")
         assert internal is not None and abs(float(internal) - 691.20) < 1.0, internal
@@ -319,7 +319,7 @@ class TestPersianaQuoteAutomaticServices:
         assert abs(float(fs.get("installation_cost") or 0) - 260) < 1.0, fs
         assert abs(float(fs.get("other_direct_costs") or 0) - 40) < 1.0, fs
         subtotal = q.get("subtotal") or q.get("subtotal_amount") or (q.get("totals") or {}).get("subtotal")
-        assert abs(float(subtotal) - 3836) < 1.0, subtotal
+        assert abs(float(subtotal) - 3816) < 1.0, subtotal
 
     def test_supply_only_no_automatic_services(self, admin_token):
         qid = self._make_quote(admin_token)

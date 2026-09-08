@@ -22,7 +22,7 @@ from .formulas import (
     glass_dimensions_1sash, glass_real_area_sqm, glass_billable_area_sqm,
     recipe_code, production_time_hours_for,
     glass_price_per_sqm, V1_3_COMPONENT_PRICES,
-    PVC_ELIGIBLE_ROLES, is_foil_surcharge_applicable,
+    PVC_ELIGIBLE_ROLES, is_foil_surcharge_applicable, STANDARD_FOIL_SURCHARGE_PERCENT,
 )
 
 
@@ -482,7 +482,7 @@ class TechnicalCostResolver:
         # Pellicolato +10% (solo Fase 1B: attivato solo se colore non è WHITE_MASS)
         foil_surcharge = Decimal("0")
         if is_foil_surcharge_applicable(req.color_internal, req.color_external):
-            foil_surcharge = foil_pvc_base * Decimal("0.10")
+            foil_surcharge = foil_pvc_base * (STANDARD_FOIL_SURCHARGE_PERCENT / Decimal("100"))
 
         total_internal = (material_cost + glass_cost + hardware_cost
                           + labor_cost + foil_surcharge)

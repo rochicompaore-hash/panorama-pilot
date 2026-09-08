@@ -1463,4 +1463,4 @@ Con TEMPORARY multiplier 2.5/3.0/3.5 e included_services 30/200/500 €: BASE 50
 ### Test — 17/17 verdi (invariati)
 
 ---
-## 2026-09-08 — Vedi `memory/CHANGELOG.md` (msg 401 Pricing Integrity Audit = PASS; Persiane pricing implementato; Cassonetti 4464/4464 validati). Backlog P0: completare PRE-RELEASE CLEANUP (full-suite 0F/0E, /api/sequences, tenant isolation, frontend build) → poi GENERAL PRE-PRODUCTION RELEASE GATE. FREEZE: Vano V2, F2, F3, F4.
+## 2026-09-08 — Vedi `memory/CHANGELOG.md`: msg 401 Pricing Integrity Audit = PASS; msg 402 Quote Editor Completion V1 = PASS (`QUOTE_EDITOR_FINAL_AUDIT.md`). Backlog P0: PRE-RELEASE CLEANUP residuo (full-suite 0F/0E, /api/sequences, tenant isolation, frontend build) → GENERAL PRE-PRODUCTION RELEASE GATE. Prossimo turno richiesto dal PO: CONNECTOR AUDIT (solo analisi). FREEZE: Vano V2, F2, F3, F4.

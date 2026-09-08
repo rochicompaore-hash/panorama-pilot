@@ -24,6 +24,34 @@ PROPERTY_TYPES = {"APPARTAMENTO", "CASA_SINGOLA", "BIFAMILIARE", "CONDOMINIO",
                   "ATTIVITA_COMMERCIALE", "ALTRO"}
 
 
+
+SITE_REQUIRED_ERRORS = {
+    "SITE_ADDRESS_REQUIRED": ("address", "street_number", "postal_code", "city", "province"),
+    "SITE_FLOOR_REQUIRED": ("floor",),
+    "SITE_ELEVATOR_REQUIRED": ("has_elevator",),
+    "SITE_PHONE_REQUIRED": ("site_contact_phone",),
+}
+
+
+def site_missing_codes(data: dict) -> list:
+    """msg 402 Lotto 2 — dati obbligatori cantiere (indirizzo completo, piano, ascensore, telefono)."""
+    codes = []
+    for code, fields in SITE_REQUIRED_ERRORS.items():
+        for f in fields:
+            v = data.get(f)
+            if v is None or (isinstance(v, str) and not v.strip()):
+                codes.append(code)
+                break
+    return codes
+
+
+def _assert_site_complete(data: dict):
+    codes = site_missing_codes(data)
+    if codes:
+        raise HTTPException(400, detail={"code": codes[0], "codes": codes,
+                                         "message": "Dati cantiere obbligatori mancanti: " + ", ".join(codes)})
+
+
 class SiteCreate(BaseModel):
     customer_id: str = Field(..., min_length=1)
     name: str = Field(..., min_length=1, max_length=200)
@@ -94,6 +122,7 @@ async def create_site(payload: SiteCreate,
                        user: dict = Depends(require_permission("crm.customers.edit"))):
     if payload.property_type and payload.property_type not in PROPERTY_TYPES:
         raise HTTPException(400, f"property_type must be one of {PROPERTY_TYPES}")
+    _assert_site_complete(payload.model_dump())
     db = get_db()
     # Verifica customer esiste e appartiene al tenant
     cust = await db.customers.find_one({"_id": payload.customer_id,
@@ -141,6 +170,8 @@ async def update_site(site_id: str, payload: SiteUpdate,
         raise HTTPException(400, f"property_type must be one of {PROPERTY_TYPES}")
     db = get_db()
     changes = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
+    _existing = await db.sites.find_one({"_id": site_id, "tenant_id": user["tenant_id"], "deleted_at": None}) or {}
+    _assert_site_complete({**_existing, **changes})
     if not changes:
         raise HTTPException(400, "No changes")
     changes["updated_at"] = datetime.now(timezone.utc).isoformat()

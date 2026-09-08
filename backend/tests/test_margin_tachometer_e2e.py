@@ -22,19 +22,11 @@ COMMERCIAL_EMAIL = "commercial_test@infissiexpress.com"
 COMMERCIAL_PASSWORD = "CommTest!2026"
 GOLDEN_QUOTE_ID = "3b4fd98a-fc62-457d-9d66-494742e5fc90"
 
-COMMERCIAL_SAFE_KEYS = {
-    "net_revenue_ex_vat",
-    "pre_commission_margin",
-    "margin_band",
-    "commission_rate",
-    "commission_gross",
-    "commission_status",
-    "commission_policy_version",
-}
+from app.services.margin_engine import COMMERCIAL_SAFE_KEYS  # policy msg 396 §6 / msg 402 §36: tachometer sì, PRE margin no
 ADMIN_ONLY_KEYS = {
     "supply_cost", "installation_cost", "other_direct_costs",
     "pre_commission_contribution", "commission_base",
-    "final_company_contribution", "final_company_margin",
+    "final_company_contribution",
     "margin_policy_version", "gross_contract_value",
 }
 
@@ -74,12 +66,13 @@ class TestGolden23OTTIMO:
         assert fs["supply_cost"] == 6000.0
         assert fs["installation_cost"] == 1000.0
         assert fs["pre_commission_margin"] == 30.0
-        assert fs["margin_band"] == "OTTIMO"
-        assert fs["commission_rate"] == 0.15
-        assert fs["commission_gross"] == 1500.0
+        # msg 400 §D / msg 402 §35: PRE 30.00% esatto → fascia 10% (BUONO)
+        assert fs["margin_band"] == "BUONO"
+        assert fs["commission_rate"] == 0.10
+        assert fs["commission_gross"] == 1000.0
         assert fs["commission_status"] == "OK"
-        assert fs["final_company_contribution"] == 1500.0
-        assert fs["final_company_margin"] == 15.0
+        assert fs["final_company_contribution"] == 2000.0
+        assert fs["final_company_margin"] == 20.0
 
 
 # ---------------------------------------------------------------------------
@@ -97,10 +90,10 @@ class TestRBAC:
         for k in ADMIN_ONLY_KEYS:
             assert k not in fs, f"LEAK to commercial: {k}"
         # But safe fields do carry values
-        assert fs["margin_band"] == "OTTIMO"
-        assert fs["commission_rate"] == 0.15
-        assert fs["commission_gross"] == 1500.0
-        assert fs["pre_commission_margin"] == 30.0
+        assert fs["margin_band"] == "BUONO"
+        assert fs["commission_rate"] == 0.10
+        assert fs["commission_gross"] == 1000.0
+        assert fs["tachometer_value"] == 20.0   # FINAL margin (msg 402 §36)
 
 
 # ---------------------------------------------------------------------------
@@ -207,4 +200,4 @@ class TestFreeze:
         fs = body["financial_snapshot"]
         # frozen fields should be present in the stored doc — we hit the endpoint
         # so cannot directly assert frozen_at without DB read; assert band coherent
-        assert fs["margin_band"] == "OTTIMO"
+        assert fs["margin_band"] == "BUONO"

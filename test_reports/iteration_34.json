@@ -1,0 +1,54 @@
+{
+  "summary": "msg402 QUOTE EDITOR COMPLETION V1 — Full frontend E2E on quote 35cccba2-63a2-4e1e-a1ab-604d28a36fda. 7/8 acceptance flows GREEN with all golden values matching. Verified: NewSiteInlineForm phone-required (SITE_PHONE_REQUIRED shown when phone empty), 5 payment options in nq-payment select, header InstallationMode + Smontaggio/Smaltimento controls, quote-payment FULL_UPFRONT triggers automatic 5% discount and reverts, quote-delivery STANDARD/EXPRESS switching with correct texts and +20% surcharge, FINESTRE PROEVOLUTION with EXACTLY 4 glass options (76/96/125/156,25 €/m²), automatic services (Profilatura 5,40 ml × 8 €/ml=43,20€, Montaggio 150€, Smontaggio 30€ — NOT 40€), Lotto 1 line-edit reopens configurator at step 3 with prefilled values, recompute on modify (1300×1600 qty2 → 1481,28 unit × 2, profilatura 5,80ml=46,40×2=92,80€, montaggio qty2=300€, smontaggio qty2=60€) same row not duplicated, persistence after reload, Cassonetto live 500x250/163/003=329,01€ and modified 700x250/326=276,13€, Persiana Fisse RAL 1200x1500=1282,50€ and Orientabili qty2=1728,00€×2 with services (posa 300€ + smontaggio 60€), PDF preview HTTP 200 (32,893 bytes) contains 'TEMPI INDICATIVI DI CONSEGNA', 'Sconto pagamento anticipato (5%)', 'Maggiorazione consegna accelerata (+20%)', 'Condizioni di pagamento' and NONE of 'internal_cost'/'supply_cost'/'costo', RBAC commercial hides Costo fornitura/produzione/acquisto/posa + RISERVATO DIREZIONE + purchase_rate/multiplier in persian cfg while keeping Margin Tachometer visible.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "NewQuoteDialog / NewSiteInlineForm", "issue": "After successful site creation via ns-save, toast 'Cantiere creato' fires and onCreated calls setSiteId(site.id), but the nq-site Radix Select trigger still shows placeholder 'Seleziona cantiere…' and nq-submit remains disabled — the newly created cantiere is NOT auto-selected as required by the spec. Sites list refetch invalidateQueries is fired but the SelectItem for the new site is not yet present when setSiteId runs, so Radix Select can't display it. Workaround: user must manually click nq-site and pick the new cantiere. Repro: /quotes → Nuovo preventivo → pick customer → + Nuovo cantiere → fill all fields incl. phone → Crea cantiere → observe nq-site trigger unchanged.", "selector": "[data-testid=nq-site]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "QuoteEditor line-services", "issues": ["Profilatura ml quantity displayed with English decimal dot ('5.40 ml', '5.80 ml') instead of Italian format ('5,40 ml' / '5,80 ml'). Amounts are already localized (43,20 € / 92,80 €). Minor cosmetic inconsistency."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix nq-site auto-selection after site creation: after site is created and returned, either (a) await refetch of sites-for-quote before setSiteId, or (b) insert the returned site into the local query cache with setQueryData so Radix Select renders the SelectItem immediately when siteId is set."
+  ],
+  "critical_code_review_comments": [
+    "QuotesPage.jsx onCreated does invalidateQueries + setSiteId(site.id) in the same tick — Radix Select won't reflect a value that isn't present in its SelectItem children, so trigger displays placeholder until refetch completes; consider qc.setQueryData(['sites-for-quote', customerId], (old) => ({...old, items: [site, ...(old?.items||[])]})) then setSiteId(site.id).",
+    "InstallationModeCard: Smaltimento select has disableIncluded=true (fail-closed) as required. Smontaggio 30€/pz correctly resolved by service_resolver — no 40€ leak. Good.",
+    "MultiCategoryConfiguratorDialog edit mode reliably prefills width/height/qty/glass and reopens at step 3 for FINESTRE/CASSONETTO/PERSIANA. reconfigure endpoint returns same lineId and services recompute authoritatively (verified rows count stayed constant across edits).",
+    "Line services rendering uses locale-aware currency (€) but ml value (Profilatura X.YZ ml) uses default JS toString — should route through Number.toLocaleString('it-IT', {minimumFractionDigits:2}) for consistency."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "87% (7/8 flows fully green; 1 with auto-select bug)"},
+  "test_credentials": "Admin: admin@infissiexpress.com / Admin!2025; Commercial: commercial_test@infissiexpress.com / CommTest!2026",
+  "seed_data_creation": "Ephemeral: customer CLI-000081 (existing) → new site CANT-2026-00015 (Via Test E2E 10, 20100 Milano MI, floor 2, elevator SI, phone 3331234567) → Quote PRV-2026-02244-R00 id=35cccba2-63a2-4e1e-a1ab-604d28a36fda with 3 lines (ProEvolution 1300×1600 qty2 Triplo satinato, Cassonetto 700×250/326/003 qty1, Persiana Orient RAL 1200×1500 qty2) + 1 preview PDF f7057dd3-2ea3-4dbf-87fa-dbed7d8430bf.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Single blocking UI bug: nq-site not auto-selected after inline site creation. All pricing goldens (msg401 + msg402) match: Cassonetto 329,01/276,13 €, Persiana 1282,50/1728,00 €, FINESTRE PROEVOLUTION 1200×1500 Triplo Sat 1355,80 € unit, 1300×1600 qty2 Triplo Sat 1481,28 € unit × 2 = 3415,36 €, Profilatura 5,40 ml=43,20 € / 5,80 ml=46,40 € (×qty=92,80). Smontaggio 30€/pz (NOT 40) confirmed. Payment FULL_UPFRONT applies 5% discount (-457,65€ on 9153,10€ base) and EXPRESS delivery +20% (=1525,50€). PDF preview 200 OK with expected text and no cost leaks. RBAC commercial redaction verified in both editor totals and Persiana cfg detail.",
+  "observed_golden_values": {
+    "FINESTRE ProEvolution 1200x1500 Doppio (76€/m²) unit": "1046,14 €",
+    "FINESTRE ProEvolution 1200x1500 Triplo Satinato (156,25€/m²) unit": "1355,80 €",
+    "FINESTRE ProEvolution 1300x1600 qty2 Triplo Satinato unit": "1481,28 €",
+    "FINESTRE profilatura 5,40 ml": "43,20 €",
+    "FINESTRE profilatura 5,80 ml × qty2": "92,80 €",
+    "FINESTRE montaggio infissi 1/2 ante qty1": "150,00 €",
+    "FINESTRE montaggio qty2": "300,00 €",
+    "FINESTRE smontaggio qty1": "30,00 € (NOT 40)",
+    "FINESTRE smontaggio qty2": "60,00 €",
+    "Cassonetto 500x250/163/SI/003 preview": "329,01 €",
+    "Cassonetto 700x250/326/SI/003 preview (modified)": "276,13 €",
+    "Cassonetto montaggio singolo": "90,00 €",
+    "Cassonetto smontaggio": "30,00 €",
+    "Persiana Fisse RAL 1200x1500 unit": "1282,50 €",
+    "Persiana Orientabili RAL 1200x1500 unit (modified)": "1728,00 €",
+    "Persiana montaggio 1/2 ante qty1": "150,00 €",
+    "Persiana montaggio qty2": "300,00 €",
+    "Payment FULL_UPFRONT discount on totale 9153,10€ base": "-457,65 €",
+    "Delivery EXPRESS +20% surcharge": "1525,50 €",
+    "PDF preview HTTP status": "200",
+    "PDF preview size bytes": "32893"
+  },
+  "rca of the issue": "nq-site auto-selection bug — In /app/frontend/src/pages/QuotesPage.jsx (line 216): `onCreated={(site) => { qc.invalidateQueries({ queryKey: ['sites-for-quote', customerId] }); setSiteId(site.id); setShowNewSite(false); }}`. React-Query invalidate triggers async refetch; setSiteId runs synchronously with a value that isn't yet present in `(sites?.items || [])` used at line 198 to render SelectItem children. Radix Select requires the value to match an existing SelectItem to display it. Fix: prepend the newly-created site to the cache before setSiteId: `qc.setQueryData(['sites-for-quote', customerId], (old) => ({ ...(old||{}), items: [site, ...((old&&old.items)||[])] }))` then `setSiteId(site.id)`."
+}

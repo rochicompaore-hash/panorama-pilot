@@ -243,6 +243,15 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
         # non azzero la commission_rate ma la marchiamo come non finale
         if status == "OK":
             status = "NEEDS_COST_CONFIGURATION"
+    # msg 402 — servizi automatici con costo interno non definito (es. PROFILATURA) ⇒ snapshot non definitivo
+    svc_missing = sorted({str(sv.get("service_code")) for l in lines
+                          for sv in (l.get("automatic_services") or []) + (l.get("manual_extra_services") or [])
+                          if sv.get("internal_cost_status") == "NEEDS_PO_COSTING"})
+    if svc_missing:
+        fs_status = "INCOMPLETE"
+        fs_errors.extend(f"MISSING_INTERNAL_COST_{c}" for c in svc_missing)
+        if status == "OK":
+            status = "NEEDS_COST_CONFIGURATION"
 
     commission_base = net_revenue
     commission_gross = _r2(commission_base * rate) if rate is not None else None

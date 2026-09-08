@@ -192,6 +192,7 @@ class TestSitesAndTimeline:
             "province": "MI",
             "floor": "3",
             "has_elevator": True,
+            "site_contact_phone": "3331234567",  # msg 402 Lotto 2: obbligatorio
             "property_type": "APPARTAMENTO",
         }
         r = requests.post(f"{API}/sites", json=payload, headers=h, timeout=15)

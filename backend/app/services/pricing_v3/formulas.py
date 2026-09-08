@@ -126,7 +126,7 @@ GLASS_PRICES_PER_SQM = {
     "DOUBLE_STANDARD": Decimal("76.00"),
     "DOUBLE_SATIN":    Decimal("96.00"),
     "TRIPLE_STANDARD": Decimal("125.00"),
-    "TRIPLE_SATIN":    Decimal("156.00"),  # PO msg 401 §27: 156.25 → 156.00
+    "TRIPLE_SATIN":    Decimal("156.25"),  # PO msg 402: valore definitivo 156.25
 }
 
 
@@ -155,7 +155,13 @@ V1_3_COMPONENT_PRICES = {
 }
 
 
-# Componenti PVC eleggibili al pellicolato +10% (BR-09)
+# Pellicolato standard — policy configurabile (BR-09, effective 2026-08-11; PO msg 402 Lotto 8: range 10-15%,
+# valore vigente 10% mantenuto fino a conferma finale PO — NON cambiare silenziosamente).
+STANDARD_FOIL_SURCHARGE_PERCENT = Decimal("10")
+STANDARD_FOIL_SURCHARGE_STATUS = "NEEDS_PO_FINAL_CONFIRMATION"
+STANDARD_FOIL_SURCHARGE_SOURCE = "BR-09 hardcoded policy (pricing_v3.resolvers) — effective 2026-08-11"
+
+# Componenti PVC eleggibili al pellicolato (BR-09)
 PVC_ELIGIBLE_ROLES = {"FRAME", "SASH", "GLAZING_BEAD", "MEETING_STILE"}
 
 

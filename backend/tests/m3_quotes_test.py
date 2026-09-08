@@ -241,12 +241,12 @@ def test_superadmin_bypass_discount_threshold(s, admin_h, created_quote):
 def test_patch_quote_fields(s, admin_h, created_quote):
     qid = created_quote["id"]
     r = s.patch(f"{BASE_URL}/api/quotes/{qid}", headers=admin_h, json={
-        "title": "TEST_M3 Updated title", "payment_terms": "50% acconto", "probability": 60
+        "title": "TEST_M3 Updated title", "payment_terms": "DEPOSIT_50_BALANCE_50", "probability": 60
     })
     assert r.status_code == 200
     q = s.get(f"{BASE_URL}/api/quotes/{qid}", headers=admin_h).json()
     assert q["title"] == "TEST_M3 Updated title"
-    assert q["payment_terms"] == "50% acconto"
+    assert q["payment_terms"] == "DEPOSIT_50_BALANCE_50" and q["automatic_discount_percent"] == 0
     assert q["probability"] == 60
 
 

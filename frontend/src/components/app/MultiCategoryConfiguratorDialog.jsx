@@ -43,14 +43,22 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
     }
   }, [open]);
 
-  // Prefill for edit
+  // Prefill for edit (msg 402 Lotto 1): stesso configuratore, valori già popolati.
+  const isEdit = !!(initialConfig?.id && initialConfig?.product_id);
   React.useEffect(() => {
-    if (open && initialConfig?.category_code && initialConfig?.product_id) {
-      // Try to skip to step 3 if we have full context (edit mode)
-      // We'll set-and-fetch below via category/product queries
-      setStep(3);
-    }
-  }, [open, initialConfig]);
+    if (!open || !isEdit) return;
+    (async () => {
+      try {
+        const prod = (await api.get(`/multi-cat/products/${initialConfig.product_id}`)).data;
+        setSelectedCat({ id: prod.category_id, code: prod.category_code || initialConfig.category_code });
+        setSelectedProduct(prod);
+        const cfg = initialConfig.configuration_snapshot || initialConfig.product_config || {};
+        setInputs({ ...cfg, quantity: initialConfig.quantity || cfg.quantity || 1, width_mm: cfg.width_mm ?? initialConfig.width_mm, height_mm: cfg.height_mm ?? initialConfig.height_mm });
+        setPreview(null);
+        setStep(3);
+      } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || e.message); }
+    })();
+  }, [open, isEdit, initialConfig]);
 
   // Categories
   const { data: catsResp } = useQuery({
@@ -176,6 +184,7 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
     const qty = Number(inputs.quantity || 1);
     const desc = `${selectedProduct.name}${inputs.width_mm && inputs.height_mm ? ` · ${inputs.width_mm}×${inputs.height_mm} mm` : ""}${inputs.linear_meters ? ` · ${inputs.linear_meters} ml` : ""}`;
     onConfirm?.({
+      ...(isEdit ? { line_id: initialConfig.id, opening_id: initialConfig.opening_id } : {}),
       // legacy fields (retro-compat with QuoteLineCreate)
       category: (selectedCat?.code || "").toLowerCase(),
       product_key: selectedProduct.key,
@@ -399,7 +408,7 @@ function PricingModelRenderer({ model, inputs, setInputs, product, category }) {
           <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-tech-height" />
           <SelectField label="Colore interno" value={inputs.color_internal || "WHITE_MASS"} onChange={(v) => set("color_internal", v)} options={[["WHITE_MASS","Bianco"],["ANTHRACITE","Antracite"],["OAK","Rovere"]]} testid="cfg-tech-cint" />
           <SelectField label="Colore esterno" value={inputs.color_external || "WHITE_MASS"} onChange={(v) => set("color_external", v)} options={[["WHITE_MASS","Bianco"],["ANTHRACITE","Antracite"],["OAK","Rovere"]]} testid="cfg-tech-cext" />
-          <SelectField label="Vetro" value={inputs.glass_type || "DOUBLE_STANDARD"} onChange={(v) => set("glass_type", v)} options={[["DOUBLE_STANDARD","Doppio standard"],["TRIPLE_ACOUSTIC","Triplo acustico"],["DOUBLE_LOW_E","Basso emissivo"]]} testid="cfg-tech-glass" />
+          <SelectField label="Vetro" value={inputs.glass_type || "DOUBLE_STANDARD"} onChange={(v) => set("glass_type", v)} options={[["DOUBLE_STANDARD","Doppio vetro (76 €/m²)"],["DOUBLE_SATIN","Doppio vetro satinato (96 €/m²)"],["TRIPLE_STANDARD","Triplo vetro (125 €/m²)"],["TRIPLE_SATIN","Triplo vetro satinato (156,25 €/m²)"]]} testid="cfg-tech-glass" />
           <NumField label="Quantità" value={inputs.quantity || 1} onChange={(v) => set("quantity", v)} testid="cfg-qty" min={1} />
         </div>
       </Card>

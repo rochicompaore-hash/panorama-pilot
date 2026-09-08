@@ -287,7 +287,7 @@ async def seed_persiana_product(db, tenant_id: str, dry: bool) -> int:
         "color_domain": "INTERNAL_MAP",
         "color_map": {"RAL": "RAL", "WOOD_EFFECT": "WOOD", "SPECIAL_RAFFAELLO": "SPECIAL"},
         "pricing_version": "persiane_2026_09_v1",
-        "policy_note": "Purchase ×2.5. Minimo 1.30 m² per unità. Orientabile +99 €/m² sul costo acquisto prima del multiplier. Posa 150 € (INSTALL_SHUTTER_1_2_SASH) e smontaggio 40 €/pz (REMOVE_SHUTTER) separati.",
+        "policy_note": "Purchase ×2.5. Minimo 1.30 m² per unità. Orientabile +99 €/m² sul costo acquisto prima del multiplier. Posa 150 € (INSTALL_SHUTTER_1_2_SASH) e smontaggio 30 €/pz cliente (REMOVE_SHUTTER, msg 402) separati.",
     }
     base = {
         "name": "Persiana in alluminio (RAL / Effetto legno / Speciali)",

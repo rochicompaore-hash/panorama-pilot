@@ -200,7 +200,8 @@
     <tr><td class="k">Oggetto</td><td class="v">{{ snap.quote.title or 'Fornitura e posa serramenti' }}</td></tr>
     <tr><td class="k">N° vani</td><td class="v">{{ snap.quote.openings | length }}</td></tr>
     <tr><td class="k">N° righe prodotto</td><td class="v">{{ snap.quote.lines | length }}</td></tr>
-    <tr><td class="k">Tempo indicativo di consegna</td><td class="v">{{ snap.template.delivery_days_min }}-{{ snap.template.delivery_days_max }} giorni lavorativi dall'ordine e dal rilievo definitivo</td></tr>
+    <tr><td class="k">Tempi indicativi di consegna</td><td class="v">{% if snap.quote.delivery_customer_text %}{{ snap.quote.delivery_customer_text }}{% else %}{{ snap.template.delivery_days_min }}-{{ snap.template.delivery_days_max }} giorni lavorativi dall'ordine e dal rilievo definitivo{% endif %}</td></tr>
+    {% if snap.quote.installation_mode %}<tr><td class="k">Modalità</td><td class="v">{% if snap.quote.installation_mode == 'SUPPLY_AND_INSTALLATION' %}Fornitura e posa in opera{% else %}Solo fornitura{% endif %}{% if snap.quote.dismantling_mode == 'INCLUDED' %} · smontaggio incluso{% endif %}</td></tr>{% endif %}
     <tr><td class="k">Garanzia</td><td class="v">{{ snap.template.warranty_months }} mesi sui prodotti forniti</td></tr>
     <tr><td class="k">Validità offerta</td><td class="v">{% if snap.quote.valid_until %}Fino al <b>{{ snap.quote.valid_until | dt }}</b>{% else %}{{ snap.template.validity_days }} giorni dalla data di emissione{% endif %}</td></tr>
   </table>
@@ -337,6 +338,11 @@
 <div class="section econ">
   <h2>Riepilogo economico</h2>
   <table>
+    {% if snap.quote.delivery_surcharge_amount and snap.quote.delivery_surcharge_amount > 0 %}<tr><td class="k">Maggiorazione consegna accelerata (+{{ snap.quote.delivery_surcharge_percent | num(0) }}%)</td><td class="v">{{ snap.quote.delivery_surcharge_amount | cur }}</td></tr>{% endif %}
+    {% if snap.quote.payment_discount_amount and snap.quote.payment_discount_amount > 0 %}
+    <tr><td class="k">Imponibile prima dello sconto</td><td class="v">{{ snap.quote.subtotal_before_payment_discount | cur }}</td></tr>
+    <tr><td class="k">Sconto pagamento anticipato ({{ snap.quote.automatic_discount_percent | num(0) }}%)</td><td class="v">− {{ snap.quote.payment_discount_amount | cur }}</td></tr>
+    {% endif %}
     <tr><td class="k">Imponibile</td><td class="v">{{ snap.quote.subtotal | cur }}</td></tr>
     {% for vb in snap.quote.vat_breakdown %}
       <tr><td class="k">Imponibile IVA {{ vb.rate_pct | num(0) }}%</td><td class="v">{{ vb.taxable | cur }}</td></tr>
@@ -349,7 +355,12 @@
 <!-- Payment terms -->
 <div class="payment">
   <h3>Condizioni di pagamento</h3>
-  {% if snap.payment_terms.installments %}
+  {% if snap.quote.payment_schedule %}
+  <p><b>{{ snap.quote.payment_terms_label }}</b></p>
+  <ul>
+    {% for st in snap.quote.payment_schedule %}<li>{% if st.percent %}<b>{{ st.percent | num(0) }}%</b> {% endif %}{{ st.label }}</li>{% endfor %}
+  </ul>
+  {% elif snap.payment_terms.installments %}
   <ul>
     {% for inst in snap.payment_terms.installments %}
       <li>
@@ -365,7 +376,7 @@
     {% endfor %}
   </ul>
   {% else %}<p class="muted small">Termini di pagamento da concordare.</p>{% endif %}
-  {% if snap.payment_terms.display_note %}<div class="note">{{ snap.payment_terms.display_note }}</div>{% endif %}
+  {% if snap.payment_terms.display_note and not snap.quote.payment_schedule %}<div class="note">{{ snap.payment_terms.display_note }}</div>{% endif %}
 </div>
 
 <!-- Clauses -->

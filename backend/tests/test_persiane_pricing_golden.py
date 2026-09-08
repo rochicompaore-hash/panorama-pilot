@@ -179,13 +179,13 @@ class TestApiE2E:
         assert "INSTALL_SHUTTER_1_2_SASH" in svcs and "REMOVE_SHUTTER" in svcs
         posa, rem = svcs["INSTALL_SHUTTER_1_2_SASH"], svcs["REMOVE_SHUTTER"]
         assert posa["quantity"] == 2 and posa["unit_sale_price"] == 150 and posa["sale_price_total"] == 300 and posa["internal_cost_total"] == 260
-        assert rem["quantity"] == 2 and rem["unit_sale_price"] == 40 and rem["sale_price_total"] == 80 and rem["internal_cost_total"] == 40
+        assert rem["quantity"] == 2 and rem["unit_sale_price"] == 30 and rem["sale_price_total"] == 60 and rem["internal_cost_total"] == 40
         q = admin.get(f"{BASE_URL}/api/quotes/{qid}", timeout=20).json()
         fs = q["financial_snapshot"]
         assert abs(fs["supply_cost"] - 1382.4) < 0.01          # 691.20 × 2
         assert fs["installation_cost"] == 260.0                 # posa interno 130 × 2
         assert fs["other_direct_costs"] == 40.0                 # smontaggio interno 20 × 2
-        assert abs(q["subtotal"] - (3456.0 + 300 + 80)) < 0.01  # prodotto + posa + smontaggio (nessun ×2.5 sui servizi)
+        assert abs(q["subtotal"] - (3456.0 + 300 + 60)) < 0.01  # prodotto + posa + smontaggio 30 €/pz (msg 402)
 
     def test_line_below_minimum_via_api(self, admin, persiana):
         qid = _new_quote(admin, installation_mode="SUPPLY_ONLY")

@@ -211,6 +211,37 @@ def _materialize(service_doc: Dict[str, Any], service_type: str, quantity: float
     }
 
 
+PROFILING_SALE_PER_ML = 8.00
+PROFILING_POLICY_VERSION = "profiling_8_eur_ml_v1_msg402"
+PROFILING_CATEGORIES = {"FINESTRE", "PORTEFINESTRE"}
+
+
+def build_profiling_service(line: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """PROFILATURA (msg 402 §4-§5): perimeter_ml = 2×(L+H)/1000 · 8,00 €/ml · × qty (per finestra/portafinestra).
+    Costo interno: NEEDS_PO_COSTING (non inventato) → internal_cost_total=None."""
+    cat = str(line.get("category_code") or "").upper()
+    if cat not in PROFILING_CATEGORIES or str(line.get("pricing_model") or "").upper() != "FORMULA_TECHNICAL":
+        return None
+    cfg = line.get("configuration_snapshot") or line.get("product_config") or {}
+    w = float(cfg.get("width_mm") or line.get("width_mm") or 0)
+    h = float(cfg.get("height_mm") or line.get("height_mm") or 0)
+    if w <= 0 or h <= 0:
+        return None
+    qty = max(float(line.get("quantity") or 1), 1.0)
+    perimeter_ml = round(2 * (w + h) / 1000.0 + 1e-9, 3)
+    unit_sale = round(perimeter_ml * PROFILING_SALE_PER_ML + 1e-9, 2)
+    return {
+        "id": str(uuid.uuid4()), "automatic": True, "service_id": None,
+        "service_code": "PROFILING", "service_name": f"Profilatura {perimeter_ml:.2f} ml × {PROFILING_SALE_PER_ML:.2f} €/ml",
+        "service_category": "PROFILATURA", "service_type": "PROFILATURA", "pricing_unit": "PER_ITEM",
+        "perimeter_ml": perimeter_ml, "sale_price_per_ml": PROFILING_SALE_PER_ML,
+        "quantity": qty, "unit_sale_price": unit_sale, "unit_internal_reference_price": None,
+        "sale_price_total": round(unit_sale * qty + 1e-9, 2), "internal_cost_total": None,
+        "internal_cost_status": "NEEDS_PO_COSTING",
+        "pricing_status": "ACTIVE", "service_policy_version": PROFILING_POLICY_VERSION,
+    }
+
+
 async def resolve_line_services(
     db,
     tenant_id: str,

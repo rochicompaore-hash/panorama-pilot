@@ -158,7 +158,9 @@ class TestFormulaTechnicalContract:
         assert r.status_code == 200, r.text
         line = r.json()
         try:
-            assert line["subtotal_line"] == unit
+            # msg 402 §4: subtotal_line = prodotto + PROFILATURA automatica (2×(L+H)/1000 × 8 €/ml)
+            prof = sum(s["sale_price_total"] for s in line.get("automatic_services", []) if s["service_code"] == "PROFILING")
+            assert abs(line["subtotal_line"] - (unit + prof)) < 0.02
             assert line["unit_price_final"] == unit
             # Assert quote total contains this line
             q = requests.get(f"{BASE_URL}/api/quotes/{qid}", headers=headers, timeout=20).json()

@@ -26,6 +26,13 @@ import { FilePdf, Download, Eye, CaretDown, Link, Copy, XCircle } from "@phospho
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0); } catch { return "€ 0,00"; } }
 function fmtPct(n) { return typeof n === "number" ? `${n.toFixed(2).replace(".", ",")} %` : "—"; }
 
+const PAYMENT_TERMS_OPTIONS = [
+  ["DEPOSIT_50_BALANCE_50", "50% acconto all'ordine · 50% avviso merce pronta"],
+  ["FULL_UPFRONT", "100% all'ordine (sconto automatico 5%)"],
+  ["DEPOSIT_30_SURVEY_20_BALANCE_50", "30% ordine · 20% dopo rilievo · 50% merce pronta"],
+  ["FINANCING_WITHOUT_DEPOSIT", "Finanziamento senza acconto"],
+  ["FINANCING_WITH_DEPOSIT", "Finanziamento con acconto"],
+];
 const CATEGORY_LABELS = { window: "Serramento", shutter: "Persiana/Scuro", roller: "Tapparella", persian: "Persiana", screen: "Zanzariera", box: "Cassonetto", sill: "Davanzale", trim: "Coprifilo", accessory: "Accessorio", installation: "Posa", disposal: "Smaltimento", extra: "Extra" };
 
 export default function QuoteEditorPage() {
@@ -105,6 +112,17 @@ export default function QuoteEditorPage() {
     },
   });
 
+  const [editLine, setEditLine] = React.useState(null);
+  const reconfigureLine = useMutation({
+    mutationFn: async ({ line_id, ...p }) => (await api.put(`/quotes/${id}/lines/${line_id}/reconfigure`, p)).data,
+    onSuccess: () => { toast.success("Riga aggiornata e ricalcolata"); reload(); },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
+  });
+  const patchQuote = useMutation({
+    mutationFn: async (fields) => (await api.patch(`/quotes/${id}`, fields)).data,
+    onSuccess: () => { toast.success("Preventivo aggiornato e ricalcolato"); reload(); },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
+  });
   const addOpening = useMutation({
     mutationFn: async (p) => (await api.post(`/quotes/${id}/openings`, p, withVersion(getVersion(q)))).data,
     onSuccess: () => { toast.success("Vano aggiunto"); reload(); },
@@ -246,8 +264,10 @@ export default function QuoteEditorPage() {
   };
 
   const onConfiguratorConfirm = async (payload) => {
-    await addLine.mutateAsync(payload);
+    if (payload.line_id) await reconfigureLine.mutateAsync(payload);
+    else await addLine.mutateAsync(payload);
     setCfgOpen(false);
+    setEditLine(null);
   };
 
   return (
@@ -322,24 +342,34 @@ export default function QuoteEditorPage() {
               </div>
               <div>
                 <Label className="text-xs">Termini di pagamento</Label>
-                <Input
-                  defaultValue={q.payment_terms || ""}
-                  disabled={!editable}
-                  onChange={(e) => autosave.schedule({ payment_terms: e.target.value })}
-                  placeholder="Es. 30% acconto, 70% a saldo"
-                  className="rounded-sm h-9"
-                  data-testid="quote-payment-input"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Tempi di consegna (giorni)</Label>
-                <Input
-                  type="number" defaultValue={q.delivery_days ?? ""}
-                  disabled={!editable}
-                  onChange={(e) => autosave.schedule({ delivery_days: Number(e.target.value) || null })}
-                  className="rounded-sm h-9 font-mono-plex"
-                  data-testid="quote-delivery-input"
-                />
+                <Select value={q.payment_terms_code || q.payment_terms || "DEPOSIT_50_BALANCE_50"} disabled={!editable} onValueChange={(v) => patchQuote.mutate({ payment_terms: v })}>
+                  <SelectTrigger className="rounded-sm h-9" data-testid="quote-payment-select"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_TERMS_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v} data-testid={`payment-opt-${v}`}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {(q.payment_schedule || []).length > 0 && (
+                  <div className="mt-1 text-[10px] font-mono-plex text-muted-foreground" data-testid="quote-payment-schedule">
+                    {q.payment_schedule.map((s, i) => <span key={i} className="mr-2">{s.percent != null ? `${s.percent}% ` : ""}{s.label}</span>)}
+                  </div>
+                )}
+                <div className="mt-2">
+                  <Label className="text-[10px] uppercase">Consegna</Label>
+                  <Select value={q.delivery_mode || "STANDARD"} disabled={!editable} onValueChange={(v) => patchQuote.mutate({ delivery_mode: v })}>
+                    <SelectTrigger className="rounded-sm h-9" data-testid="quote-delivery-select"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="STANDARD" data-testid="delivery-opt-STANDARD">Standard — oltre 90 giorni</SelectItem>
+                      <SelectItem value="EXPRESS" data-testid="delivery-opt-EXPRESS">Accelerata (+20%) — giorni da confermare</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {q.delivery_customer_text && <div className="mt-1 text-[10px] text-muted-foreground" data-testid="quote-delivery-text">{q.delivery_customer_text}</div>}
+                  {Number(q.delivery_surcharge_amount) > 0 && <div className="mt-1 text-xs font-bold text-amber-700" data-testid="quote-delivery-surcharge">Maggiorazione consegna accelerata +{q.delivery_surcharge_percent}% = {fmtEUR(q.delivery_surcharge_amount)}</div>}
+                </div>
+                {Number(q.automatic_discount_percent) > 0 && (
+                  <div className="mt-1 text-xs font-bold text-emerald-700" data-testid="quote-payment-discount">
+                    Sconto automatico pagamento {q.automatic_discount_percent}% = − {fmtEUR(q.payment_discount_amount)}
+                  </div>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Garanzia (mesi)</Label>
@@ -427,7 +457,10 @@ export default function QuoteEditorPage() {
                       ) : `${l.discount_pct}%`}
                     </TableCell>
                     <TableCell className="font-mono-plex text-xs font-bold">{fmtEUR(l.subtotal_line)}</TableCell>
-                    <TableCell>{editable && <Button variant="ghost" size="sm" onClick={() => delLine.mutate(l.id)} className="text-destructive" data-testid={`line-delete-${l.id}`}><Trash size={12} /></Button>}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {editable && l.product_id && <Button variant="ghost" size="sm" onClick={() => { setEditLine(l); setCfgOpen(true); }} data-testid={`line-edit-${l.id}`}>Modifica</Button>}
+                      {editable && <Button variant="ghost" size="sm" onClick={() => delLine.mutate(l.id)} className="text-destructive" data-testid={`line-delete-${l.id}`}><Trash size={12} /></Button>}
+                    </TableCell>
                   </TableRow>
                   {(l.automatic_services || []).length > 0 && (
                     <TableRow className="bg-muted/30" data-testid={`line-services-${l.id}`}>
@@ -501,7 +534,7 @@ export default function QuoteEditorPage() {
         </div>
       </div>
 
-      <MultiCategoryConfiguratorDialog open={cfgOpen} onOpenChange={setCfgOpen} onConfirm={onConfiguratorConfirm} canSeeCosts={canSeeCosts} />
+      <MultiCategoryConfiguratorDialog open={cfgOpen} onOpenChange={(o) => { setCfgOpen(o); if (!o) setEditLine(null); }} onConfirm={onConfiguratorConfirm} initialConfig={editLine} canSeeCosts={canSeeCosts} />
       <ConflictModal {...conflict.modalProps} />
 
       <PublicLinkDialog

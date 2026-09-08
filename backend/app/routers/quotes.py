@@ -23,7 +23,10 @@ from app.services.margin_engine import (
     redact_financial_snapshot_for_role,
 )
 from app.services.multi_category_pricing import resolve_and_compute
+from app.services.payment_terms import resolve_payment_terms, apply_automatic_discount, PAYMENT_POLICIES
+from app.services.delivery_policy import resolve_delivery, apply_delivery_surcharge, DELIVERY_MODES
 from app.models_multi_category import ConfigureRequest, SimplePricingInputs
+from app.services.service_resolver import build_profiling_service
 from app.services.service_resolver import (
     resolve_line_services,
     seed_disposal_services,
@@ -101,6 +104,10 @@ def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
     is left untouched (§18).
     """
     totals = compute_quote_totals(lines)
+    # msg 402 Lotto 9 — maggiorazione consegna EXPRESS +20% (base commerciale, esclusi ENEA), poi sconto pagamento
+    totals = apply_delivery_surcharge(totals, lines, existing_quote.get("delivery_surcharge_percent") or 0)
+    # msg 402 Lotto 5 — sconto automatico da payment terms (FULL_UPFRONT = 5%)
+    totals = apply_automatic_discount(totals, existing_quote.get("automatic_discount_percent") or 0)
     if _is_frozen(existing_quote):
         return totals
     proposed = dict(existing_quote)
@@ -196,6 +203,11 @@ async def create_quote(body: QuoteCreate, request: Request, user: dict = Depends
                                               "customer_id": body.customer_id, "deleted_at": None})
         if not site_doc:
             raise HTTPException(status_code=400, detail="Cantiere non valido per il cliente indicato")
+        from app.routers.sites import site_missing_codes
+        _missing = site_missing_codes(site_doc)
+        if _missing:
+            raise HTTPException(status_code=400, detail={"code": "SITE_INCOMPLETE", "codes": _missing,
+                                                         "message": "Il cantiere selezionato non ha i dati obbligatori: " + ", ".join(_missing)})
 
     number, n_int = await _next_quote_number(user["tenant_id"])
     # Se abbiamo un cantiere, pre-compila il site_address con i dati del cantiere
@@ -216,8 +228,10 @@ async def create_quote(body: QuoteCreate, request: Request, user: dict = Depends
         site_address=resolved_site_address,
         title=body.title or f"Preventivo {number}",
         intervention_type=body.intervention_type,
-        payment_terms=body.payment_terms, valid_until=body.valid_until,
+        valid_until=body.valid_until,
         notes=body.notes,
+        **{k: v for k, v in resolve_payment_terms(body.payment_terms if body.payment_terms in PAYMENT_POLICIES else None).items()},
+        **resolve_delivery("STANDARD"),
         disclaimer="Le misure riportate nel presente preventivo sono indicative e non costituiscono misure esecutive o oggetto definitivo del contratto. Le misure definitive saranno rilevate e validate dal tecnico incaricato prima dell'ordine o dell'avvio della produzione.",
         created_by=user["id"], updated_by=user["id"],
     )
@@ -258,6 +272,17 @@ async def update_quote(
     user: dict = Depends(require_permission("quotes.edit")),
 ):
     payload = body.model_dump(exclude_unset=True)
+    # msg 402 Lotto 5 — payment terms strutturati (fail-closed su codice sconosciuto)
+    if "payment_terms" in payload and payload["payment_terms"]:
+        try:
+            payload.update(resolve_payment_terms(payload["payment_terms"]))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail={"code": "PAYMENT_TERMS_INVALID", "message": str(e), "allowed": list(PAYMENT_POLICIES.keys())})
+    if "delivery_mode" in payload and payload["delivery_mode"]:
+        try:
+            payload.update(resolve_delivery(payload["delivery_mode"]))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail={"code": "DELIVERY_MODE_INVALID", "message": str(e), "allowed": list(DELIVERY_MODES.keys())})
     # Installation Mode V1 (msg 393 §12): validate enums fail-closed.
     if "installation_mode" in payload:
         v = (payload["installation_mode"] or "").upper()
@@ -305,7 +330,8 @@ async def update_quote(
     # dismantling_mode / disposal_mode / withholding / enea_practice_code
     # ri-risolvi i servizi automatici + ricomputa il financial_snapshot.
     if any(k in payload for k in ("installation_mode", "dismantling_mode", "disposal_mode",
-                                  "withholding_applicable", "withholding_rate", "enea_practice_code")):
+                                  "withholding_applicable", "withholding_rate", "enea_practice_code",
+                                  "payment_terms", "tax_deduction_requested", "delivery_mode")):
         db = get_db()
         fresh = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
         if fresh and not _is_frozen(fresh):
@@ -363,6 +389,9 @@ async def update_quote(
                     if auto_svcs:
                         new_l["service_policy_version"] = auto_svcs[0]["service_policy_version"]
                     all_errors.extend(errs)
+                _prof = build_profiling_service(new_l)
+                if _prof:
+                    new_l["automatic_services"] = list(new_l["automatic_services"]) + [_prof]
                 new_lines.append(compute_line(new_l))
             if any(e.startswith("MISSING_DISPOSAL_PRICING") for e in all_errors):
                 raise HTTPException(
@@ -409,7 +438,7 @@ async def autosave_quote(
       valid_until, discount_pct_global, internal_notes, site_address, description
     """
     ALLOWED = {
-        "title", "notes", "payment_terms", "delivery_days", "warranty_months",
+        "title", "notes", "delivery_days", "warranty_months",
         "valid_until", "discount_pct_global", "internal_notes", "site_address",
         "description",
     }
@@ -515,62 +544,75 @@ async def delete_opening(qid: str, oid: str, user: dict = Depends(require_permis
 
 
 # ----- Lines -----
-@router.post("/{qid}/lines")
-async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
-    db = get_db()
-    doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
-    if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
-    _assert_editable(doc)
-    line_data = body.model_dump()
-    # P0 §19 msg 394 — AUTHORITATIVE PRICING RECOMPUTE.
-    # Il payload del frontend può arrivare RBAC-redacted (commerciale non vede i
-    # costi nel preview). Il backend è source-of-truth economica: se abbiamo
-    # product_id + configuration_snapshot, ricomputiamo con snapshot COMPLETI
-    # (non redacted) e sovrascriviamo i campi costo.
+async def _build_priced_line(db, user: dict, doc: dict, line_data: dict) -> "QuoteLine":
+    """Backend-authoritative pricing of a line payload (create or reconfigure).
+
+    Ricomputa snapshot completi (non redacted) da product_id + configuration_snapshot,
+    poi risolve i servizi automatici in base ai flag del preventivo.
+    """
     prod_id = line_data.get("product_id")
     cfg_snap = line_data.get("configuration_snapshot") or line_data.get("product_config") or {}
     if prod_id and cfg_snap and line_data.get("pricing_model"):
         prod = await db.products.find_one({"_id": prod_id, "tenant_id": user["tenant_id"], "deleted_at": None})
         if prod:
             try:
-                simple_inp = SimplePricingInputs(
-                    width_mm=cfg_snap.get("width_mm"),
-                    height_mm=cfg_snap.get("height_mm"),
-                    linear_meters=cfg_snap.get("linear_meters"),
-                    quantity=int(line_data.get("quantity") or 1),
-                    options={k: v for k, v in cfg_snap.items() if k not in ("width_mm", "height_mm", "linear_meters", "quantity")},
-                )
-                req = ConfigureRequest(product_id=prod_id, simple_inputs=simple_inp)
+                qty = int(line_data.get("quantity") or 1)
+                if line_data.get("pricing_model") == "FORMULA_TECHNICAL":
+                    ti = {k: v for k, v in cfg_snap.items() if not str(k).startswith("__")}
+                    ti["quantity"] = qty
+                    ti.setdefault("product_key", prod.get("key"))
+                    req = ConfigureRequest(product_id=prod_id, technical_inputs=ti)
+                else:
+                    simple_inp = SimplePricingInputs(
+                        width_mm=cfg_snap.get("width_mm"),
+                        height_mm=cfg_snap.get("height_mm"),
+                        linear_meters=cfg_snap.get("linear_meters"),
+                        quantity=qty,
+                        options={k: v for k, v in cfg_snap.items() if k not in ("width_mm", "height_mm", "linear_meters", "quantity")},
+                    )
+                    req = ConfigureRequest(product_id=prod_id, simple_inputs=simple_inp)
                 cat = None
                 if prod.get("category_id"):
                     cat = await db.product_categories.find_one({"_id": prod["category_id"]})
                 resp = await resolve_and_compute(prod, cat or {}, req, user["tenant_id"])
+                resp_dict = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
                 if getattr(resp, "pricing_status", None) == "ok":
-                    resp_dict = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
-                    if resp_dict.get("technical_snapshot"):
-                        line_data["technical_snapshot"] = resp_dict["technical_snapshot"]
-                    if resp_dict.get("commercial_snapshot"):
-                        line_data["commercial_snapshot"] = resp_dict["commercial_snapshot"]
-                    if resp_dict.get("simple_snapshot"):
-                        line_data["simple_snapshot"] = resp_dict["simple_snapshot"]
+                    line_data["pricing_snapshot"] = resp_dict
+                    for k in ("technical_snapshot", "commercial_snapshot", "simple_snapshot"):
+                        if resp_dict.get(k):
+                            line_data[k] = resp_dict[k]
                     ss = resp_dict.get("simple_snapshot") or {}
                     ts = resp_dict.get("technical_snapshot") or {}
-                    qty = float(line_data.get("quantity") or 1)
+                    cs = resp_dict.get("commercial_snapshot") or {}
+                    fq = float(qty or 1)
+                    unit = (ss.get("unit_price_final") or ss.get("sale_price_per_item")
+                            or cs.get("final_unit_price") or cs.get("unit_sale_price"))
+                    if unit is not None and float(unit) > 0:
+                        line_data["base_price"] = float(unit)
+                        line_data["unit_price_final"] = float(unit)
+                        line_data["subtotal_line"] = round(float(unit) * fq, 2)
                     if ts.get("total_internal_cost") is not None:
                         line_data["internal_cost"] = float(ts["total_internal_cost"])
                     elif ss.get("purchase_total_cost") is not None:
-                        line_data["internal_cost"] = float(ss["purchase_total_cost"]) / max(qty, 1)
+                        line_data["internal_cost"] = float(ss["purchase_total_cost"]) / max(fq, 1)
                     elif ss.get("purchase_cost_per_item") is not None:
                         line_data["internal_cost"] = float(ss["purchase_cost_per_item"])
                     elif ss.get("internal_production_cost_per_item") is not None:
                         line_data["internal_cost"] = float(ss["internal_production_cost_per_item"])
+                else:
+                    raise HTTPException(status_code=400, detail={
+                        "code": "PRICING_NOT_OK", "pricing_status": resp_dict.get("pricing_status"),
+                        "message": "Il motore prezzi non ha restituito un prezzo valido per la configurazione.",
+                        "errors": resp_dict.get("blocking_errors") or [],
+                    })
+            except HTTPException:
+                raise
             except Exception as _pricing_err:
                 import logging
                 logging.getLogger(__name__).error(f"authoritative_pricing_recompute failed for pid={prod_id}: {_pricing_err}")
 
-    # Fail-closed §6/§8 — Multi-Category V1: righe FORMULA_TECHNICAL non possono
-    # essere aggiunte con base_price=0. Zero € NON è "pricing non configurato".
-    if line_data.get("source") == "MULTI_CATEGORY_V1" and line_data.get("pricing_model") == "FORMULA_TECHNICAL":
+    # Fail-closed §6/§8 — Multi-Category V1: nessuna riga a 0 € da configuratore.
+    if line_data.get("source") == "MULTI_CATEGORY_V1":
         bp = float(line_data.get("base_price") or 0)
         upf = float(line_data.get("unit_price_final") or 0)
         if bp <= 0 and upf <= 0:
@@ -578,9 +620,8 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
                 status_code=400,
                 detail={
                     "code": "COMMERCIAL_PRICING_NOT_CONFIGURED",
-                    "message": "Impossibile aggiungere una riga FORMULA_TECHNICAL con prezzo 0 €. Il motore commerciale non ha restituito un prezzo valido.",
+                    "message": "Impossibile salvare una riga con prezzo 0 €. Il motore commerciale non ha restituito un prezzo valido.",
                     "product_key": line_data.get("product_key"),
-                    "hint": "Verificare pricing_v3 commercial_rule / package_multiplier per il tenant.",
                 },
             )
     # Auto-fill dimensions from opening if not set
@@ -590,10 +631,7 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
             line_data["width_mm"] = line_data.get("width_mm") or op.get("width_mm")
             line_data["height_mm"] = line_data.get("height_mm") or op.get("height_mm")
     ql = QuoteLine(**{k: v for k, v in line_data.items() if v is not None or k in ("opening_id", "product_key", "image_url", "source", "category_id", "category_code", "product_id", "product_code", "pricing_model", "configuration_snapshot", "pricing_snapshot", "technical_snapshot", "commercial_snapshot", "simple_snapshot", "financial_snapshot", "width_mm", "height_mm")})
-    lines = doc.get("lines") or []
-    ql.order_index = len(lines)
-    # Installation Mode V1 (msg 393 §13): auto-resolve standard services if the quote
-    # is in SUPPLY_AND_INSTALLATION. Idempotent — same inputs → same output.
+    # Installation Mode V1 (msg 393 §13): servizi automatici secondo i flag di testata.
     if doc.get("installation_mode") == "SUPPLY_AND_INSTALLATION":
         auto_svcs, errors = await resolve_line_services(
             db, user["tenant_id"], ql.model_dump(),
@@ -602,7 +640,6 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
             disposal_mode=doc.get("disposal_mode") or "EXCLUDED",
             intervention_type=doc.get("intervention_type") or "new",
         )
-        # Fail-closed §8: se disposal INCLUDED ma pricing non definito, blocca.
         if any(e.startswith("MISSING_DISPOSAL_PRICING") for e in errors):
             raise HTTPException(
                 status_code=400,
@@ -610,11 +647,66 @@ async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict
             )
         ql.automatic_services = auto_svcs
         ql.service_policy_version = auto_svcs[0]["service_policy_version"] if auto_svcs else None
+    else:
+        ql.automatic_services = []
+    # PROFILATURA (msg 402 §4-§5): sempre presente su finestre/portefinestre, indipendente dalla posa.
+    prof = build_profiling_service(ql.model_dump())
+    if prof:
+        ql.automatic_services = [s for s in ql.automatic_services if s.get("service_code") != "PROFILING"] + [prof]
+    return ql
+
+
+@router.post("/{qid}/lines")
+async def add_line(qid: str, body: QuoteLineCreate, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+    db = get_db()
+    doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
+    _assert_editable(doc)
+    ql = await _build_priced_line(db, user, doc, body.model_dump())
+    lines = doc.get("lines") or []
+    ql.order_index = len(lines)
     lines.append(compute_line(ql.model_dump()))
     patch = _financial_totals_patch(lines, doc)
     await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
     await record_audit(action="quotes.line_add", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=qid, after={"category": ql.category, "price": ql.base_price})
     return lines[-1]
+
+
+@router.put("/{qid}/lines/{lid}/reconfigure")
+async def reconfigure_line(qid: str, lid: str, body: QuoteLineCreate, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+    """MODIFICA riga (msg 402 Lotto 1): stesso configuratore, stessa line identity,
+    recompute backend autoritativo di prezzo/snapshot/servizi/totali/margine."""
+    db = get_db()
+    doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
+    _assert_editable(doc)
+    lines = doc.get("lines") or []
+    idx = next((i for i, l in enumerate(lines) if l["id"] == lid), None)
+    if idx is None: raise HTTPException(status_code=404, detail="Riga non trovata")
+    old = lines[idx]
+    data = body.model_dump()
+    data["id"] = lid
+    data["order_index"] = old.get("order_index", idx)
+    data["opening_id"] = data.get("opening_id") or old.get("opening_id")
+    for k in ("discount_pct", "manual_extra_services", "notes"):
+        if data.get(k) in (None, [], "") and old.get(k) not in (None, [], ""):
+            data[k] = old[k]
+    ql = await _build_priced_line(db, user, doc, data)
+    new_line = compute_line(ql.model_dump())
+    history = list(old.get("previous_snapshots") or [])[-9:]
+    history.append({
+        "replaced_at": datetime.now(timezone.utc).isoformat(), "replaced_by": user["id"],
+        "width_mm": old.get("width_mm"), "height_mm": old.get("height_mm"), "quantity": old.get("quantity"),
+        "unit_price_final": old.get("unit_price_final"), "subtotal_line": old.get("subtotal_line"),
+        "configuration_snapshot": old.get("configuration_snapshot"),
+    })
+    new_line["previous_snapshots"] = history
+    lines[idx] = new_line
+    patch = _financial_totals_patch(lines, doc)
+    await db.quotes.update_one({"_id": qid}, {"$set": {"lines": lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}})
+    await record_audit(action="quotes.line_reconfigure", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=qid,
+                       before={"line_id": lid, "qty": old.get("quantity"), "price": old.get("unit_price_final")}, after={"qty": new_line.get("quantity"), "price": new_line.get("unit_price_final")})
+    return lines[idx]
 
 
 @router.patch("/{qid}/lines/{lid}")

@@ -41,6 +41,7 @@ class QuoteLine(BaseModel):
     commercial_snapshot: Optional[Dict[str, Any]] = None
     simple_snapshot: Optional[Dict[str, Any]] = None
     financial_snapshot: Optional[Dict[str, Any]] = None
+    previous_snapshots: List[Dict[str, Any]] = Field(default_factory=list)
     # --- Installation Mode V1 (msg 393) ---
     automatic_services: List[Dict[str, Any]] = Field(default_factory=list)
     manual_extra_services: List[Dict[str, Any]] = Field(default_factory=list)
@@ -103,6 +104,25 @@ class Quote(BaseDoc):
     intervention_type: str = "new"  # new | renovation | replacement
     tax_practice: Optional[str] = None  # es. bonus 50%, ecobonus, etc.
     payment_terms: Optional[str] = None
+    # msg 402 Lotto 5 — payment terms snapshot
+    payment_terms_code: Optional[str] = None
+    payment_terms_label: Optional[str] = None
+    payment_schedule: List[Dict[str, Any]] = Field(default_factory=list)
+    automatic_discount_percent: float = 0.0
+    financing_mode: Optional[str] = None
+    payment_policy_version: Optional[str] = None
+    payment_discount_amount: float = 0.0
+    subtotal_before_payment_discount: float = 0.0
+    # msg 402 Lotto 9 — delivery policy snapshot
+    delivery_mode: str = "STANDARD"
+    delivery_label: Optional[str] = None
+    estimated_delivery_min_days: Optional[int] = None
+    estimated_delivery_max_days: Optional[int] = None
+    delivery_customer_text: Optional[str] = None
+    delivery_surcharge_percent: float = 0.0
+    delivery_surcharge_amount: float = 0.0
+    express_days_status: Optional[str] = None
+    delivery_policy_version: Optional[str] = None
     valid_until: Optional[datetime] = None
 
     # content
@@ -179,6 +199,7 @@ class QuoteCreate(BaseModel):
 
 class QuoteUpdate(BaseModel):
     title: Optional[str] = None
+    delivery_mode: Optional[str] = None
     intervention_type: Optional[str] = None
     tax_practice: Optional[str] = None
     payment_terms: Optional[str] = None
