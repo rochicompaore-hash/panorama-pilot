@@ -19,3 +19,8 @@
 - Lotto 8: foil surcharge configurabile (10%, NEEDS_PO_FINAL_CONFIRMATION). Lotto 9: delivery policy STANDARD >90gg / EXPRESS +20% `app/services/delivery_policy.py`. Lotto 10: PDF (consegna, pagamento, sconti, maggiorazione).
 - Test: tests/test_quote_editor_v1_lotto1_reconfigure.py, tests/test_quote_editor_v1_lotti_2_5_6_9.py; testing agent iteration_34. Report: memory/QUOTE_EDITOR_FINAL_AUDIT.md.
 - Prossimo: GENERAL PRE-PRODUCTION RELEASE GATE (dopo chiusura PRE-RELEASE CLEANUP residuo: full-suite, /api/sequences, tenant isolation). Connector Audit rimandato (solo analisi).
+
+## 2026-09-08 — msg 403 CONNECTOR AUDIT = COMPLETE + governance V1
+- `memory/CONNECTOR_AUDIT_REPORT.md` (analisi, nessun codice): MUST-HAVE = SDI via intermediario, email inbound, riconciliazione bancaria, export contabilità, monitoring/backup.
+- Governance: foil 10% ACTIVE; EXPRESS delivery fail-closed (EXPRESS_DELIVERY_NOT_READY_FOR_CUSTOMER_USE, UI disabilitata); ENEA internal cost riportato a NEEDS_PO_COSTING (snapshot INCOMPLETE); profilatura costo NEEDS_PO_COSTING. Verificato testing agent iteration_35.
+- Preventivatore in FUNCTIONAL FREEZE. Prossimo: PRE-RELEASE CLEANUP residuo → Release Gate.

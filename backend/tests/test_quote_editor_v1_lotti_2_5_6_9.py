@@ -89,19 +89,21 @@ class TestPaymentTerms:
 
 
 class TestDeliveryPolicy:
-    def test_standard_and_express(self, admin, cid):
+    def test_standard_default_and_express_fail_closed(self, admin, cid):
         qid = _quote_10000(admin, cid)
         q = admin.get(f"{BASE_URL}/api/quotes/{qid}", timeout=20).json()
         assert q["delivery_mode"] == "STANDARD" and q["estimated_delivery_min_days"] == 90 and q["delivery_surcharge_amount"] == 0
-        q = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"delivery_mode": "EXPRESS"}, timeout=20).json()
-        assert q["delivery_surcharge_percent"] == 20 and q["delivery_surcharge_amount"] == 2000
-        assert q["express_days_status"] == "NEEDS_PO_CONFIRMATION" and q["estimated_delivery_min_days"] is None
-        assert q["subtotal"] == 12000 and q["vat_amount"] == 2640 and q["total"] == 14640
-        assert q["financial_snapshot"]["net_revenue_ex_vat"] == 12000
-        q = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"payment_terms": "FULL_UPFRONT"}, timeout=20).json()
-        assert q["payment_discount_amount"] == 600 and q["subtotal"] == 11400   # sconto dopo maggiorazione
-        q = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"delivery_mode": "STANDARD"}, timeout=20).json()
-        assert q["delivery_surcharge_amount"] == 0 and q["subtotal"] == 9500
+        assert "90 giorni" in q["delivery_customer_text"]
+        # PO msg 403 §6: EXPRESS non acquistabile finché i giorni non sono definiti
+        r = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"delivery_mode": "EXPRESS"}, timeout=20)
+        assert r.status_code == 400 and r.json()["detail"]["code"] == "EXPRESS_DELIVERY_NOT_READY_FOR_CUSTOMER_USE"
+        q = admin.get(f"{BASE_URL}/api/quotes/{qid}", timeout=20).json()
+        assert q["delivery_mode"] == "STANDARD" and q["total"] == 12200
+
+    def test_express_surcharge_engine_ready_for_future(self):
+        from app.services.delivery_policy import apply_delivery_surcharge
+        t = apply_delivery_surcharge({"subtotal": 10000.0, "vat_amount": 2200.0, "internal_cost": 4000.0}, [{"subtotal_line": 10000.0}], 20)
+        assert t["delivery_surcharge_amount"] == 2000 and t["subtotal"] == 12000 and t["vat_amount"] == 2640
 
 
 class TestProfiling:

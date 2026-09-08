@@ -21,6 +21,8 @@ DELIVERY_MODES: Dict[str, Dict[str, Any]] = {
         "estimated_delivery_min_days": None, "estimated_delivery_max_days": None,
         "customer_text": "Consegna accelerata: tempistica da confermare per iscritto al momento dell'ordine.",
         "surcharge_percent": EXPRESS_SURCHARGE_PERCENT, "express_days_status": "NEEDS_PO_CONFIRMATION",
+        # PO msg 403 §6: senza giorni definiti la modalità NON è acquistabile dal cliente (fail-closed)
+        "customer_ready": False, "not_ready_code": "EXPRESS_DELIVERY_NOT_READY_FOR_CUSTOMER_USE",
     },
 }
 
@@ -30,6 +32,8 @@ def resolve_delivery(mode: Optional[str]) -> Dict[str, Any]:
     pol = DELIVERY_MODES.get(m)
     if not pol:
         raise ValueError(f"DELIVERY_MODE_INVALID:{m}")
+    if pol.get("customer_ready") is False:
+        raise ValueError(pol["not_ready_code"])
     return {
         "delivery_mode": m,
         "delivery_label": pol["label"],

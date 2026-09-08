@@ -158,7 +158,7 @@ V1_3_COMPONENT_PRICES = {
 # Pellicolato standard — policy configurabile (BR-09, effective 2026-08-11; PO msg 402 Lotto 8: range 10-15%,
 # valore vigente 10% mantenuto fino a conferma finale PO — NON cambiare silenziosamente).
 STANDARD_FOIL_SURCHARGE_PERCENT = Decimal("10")
-STANDARD_FOIL_SURCHARGE_STATUS = "NEEDS_PO_FINAL_CONFIRMATION"
+STANDARD_FOIL_SURCHARGE_STATUS = "ACTIVE"  # PO msg 403 §5: V1 = 10% ACTIVE (revisione futura con nuova versione)
 STANDARD_FOIL_SURCHARGE_SOURCE = "BR-09 hardcoded policy (pricing_v3.resolvers) — effective 2026-08-11"
 
 # Componenti PVC eleggibili al pellicolato (BR-09)

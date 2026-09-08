@@ -359,7 +359,7 @@ export default function QuoteEditorPage() {
                     <SelectTrigger className="rounded-sm h-9" data-testid="quote-delivery-select"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="STANDARD" data-testid="delivery-opt-STANDARD">Standard — oltre 90 giorni</SelectItem>
-                      <SelectItem value="EXPRESS" data-testid="delivery-opt-EXPRESS">Accelerata (+20%) — giorni da confermare</SelectItem>
+                      <SelectItem value="EXPRESS" disabled data-testid="delivery-opt-EXPRESS">Accelerata (+20%) — non disponibile: tempistica da definire (PO)</SelectItem>
                     </SelectContent>
                   </Select>
                   {q.delivery_customer_text && <div className="mt-1 text-[10px] text-muted-foreground" data-testid="quote-delivery-text">{q.delivery_customer_text}</div>}

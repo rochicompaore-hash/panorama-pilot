@@ -282,7 +282,8 @@ async def update_quote(
         try:
             payload.update(resolve_delivery(payload["delivery_mode"]))
         except ValueError as e:
-            raise HTTPException(status_code=400, detail={"code": "DELIVERY_MODE_INVALID", "message": str(e), "allowed": list(DELIVERY_MODES.keys())})
+            _code = "EXPRESS_DELIVERY_NOT_READY_FOR_CUSTOMER_USE" if "NOT_READY" in str(e) else "DELIVERY_MODE_INVALID"
+            raise HTTPException(status_code=400, detail={"code": _code, "message": str(e), "allowed": ["STANDARD"]})
     # Installation Mode V1 (msg 393 §12): validate enums fail-closed.
     if "installation_mode" in payload:
         v = (payload["installation_mode"] or "").upper()

@@ -1,0 +1,15 @@
+{
+  "summary": "PO msg 403 governance backend tests (§4 PROFILING PO, §5 foil static, §6 EXPRESS blocked, §7 ENEA needs cost, + regression FULL_UPFRONT 5%). All 3 pytest tests PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_po403_governance.py", "/app/test_reports/pytest/po403.xml"],
+  "action_items": [],
+  "critical_code_review_comments": ["commission_status is nested inside financial_snapshot (not at quote root) — expected per current schema; consumers must read fs.commission_status."],
+  "updated_files": ["/app/backend/tests/test_po403_governance.py"],
+  "success_rate": {"backend": "100%", "frontend": "N/A"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "seed_data_creation": "TEST_PO403_MAIN and TEST_PO403_PROFILING quotes created (not cleaned up; prefixed TEST_).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Verified: (§6) PATCH delivery_mode=EXPRESS → 400 code EXPRESS_DELIVERY_NOT_READY_FOR_CUSTOMER_USE, quote remains STANDARD with total 12200; (regression) FULL_UPFRONT → 5% discount → subtotal 9500 total 11590; (§7) tax_deduction_requested+enea_practice_code=ENEA_STANDARD → ENEA line base_price 100, financial_snapshot_status INCOMPLETE, MISSING_INTERNAL_COST_ENEA, fs.commission_status NEEDS_COST_CONFIGURATION, withholding_applicable True; (§4) PROEVOLUTION FORMULA_TECHNICAL 1200x1500 → PROFILING service perimeter_ml 5.4, unit_sale_price 43.2, internal_cost_status NEEDS_PO_COSTING, MISSING_INTERNAL_COST_PROFILING in fs errors; (§5) formulas.py has STANDARD_FOIL_SURCHARGE_PERCENT=Decimal(10) status ACTIVE. Note: multi-cat products API returns product identifier in field 'key' (not product_code); commission_status is inside financial_snapshot."
+}
