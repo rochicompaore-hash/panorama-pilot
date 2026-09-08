@@ -12,7 +12,7 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://serramento-ops.preview.emergentagent.com").rstrip("/")
 
 ADMIN = ("admin@infissiexpress.com", "Admin!2025")
-COMMERCIAL = ("commercial_test@infissiexpress.com", "Commercial!2025")
+COMMERCIAL = ("commercial_test@infissiexpress.com", "CommTest!2026")
 
 PID_TAP = "1ddf23e0-cc3e-444f-91af-cdfd5e270bc2"
 PID_UV = "c9b14d1f-553e-4d7d-8237-88e7bc9fb6a8"

@@ -78,6 +78,9 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
     if (p.pricing_model === "AREA" || p.pricing_model === "FORMULA_TECHNICAL") {
       defaults.width_mm = 1200; defaults.height_mm = 1400;
     }
+    if (p.pricing_model === "AREA_PURCHASE_MULTIPLIER") {
+      defaults.width_mm = 1200; defaults.height_mm = 1500; defaults.orientable = false;
+    }
     if (p.pricing_model === "LINEAR_METER") defaults.linear_meters = 1;
     if (p.pricing_model === "GRID") {
       defaults.width_mm = 500; defaults.height_mm = 250;
@@ -123,6 +126,7 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
             ...(inputs.color_code ? { color_code: inputs.color_code } : {}),
             ...(inputs.depth_mm ? { depth_mm: Number(inputs.depth_mm) } : {}),
             ...(inputs.ceiling_liner ? { ceiling_liner: inputs.ceiling_liner } : {}),
+            ...(typeof inputs.orientable === "boolean" ? { orientable: inputs.orientable } : {}),
           },
         } };
       }
@@ -417,17 +421,42 @@ function PricingModelRenderer({ model, inputs, setInputs, product, category }) {
   }
 
   if (model === "GRID") {
+    const cfg = product?.pricing_config || {};
+    const widths = cfg.widths_mm || Array.from({ length: 31 }, (_, i) => 500 + i * 100);
+    const heights = cfg.heights_mm || [250, 350, 450, 550, 650, 750];
+    const depths = cfg.depths_mm || [163, 326, 489, 652];
     return (
       <Card className="rounded-sm border-border p-4 space-y-3" data-testid="cfg-grid">
         <div className="text-xs font-bold">Cassonetto — griglia ufficiale (L × H × profondità × cielino × colore)</div>
+        <div className="text-[11px] text-muted-foreground">Solo misure di listino: L {widths[0]}–{widths[widths.length - 1]} mm (step 100) · H {heights.join("/")} mm. Le misure del cassonetto sono indipendenti dal vano.</div>
         <div className="grid grid-cols-2 gap-3">
-          <NumField label="Larghezza (mm)" value={inputs.width_mm} onChange={(v) => set("width_mm", v)} testid="cfg-grid-width" min={500} step={100} />
-          <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-grid-height" min={250} step={100} />
-          <SelectField label="Profondità (mm)" value={String(inputs.depth_mm || 163)} onChange={(v) => set("depth_mm", Number(v))} options={[["163","163"],["326","326"],["489","489"],["652","652"]]} testid="cfg-grid-depth" />
+          <SelectField label="Larghezza cassonetto (mm)" value={String(inputs.width_mm || widths[0])} onChange={(v) => set("width_mm", Number(v))} options={widths.map((w) => [String(w), `${w} mm`])} testid="cfg-grid-width" />
+          <SelectField label="Altezza cassonetto (mm)" value={String(inputs.height_mm || heights[0])} onChange={(v) => set("height_mm", Number(v))} options={heights.map((h) => [String(h), `${h} mm`])} testid="cfg-grid-height" />
+          <SelectField label="Profondità (mm)" value={String(inputs.depth_mm || depths[0])} onChange={(v) => set("depth_mm", Number(v))} options={depths.map((d) => [String(d), `${d} mm`])} testid="cfg-grid-depth" />
           <SelectField label="Cielino" value={inputs.ceiling_liner || "SI"} onChange={(v) => set("ceiling_liner", v)} options={[["SI","Con cielino"],["NO","Senza cielino"]]} testid="cfg-grid-ceiling" />
           <NumField label="Quantità" value={inputs.quantity || 1} onChange={(v) => set("quantity", v)} testid="cfg-qty" min={1} />
         </div>
         <ColorPicker productCategory="CASSONETTI" value={inputs.color_code} onChange={(v) => set("color_code", v)} testid="cfg-grid-color" />
+        {!inputs.color_code && <div className="text-[11px] text-amber-700" data-testid="cfg-grid-color-hint">Seleziona il colore PVC: determina la famiglia di listino (BIANCO_MASSA / STANDARD / NON_STANDARD).</div>}
+      </Card>
+    );
+  }
+
+  if (model === "AREA_PURCHASE_MULTIPLIER") {
+    const colorMap = product?.pricing_config?.color_map || { RAL: "RAL", WOOD_EFFECT: "WOOD", SPECIAL_RAFFAELLO: "SPECIAL" };
+    const labels = { RAL: "Colorazione RAL", WOOD_EFFECT: "Effetto legno", SPECIAL_RAFFAELLO: "Speciali / Raffaello" };
+    return (
+      <Card className="rounded-sm border-border p-4 space-y-3" data-testid="cfg-persiana">
+        <div className="text-xs font-bold">Persiana — dimensioni, colore e orientabilità (minimo 1,30 m² per pezzo)</div>
+        <div className="grid grid-cols-3 gap-3">
+          <NumField label="Larghezza (mm)" value={inputs.width_mm} onChange={(v) => set("width_mm", v)} testid="cfg-persiana-width" />
+          <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-persiana-height" />
+          <NumField label="Quantità" value={inputs.quantity || 1} onChange={(v) => set("quantity", v)} testid="cfg-qty" min={1} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <SelectField label="Categoria colore" value={inputs.color_code || ""} onChange={(v) => set("color_code", v)} options={Object.keys(colorMap).map((k) => [k, labels[k] || k])} testid="cfg-persiana-color" />
+          <SelectField label="Lamelle" value={inputs.orientable === true ? "YES" : inputs.orientable === false ? "NO" : ""} onChange={(v) => set("orientable", v === "YES")} options={[["NO","Fisse"],["YES","Orientabili (+ sovrapprezzo)"]]} testid="cfg-persiana-orientable" />
+        </div>
       </Card>
     );
   }
@@ -513,8 +542,8 @@ function SelectField({ label, value, onChange, options, testid }) {
   return (
     <div>
       <Label className="text-xs">{label}</Label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="rounded-sm h-9" data-testid={testid}><SelectValue /></SelectTrigger>
+      <Select value={value || undefined} onValueChange={onChange}>
+        <SelectTrigger className="rounded-sm h-9" data-testid={testid}><SelectValue placeholder="Seleziona…" /></SelectTrigger>
         <SelectContent>
           {options.map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}
         </SelectContent>
@@ -553,7 +582,9 @@ function ColorPicker({ productCategory, value, onChange, testid, tapparellaMap }
       <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
         {colors.map((c) => {
           const active = value === c.code;
-          const cat = c.pvc_color_category || c.price_category || c.cassonetti_price_family || "";
+          const cat = productCategory === "CASSONETTI"
+            ? (c.cassonetti_price_family || "")
+            : (c.pvc_color_category || c.price_category || c.cassonetti_price_family || "");
           return (
             <button
               key={c.code}
@@ -649,6 +680,21 @@ function PricingPreviewCard({ preview, product, canSeeCosts }) {
       {product.pricing_model === "FIXED_PRICE" && s && (
         <div className="mt-3 space-y-1 text-xs font-mono-plex" data-testid="preview-fixed-detail">
           <Row k="Prezzo forfait" v={fmt(s.fixed_sale_price)} />
+        </div>
+      )}
+      {product.pricing_model === "AREA_PURCHASE_MULTIPLIER" && s && (
+        <div className="mt-3 space-y-1 text-xs font-mono-plex" data-testid="preview-persiana-detail">
+          <Row k="Area reale" v={`${s.real_area_m2} m²`} />
+          {s.minimum_billable_area_m2 && <Row k="Minimo fatturabile (pz)" v={`${s.minimum_billable_area_m2} m²`} />}
+          <Row k="Area fatturata (pz)" v={`${s.billable_area_m2} m²`} />
+          <Row k="Categoria colore" v={s.color_price_category} />
+          <Row k="Lamelle" v={s.orientable ? "Orientabili" : "Fisse"} />
+          <Row k="Prezzo/m²" v={fmt(s.unit_sale_price_per_m2)} />
+          {s.purchase_rate_per_m2 != null && canSeeCosts && <Row k="Costo acquisto/m²" v={fmt(s.purchase_rate_per_m2)} />}
+          {s.effective_purchase_rate != null && canSeeCosts && s.orientable && <Row k="Costo acquisto/m² (orientabile)" v={fmt(s.effective_purchase_rate)} />}
+          {s.purchase_cost_per_item != null && canSeeCosts && <Row k="Costo acquisto (pz)" v={fmt(s.purchase_cost_per_item)} />}
+          {s.commercial_multiplier && canSeeCosts && <Row k="Moltiplicatore" v={`× ${s.commercial_multiplier}`} />}
+          <Row k="Quantità" v={s.quantity} />
         </div>
       )}
       {product.pricing_model === "GRID" && s && (

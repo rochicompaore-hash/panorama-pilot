@@ -64,27 +64,33 @@ async def list_products_for_new_quote(
     # Redaction per non-admin: nasconde campi economici interni
     if not is_admin:
         for it in items:
-            cfg = it.get("pricing_config") or {}
-            if isinstance(cfg, dict):
-                # Rimuove costi interni diretti
-                for k in ("internal_reference_price", "production_cost_seed", "internal_cost", "cost_config",
-                          "purchase_cost_table_per_m2", "commercial_multiplier",
-                          "pricing_formula_metadata"):
-                    cfg.pop(k, None)
-                # GRID: rimuove i costi interni dalla griglia (redige cella {internal,sale} -> {sale})
-                grid = cfg.get("grid")
-                if isinstance(grid, dict):
-                    redacted_grid = {}
-                    for family, subgrids in grid.items():
-                        redacted_grid[family] = {}
-                        for depth_ceil, cells in (subgrids or {}).items():
-                            redacted_grid[family][depth_ceil] = {}
-                            for dim_key, cell in (cells or {}).items():
-                                if isinstance(cell, dict):
-                                    redacted_grid[family][depth_ceil][dim_key] = {"sale": cell.get("sale")}
-                    cfg["grid"] = redacted_grid
-            it.pop("technical_recipe_id", None)
+            _redact_product_for_commercial(it)
     return {"items": items, "is_admin_view": is_admin}
+
+
+def _redact_product_for_commercial(it: dict) -> dict:
+    """Rimuove costi interni/purchase/multiplier dal prodotto (RBAC commerciale)."""
+    cfg = it.get("pricing_config") or {}
+    if isinstance(cfg, dict):
+        for k in ("internal_reference_price", "production_cost_seed", "internal_cost", "cost_config",
+                  "purchase_cost_table_per_m2", "commercial_multiplier",
+                  "orientable_surcharge_per_m2",
+                  "pricing_formula_metadata"):
+            cfg.pop(k, None)
+        # GRID: rimuove i costi interni dalla griglia (redige cella {internal,sale} -> {sale})
+        grid = cfg.get("grid")
+        if isinstance(grid, dict):
+            redacted_grid = {}
+            for family, subgrids in grid.items():
+                redacted_grid[family] = {}
+                for depth_ceil, cells in (subgrids or {}).items():
+                    redacted_grid[family][depth_ceil] = {}
+                    for dim_key, cell in (cells or {}).items():
+                        if isinstance(cell, dict):
+                            redacted_grid[family][depth_ceil][dim_key] = {"sale": cell.get("sale")}
+            cfg["grid"] = redacted_grid
+    it.pop("technical_recipe_id", None)
+    return it
 
 
 @router.get("/products/{pid}")
@@ -97,11 +103,7 @@ async def get_product_for_new_quote(pid: str, user: dict = Depends(require_permi
     is_admin = "*" in perms or "products.manage" in perms or "quotes.view_costs" in perms or "quotes.view_margins" in perms
     out = from_mongo(d)
     if not is_admin:
-        cfg = out.get("pricing_config") or {}
-        if isinstance(cfg, dict):
-            for k in ("internal_reference_price", "production_cost_seed", "internal_cost", "cost_config"):
-                cfg.pop(k, None)
-        out.pop("technical_recipe_id", None)
+        _redact_product_for_commercial(out)
     return out
 
 
@@ -160,6 +162,8 @@ async def configure_product(
             "purchase_unit_cost_per_m2", "purchase_cost_per_item", "purchase_total_cost",
             "internal_production_cost_per_item", "internal_reference_price",
             "commercial_multiplier", "margin", "contribution_margin",
+            # AREA_PURCHASE_MULTIPLIER (persiane) purchase-side fields
+            "purchase_rate_per_m2", "effective_purchase_rate", "orientable_surcharge_per_m2",
             # safety legacy
             "internal_cost", "production_cost",
         ):

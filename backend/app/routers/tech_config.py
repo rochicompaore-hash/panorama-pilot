@@ -262,13 +262,13 @@ async def list_technical_recipes(user: dict = Depends(require_permission("pricin
 #   DOUBLE_STANDARD = 76 €/m²
 #   DOUBLE_SATIN    = 96 €/m²
 #   TRIPLE_STANDARD = 125 €/m²
-#   TRIPLE_SATIN    = 156.25 €/m²
+#   TRIPLE_SATIN    = 156.00 €/m² (PO msg 401 §27)
 # minimum_billable_area_per_pane = 0.50 m² (per singolo pannello)
 GLASS_TYPES_DEFAULT = [
     ("DOUBLE_STANDARD", 76.00,  0.50, "Doppio vetro standard"),
     ("DOUBLE_SATIN",    96.00,  0.50, "Doppio vetro satinato"),
     ("TRIPLE_STANDARD", 125.00, 0.50, "Triplo vetro standard"),
-    ("TRIPLE_SATIN",    156.25, 0.50, "Triplo vetro satinato"),
+    ("TRIPLE_SATIN",    156.00, 0.50, "Triplo vetro satinato"),
 ]
 
 

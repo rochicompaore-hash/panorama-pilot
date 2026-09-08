@@ -19,7 +19,7 @@ BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 ADMIN_EMAIL = "admin@infissiexpress.com"
 ADMIN_PASSWORD = "Admin!2025"
 COMMERCIAL_EMAIL = "commercial_test@infissiexpress.com"
-COMMERCIAL_PASSWORD = "Commercial!2025"
+COMMERCIAL_PASSWORD = "CommTest!2026"
 GOLDEN_QUOTE_ID = "3b4fd98a-fc62-457d-9d66-494742e5fc90"
 
 COMMERCIAL_SAFE_KEYS = {

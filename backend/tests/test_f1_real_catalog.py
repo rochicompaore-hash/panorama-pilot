@@ -107,7 +107,7 @@ class TestF1RealCatalog:
             timeout=20,
         ).json()
         assert r["pricing_status"] == "invalid_inputs"
-        assert "DIMENSION_TO_CONFIRM" in r["blocking_errors"]
+        assert any(e.startswith("DIMENSION_TO_CONFIRM") for e in r["blocking_errors"])
 
     def test_cassonetto_missing_color_mapping(self, headers):
         pid = _product_id_by_key(headers, "CASSONETTI", "CASSONETTO_STD")

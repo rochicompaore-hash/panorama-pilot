@@ -232,6 +232,9 @@ async def seed_cassonetto_product(db, tenant_id: str, dry: bool) -> int:
         "depths_mm": grid_data["depths_mm"],
         "ceiling_liner_options": grid_data["ceiling_liner_options"],
         "finish_families": grid_data["finish_families"],
+        "widths_mm": grid_data.get("widths_mm"),
+        "heights_mm": grid_data.get("heights_mm"),
+        "imported_at": grid_data.get("imported_at"),
         "grid": grid_data["grid"],
         "color_domain": "PVC",  # risolvi finish_family da product_colors.cassonetti_price_family
         "pricing_formula_metadata": {
@@ -267,6 +270,52 @@ async def seed_cassonetto_product(db, tenant_id: str, dry: bool) -> int:
     return 0
 
 
+async def seed_persiana_product(db, tenant_id: str, dry: bool) -> int:
+    """PERSIANE — AREA_PURCHASE_MULTIPLIER (msg 401 §12-§23).
+
+    purchase €/m²: RAL 285 · WOOD 299 · SPECIAL 350 · orientabile +99 €/m² (pre-multiplier)
+    minimum 1.30 m² PER PEZZO · commercial ×2.5 · posa/smontaggio separati (listino montaggio).
+    """
+    cat = await db.product_categories.find_one({"tenant_id": tenant_id, "code": "PERSIANE_SCURI", "deleted_at": None})
+    if not cat:
+        return 0
+    pricing_config = {
+        "purchase_cost_table_per_m2": {"RAL": 285.00, "WOOD": 299.00, "SPECIAL": 350.00},
+        "minimum_billable_area_m2": 1.30,
+        "commercial_multiplier": 2.5,
+        "orientable_surcharge_per_m2": 99.00,
+        "color_domain": "INTERNAL_MAP",
+        "color_map": {"RAL": "RAL", "WOOD_EFFECT": "WOOD", "SPECIAL_RAFFAELLO": "SPECIAL"},
+        "pricing_version": "persiane_2026_09_v1",
+        "policy_note": "Purchase ×2.5. Minimo 1.30 m² per unità. Orientabile +99 €/m² sul costo acquisto prima del multiplier. Posa 150 € (INSTALL_SHUTTER_1_2_SASH) e smontaggio 40 €/pz (REMOVE_SHUTTER) separati.",
+    }
+    base = {
+        "name": "Persiana in alluminio (RAL / Effetto legno / Speciali)",
+        "pricing_model": "AREA_PURCHASE_MULTIPLIER", "pricing_config": pricing_config,
+        "category_id": cat["_id"], "category_code": "PERSIANE_SCURI",
+        "sale_unit": "m2", "minimum_billable_quantity": 1.30,
+        "line": "Standard", "new_quote_enabled": True, "legacy": False, "active": True,
+        "is_test_fixture": False, "classification_status": "CLASSIFIED",
+        "updated_at": _iso(),
+    }
+    existing = await db.products.find_one({"tenant_id": tenant_id, "key": "PERSIANA_STD", "deleted_at": None})
+    if existing:
+        if not dry:
+            await db.products.update_one({"_id": existing["_id"]}, {"$set": base, "$inc": {"version": 1}})
+        return 0
+    doc = {
+        "_id": new_id(), "tenant_id": tenant_id, "key": "PERSIANA_STD",
+        "category": "shutter",
+        "description": "Persiana — costo acquisto €/m² × 2.5 · min 1,30 m²/pz · orientabile +99 €/m²",
+        "base_price": 0.0, "base_type": "sqm", "min_billable_sqm": 1.30,
+        "order_index": 250, "compatible_packages": ["BASE", "ADVANCED", "PREMIUM"],
+        "compatible_services": [], "created_at": _iso(), "deleted_at": None, "version": 1, **base,
+    }
+    if not dry:
+        await db.products.insert_one(doc); return 1
+    return 0
+
+
 async def _list_tenant_ids(db):
     tids = await db.tenants.distinct("_id", {"deleted_at": None})
     if not tids:
@@ -286,6 +335,7 @@ async def run(tenant_ids, dry_run):
         c5 = await seed_zanzariere_products(db, tid, dry_run); print(f"  zanzariere real products: {c5} new")
         c6 = await seed_tapparella_product(db, tid, dry_run); print(f"  tapparella: {c6} new")
         c7 = await seed_cassonetto_product(db, tid, dry_run); print(f"  cassonetto: {c7} new")
+        c8 = await seed_persiana_product(db, tid, dry_run); print(f"  persiana: {c8} new")
     await close_db()
 
 

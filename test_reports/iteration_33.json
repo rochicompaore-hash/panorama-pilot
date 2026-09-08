@@ -1,0 +1,40 @@
+{
+  "summary": "msg401 PRICING INTEGRITY AUDIT — Cassonetti (GRID fail-closed) + Persiane (AREA_PURCHASE_MULTIPLIER) fully verified. 14/14 backend pytest PASS. Browser E2E (admin) matches all 8 golden values byte-for-byte (Cassonetto A/B/C/D/E + Persiana F/G/H/H×2). Fail-closed contract active (INVALID_INPUTS/MISSING_COLOR_CODE shown pre-color; Aggiungi al preventivo disabled). Persian automatic_services (posa+smontaggio) computed authoritatively on quote line and reflected in financial_snapshot. RBAC redaction verified for commercial (no purchase_rate_per_m2, no commercial_multiplier, no grid 'internal'). FINESTRE PROEVOLUTION regression fixed (no more 500). PROEVOLUTION_RESTAURO hidden from commercial catalog.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_pricing_integrity_audit_msg401.py",
+    "/app/test_reports/pytest/iteration_33.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "compute_grid (multi_category_pricing.py) is strictly fail-closed: raises DIMENSION_TO_CONFIRM / MISSING_CASSONETTO_COLOR_PRICE_FAMILY / INVALID_DEPTH / INVALID_CEILING_LINER — no interpolation, no nearest neighbor. Perfect for pricing integrity.",
+    "compute_area_purchase_multiplier correctly applies: purchase_rate + orientable_surcharge BEFORE multiplier, then min 1.30 m² per piece, ×2.5. Verified across F/G/H goldens including per-piece minimum on 800×1000.",
+    "add_line in quotes.py performs authoritative recompute (client-provided base_price ignored): confirmed by SUPPLY_ONLY case which yields empty automatic_services and installation_cost=0, and SUPPLY_AND_INSTALLATION which yields 300 posa + 80 smontaggio + supply_cost 1382.40 + subtotal 3836 exactly as expected.",
+    "_redact_product_for_commercial correctly strips purchase_cost_table_per_m2, commercial_multiplier, orientable_surcharge_per_m2 from pricing_config and 'internal' from GRID cells for commercial role.",
+    "posa (INSTALL_SHUTTER_1_2_SASH 150€) and smontaggio (REMOVE_SHUTTER 40€/pz) are NEVER inside the ×2.5 multiplier — service_resolver adds them separately to installation_cost / other_direct_costs. Contract respected."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pricing_integrity_audit_msg401.py (new — 14 tests)"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (8/8 goldens)"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025 + commercial_test@infissiexpress.com / CommTest!2026",
+  "seed_data_creation": "Ephemeral TEST_ quotes created per persiana automatic_services scenario (I + SUPPLY_ONLY). Test quote e2a78d76-8c81-4d73-ab78-d228d8c44906 used for browser E2E (line 329,01 € added and persisted on reload).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "msg401 PO audit green. Reusable regression: /app/backend/tests/test_pricing_integrity_audit_msg401.py (Cassonetto goldens A/700x250x326, Persiane F/G/H, RBAC commercial redaction, quote automatic_services, FINESTRE PROEVOLUTION no-500). UI data-testids verified: cfg-open, multi-cat-category-{CASSONETTI,PERSIANE_SCURI}, multi-cat-product-{CASSONETTO_STD,PERSIANA_STD}, cfg-grid-{width,height,depth,ceiling}, cfg-grid-color-<code>, cfg-persiana-{width,height,color,orientable}, cfg-qty, preview-total, preview-status, preview-grid-detail, preview-persiana-detail, multi-cat-confirm.",
+  "observed_golden_values": {
+    "Cassonetto A 500x250/163/SI/003": "329,01 €",
+    "Cassonetto B 500x550/163/SI/003": "422,38 €",
+    "Cassonetto C 700x250/326/SI/003": "276,13 €",
+    "Cassonetto D 500x250/163/SI/100 (STANDARD)": "370,77 €",
+    "Cassonetto E 500x250/163/SI/019 (NON_STANDARD)": "399,78 €",
+    "Cassonetto admin costo produzione (500x250/163/SI/003)": "101,23 €",
+    "Cassonetto golden API 700x250/326/SI/003 internal_production_cost": "110,45 €",
+    "Persiana F 1200x1500 Fisse RAL": "1282,50 € (Area 1.8 m², €/m² 712,50, Costo acq/m² 285,00, × 2.5)",
+    "Persiana G 1200x1500 Orientabili RAL": "1728,00 €",
+    "Persiana H 800x1000 Fisse RAL qty1": "926,25 € (Area fatturata pz 1.3 m² minimum)",
+    "Persiana H×2 800x1000 Fisse RAL qty2": "1852,50 €",
+    "Persiana API I qty2 orientable + posa + smontaggio subtotal": "3836,00 € (3456 supply + 300 posa + 80 smontaggio)"
+  }
+}

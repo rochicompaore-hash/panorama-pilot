@@ -126,7 +126,7 @@ GLASS_PRICES_PER_SQM = {
     "DOUBLE_STANDARD": Decimal("76.00"),
     "DOUBLE_SATIN":    Decimal("96.00"),
     "TRIPLE_STANDARD": Decimal("125.00"),
-    "TRIPLE_SATIN":    Decimal("156.25"),
+    "TRIPLE_SATIN":    Decimal("156.00"),  # PO msg 401 §27: 156.25 → 156.00
 }
 
 

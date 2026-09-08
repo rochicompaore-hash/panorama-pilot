@@ -1461,3 +1461,6 @@ Con TEMPORARY multiplier 2.5/3.0/3.5 e included_services 30/200/500 €: BASE 50
 - Multiplier BASE/ADVANCED/PREMIUM restano null finché il PO non li imposta
 
 ### Test — 17/17 verdi (invariati)
+
+---
+## 2026-09-08 — Vedi `memory/CHANGELOG.md` (msg 401 Pricing Integrity Audit = PASS; Persiane pricing implementato; Cassonetti 4464/4464 validati). Backlog P0: completare PRE-RELEASE CLEANUP (full-suite 0F/0E, /api/sequences, tenant isolation, frontend build) → poi GENERAL PRE-PRODUCTION RELEASE GATE. FREEZE: Vano V2, F2, F3, F4.
