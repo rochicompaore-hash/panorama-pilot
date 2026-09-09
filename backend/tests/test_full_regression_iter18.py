@@ -104,7 +104,7 @@ class TestCRM:
     def test_customers_crud(self, auth):
         name = f"TEST_ITER18_CUST_{uuid.uuid4().hex[:5]}"
         r = requests.post(f"{API}/customers", headers=auth,
-                          json={"name": name, "customer_type": "private",
+                          json={"name": name, "customer_type": "private", "first_name": name, "last_name": "Test",
                                 "email": f"c_{uuid.uuid4().hex[:5]}@example.com"}, timeout=T)
         assert r.status_code in (200, 201), r.text
         cid = r.json()["id"]

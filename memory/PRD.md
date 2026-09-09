@@ -1475,3 +1475,28 @@ Con TEMPORARY multiplier 2.5/3.0/3.5 e included_services 30/200/500 €: BASE 50
 - Test: `tests/test_p0_visuals_color_engine.py` 22/22 + testing agent iteration_38 (FE 11/11, BE 100%).
 - Data gap noto (non P0): ricetta tecnica PROEVOLUTION WINDOW_3_SASH / WINDOW_4_SASH assente → 3/4 ante = INCOMPLETE (SVG ok).
 - Pre-esistenti non correlati: `test_pdf_m332` (XPASS strict missing_site, snapshot non in listing), `test_multi_category_v1_e2e` fixture TEST_ZANZARIERA_AREA_130 e categoria PORTEFINESTRE mancanti.
+
+## 2026-09-09 — PROEVOLUTION 3/4 ANTE (msg 627) = DISABLED_FAIL_CLOSED
+- Nessuna `hardware_rule`/`technical_recipe` autoritativa per 3/4 ante → `quotable_configurations()` (ricetta+ferramenta+tempo produzione) esposta su GET /api/multi-cat/products; UI limita N. ante ai valori prezzabili; API `configure` → `not_available` + `CONFIGURATION_NOT_AVAILABLE_FOR_QUOTING`; add_line → 400. Test in `test_p0_visuals_color_engine.py` (25/25).
+
+## 2026-09-09 — QUOTE PDF PREMIUM V2 (msg 626) = PASS
+- Template `quote_pdf.html` riscritto: Roboto (font vendorizzati in `app/templates/fonts/`), primary #12a16b, A4; header brand reale + card Preventivo/Cliente/Cantiere (site join), banner Termini di pagamento (policy reale), posizioni V1.. con visual + spec, card Servizi previsti (solo inclusi) / Tempi indicativi (delivery policy) / Riepilogo economico (totale finale evidenziato), Schemi prodotti, Condizioni generali — in sintesi, condizioni complete (clauses), firma.
+- `services/general_terms.py`: GENERAL_TERMS_VERSION=GT-2026.09-V1, 14 sezioni PO + sezioni legali SOLO da `clauses` ufficiali (recesso, garanzia 24); penali/foro/forza maggiore/risoluzione/perdita acconto/limitazioni → CONTRACT_TERMS_SOURCE_MISSING (non completate). Snapshot in `general_terms_snapshots`; quote salva `general_terms_version`/`general_terms_snapshot_id`; ACCEPTED → congelato.
+- Fix: VAT breakdown riproporzionato sull'imponibile netto (IVA/Totale PDF = quote.vat_amount/total); customer name derivato da first/last/company.
+- Test `tests/test_quote_pdf_premium_v2.py` 5/5 (render reale, fonts, contenuti, totali, no-leak, versioning/freeze).
+- Pre-esistenti (PRE-RELEASE CLEANUP): test_pdf_m332 missing_site XPASS-strict, snapshot non in listing.
+
+## 2026-09-09 — CUSTOMER PORTAL CORE V1 = PASS (Lotti 1-2 + documenti + assistenza)
+- Backend `routers/customer_portal.py`: auth separata (JWT aud=customer_portal, cookie httpOnly + bearer), register → PENDING_AUTHORIZATION (mai accesso automatico), login lock per account (5 tentativi/15 min), forgot/reset; admin `/api/admin/customer-portal/users` (crea/autorizza/sospende, permessi customers.view/edit). Dati: `/jobs` (quote accepted/converted del customer), `/jobs/{id}` (righe customer-safe + visual_spec + timeline + payment_schedule), `/documents` (+ download PDF definitivi), `/tickets` (lista/crea → RICEVUTO). Isolation server-side {tenant_id, customer_id}; 404 cross-customer; zero chiavi interne.
+- Frontend `pages/CustomerPortal.jsx` (route `/customer-portal/*`, mobile-first, bottom nav Home/Documenti/Assistenza/Profilo) riusa `ProductVisualSVG`.
+- Test: `tests/test_customer_portal_core_v1.py` 5/5 + testing agent iteration_39 (BE 7/7, FE mobile tutto verde). Demo: cliente.demo@infissiexpress.com / Cliente!2026.
+- Lotti futuri (P1): libreria tecnica/certificazioni/manuali, ENEA docs, contratto/rilievo/verbali nel portale (richiede document service con `customer_visible`).
+
+## 2026-09-09 — PRE-RELEASE CLEANUP (in corso → vedi esito suite)
+- Fix reali: `/api/sequences` 500 (doc legacy con ObjectId → `from_mongo` stringifica ObjectId; counter contratti CT- ripristinato con key), brute-force lock per account (IP ingress variabili aggiravano il lock), `contract.signed` evento timeline mancante (workflow_engine), gating invio quote su `opening_products` legacy, endpoint `GET /api/quote-pdfs/{pid}/snapshot` (audit), VAT breakdown PDF riproporzionato.
+- Test stale allineati alle regole vigenti: PRV- numbering, convert idempotente (200), film_diff fixed per linea (M3.3.2), hardware WINDOW_1 = 60 €, glass config tenant 76 €/m², cassonetto `CASSONETTO_COLOR_FAMILY_UNMAPPED`, allowed_actions M3.3.4, tax_code/first_name obbligatori, ENEA costing definito, autosave whitelist, permessi ≥28, delivery_mode TEST redirect email, firma = +1 pagina. Quote Structure V1 (frozen) → skip motivato. Credenziali test solo da env (`tests._creds`, TEST_LIMITED_* in backend/.env). Frontend `yarn build` OK.
+
+## 2026-09-09 — PRE-RELEASE CLEANUP = PASS · GENERAL PRE-PRODUCTION RELEASE GATE = PASS (con 1 prerequisito infra)
+- Full backend suite chunked (7 chunk, 79 file): **1053 passed, 0 FAILED, 0 ERROR** (skip motivati: Quote Structure V1 frozen; test TENANT_ADMIN/PLATFORM_OWNER senza env). Frontend `yarn build` OK. Browser E2E finale testing agent iteration_40: BE 8/8 + FE ERP desktop + Portale mobile tutto verde.
+- deployment_agent: codice deploy-ready (env-only, CORS, /api, Mongo). **PREREQUISITO INFRA (non inventabile)**: `REDIS_URL` deve puntare a un Redis gestito (Upstash/Redis Cloud) in produzione — il rate limiter OTP/firma pubblica è fail-closed senza Redis in APP_ENV=production (design voluto). In preview: fallback in-memory (development).
+- NO PUBLISH eseguito (direttiva PO §12). Prossimi: backup, rotazione credenziali test esposte, deploy, smoke, rollback plan.

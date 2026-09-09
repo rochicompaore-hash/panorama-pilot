@@ -173,7 +173,6 @@ class TestValidationGate:
         codes = {e.get("code") for e in errors}
         assert "no_lines" in codes, codes
 
-    @pytest.mark.xfail(reason="BACKEND BUG: validate_quote_for_definitive checks `not quote.get('site_address')` but Quote model defaults to LeadAddress() (dict with all-None fields) which is truthy in Python, so 'missing_site' never fires even when street/city/zip all empty.", strict=True)
     def test_definitive_reports_missing_site(self, s, auth_headers, lead_id):
         r = s.post(f"{BASE_URL}/api/quotes", headers=auth_headers, json={
             "lead_id": lead_id, "title": "TEST_M332_NoSite",
@@ -293,10 +292,10 @@ class TestSnapshotCleanup:
         # Use list endpoint which includes snapshot (from_mongo includes it via list_quote_pdfs).
         rlist = s.get(f"{BASE_URL}/api/quotes/{qid}/pdfs", headers=auth_headers, timeout=15)
         assert rlist.status_code == 200
-        # snapshot inline
-        docs = rlist.json()["items"]
-        target = next(x for x in docs if x["id"] == pid)
-        snap = target.get("snapshot")
+        assert any(x["id"] == pid for x in rlist.json()["items"])
+        rs = s.get(f"{BASE_URL}/api/quote-pdfs/{pid}/snapshot", headers=auth_headers, timeout=15)
+        assert rs.status_code == 200
+        snap = rs.json().get("snapshot")
         assert snap, "snapshot not persisted in listing"
         lines = ((snap.get("quote") or {}).get("lines")) or []
         assert lines, "expected at least 1 line in snapshot.quote.lines"

@@ -39,11 +39,15 @@ def sa_token():
 
 @pytest.fixture(scope="session")
 def ta_token():
+    if TENANT_ADMIN is None:
+        pytest.skip("TENANT_ADMIN_EMAIL/TENANT_ADMIN_PASSWORD non configurati nell'ambiente")
     return _login(*TENANT_ADMIN)
 
 
 @pytest.fixture(scope="session")
 def po_token():
+    if PLATFORM_OWNER is None:
+        pytest.skip("PLATFORM_OWNER_EMAIL/PLATFORM_OWNER_PASSWORD non configurati nell'ambiente")
     return _login(*PLATFORM_OWNER)
 
 

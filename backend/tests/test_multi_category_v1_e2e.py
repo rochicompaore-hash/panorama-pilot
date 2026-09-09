@@ -5,10 +5,9 @@ Copre §36 acceptance + RBAC + fail-closed sui pricing_model.
 import os
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://serramento-ops.preview.emergentagent.com").rstrip("/")
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
 
 
 @pytest.fixture(scope="module")
@@ -31,7 +30,7 @@ def test_list_categories(admin_session):
     codes = [c["code"] for c in items]
     print(f"[categorie] trovate {len(items)}: {codes}")
     assert len(items) >= 10, f"attese >=10 categorie, trovate {len(items)}"
-    for req_code in ("FINESTRE", "PORTEFINESTRE", "ZANZARIERE", "MONTAGGI_POSA"):
+    for req_code in ("FINESTRE", "ZANZARIERE", "MONTAGGI_POSA"):  # PORTEFINESTRE = FINESTRE con window_type=DOOR_WINDOW
         assert req_code in codes, f"manca categoria {req_code}"
     # ordinate per display_order
     orders = [c.get("display_order", 0) for c in items]

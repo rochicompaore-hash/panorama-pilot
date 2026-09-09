@@ -20,7 +20,7 @@ from app.db import get_db
 from app.deps import require_permission, get_permission_keys_for_user
 from app.models_multi_category import ConfigureRequest, ConfigureResponse
 from app.mongo_utils import from_mongo
-from app.services.multi_category_pricing import resolve_and_compute
+from app.services.multi_category_pricing import resolve_and_compute, quotable_configurations
 
 
 router = APIRouter(prefix="/multi-cat", tags=["multi-category-catalog"])
@@ -60,6 +60,9 @@ async def list_products_for_new_quote(
 
     docs = await db.products.find(q).sort([("order_index", 1), ("name", 1)]).to_list(500)
     items = [from_mongo(d) for d in docs]
+    for it in items:
+        if it.get("pricing_model") == "FORMULA_TECHNICAL":
+            it["quotable_configurations"] = await quotable_configurations(db, user["tenant_id"], it.get("key"))
 
     # Redaction per non-admin: nasconde campi economici interni
     if not is_admin:
@@ -102,6 +105,8 @@ async def get_product_for_new_quote(pid: str, user: dict = Depends(require_permi
     perms = await get_permission_keys_for_user(user)
     is_admin = "*" in perms or "products.manage" in perms or "quotes.view_costs" in perms or "quotes.view_margins" in perms
     out = from_mongo(d)
+    if out.get("pricing_model") == "FORMULA_TECHNICAL":
+        out["quotable_configurations"] = await quotable_configurations(db, user["tenant_id"], out.get("key"))
     if not is_admin:
         _redact_product_for_commercial(out)
     return out

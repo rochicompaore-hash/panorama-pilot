@@ -22,6 +22,7 @@ import os
 import pytest
 import requests
 from decimal import Decimal
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("BASE_URL")
 if not BASE_URL:
@@ -31,8 +32,6 @@ if not BASE_URL:
                 BASE_URL = line.split("=", 1)[1].strip()
                 break
 
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
 
 
 @pytest.fixture(scope="module")
@@ -87,14 +86,14 @@ def test_gt01_proevolution_window_1sash_900x1500(token):
 
     # Vetro / Ferramenta / Manodopera
     assert abs(tech["glass_cost"] - 68.25) < 0.05
-    assert abs(tech["hardware_cost"] - 76.00) < 0.02
+    assert abs(tech["hardware_cost"] - 60.00) < 0.02  # hardware_rules (WINDOW,1) = 60 € autoritativo
     assert abs(tech["labor_cost"] - 135.00) < 0.02
     assert float(tech["hourly_workshop_cost"]) == 180.0
     assert float(tech["production_time_hours"]) == 0.75
 
     # total_internal = materiali + vetro + ferramenta + labor (+ eventuale glazing_bead)
     glazing_bead_total = float(comps["GLAZING_BEAD"]["total_cost"])
-    expected_total = 19.34 + 6.87 + 9.18 + 5.43 + glazing_bead_total + 68.25 + 76.00 + 135.00
+    expected_total = 19.34 + 6.87 + 9.18 + 5.43 + glazing_bead_total + 68.25 + 60.00 + 135.00
     assert abs(tech["total_internal_cost"] - expected_total) < 0.10, \
         f"Expected ~{expected_total:.2f}, got {tech['total_internal_cost']}"
 

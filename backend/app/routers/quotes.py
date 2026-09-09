@@ -841,7 +841,7 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
                 status_code=400,
                 detail={
                     "code": "QUOTE_HAS_BLOCKING_ERRORS",
-                    "message": f"Preventivo non inviabile: {len(blocking_lines)} riga/e con errori bloccanti. "
+                    "message": f"Preventivo non inviabile: {len(blocking_lines)} prodotto/i con errori bloccanti. "
                                "Correggi prima dell'invio.",
                     "blocking_lines": blocking_lines,
                 },

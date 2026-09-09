@@ -14,6 +14,11 @@ from __future__ import annotations
 import os
 import re
 import pytest
+
+# STRICT FREEZE (PO): motore Quote Structure V1 (Vano V1) congelato; le righe create da questo motore
+# (base_price senza pricing_snapshot) sono LEGACY_QUOTE_READ_ONLY per design. Il flusso commerciale attivo
+# è il Multi-Category Configurator V1 (coperto da test_multi_category_*, test_p0_*).
+pytestmark = pytest.mark.skip(reason="Quote Structure V1 in STRICT FREEZE: righe legacy read-only (LEGACY_QUOTE_READ_ONLY)")
 import requests
 import uuid
 from tests._creds import ADMIN_EMAIL, ADMIN_PW  # env-sourced credentials

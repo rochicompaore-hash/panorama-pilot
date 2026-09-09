@@ -13,12 +13,12 @@ import os
 import time
 import requests
 import pytest
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASS = "Admin!2025"
+ADMIN_PASS = ADMIN_PASSWORD
 
 
 @pytest.fixture(scope="module")
@@ -47,6 +47,32 @@ def _extract_code(resp):
         return d
     except Exception:
         return None
+
+
+
+def _ensure_private_customer(h):
+    """xdist loadscope: le classi girano su worker diversi -> ricrea il cliente se lo stato condiviso manca."""
+    if getattr(pytest, "private_customer_id", None):
+        return pytest.private_customer_id
+    ts = str(int(time.time() * 1000))[-8:]
+    r = requests.post(f"{API}/customers", json={"customer_type": "PRIVATE", "first_name": f"TESTMario{ts}", "last_name": "Rossi",
+                                                "email": f"test.mario.{ts}@example.com", "phone": "3331234567"}, headers=h, timeout=15)
+    assert r.status_code in (200, 201), r.text
+    pytest.private_customer_id = r.json()["id"]
+    pytest.private_customer_number = r.json()["customer_number"]
+    return pytest.private_customer_id
+
+
+def _ensure_site(h):
+    if getattr(pytest, "site_id", None):
+        return pytest.site_id
+    cid = _ensure_private_customer(h)
+    r = requests.post(f"{API}/sites", json={"customer_id": cid, "name": "TEST Abitazione principale", "address": "via Roma", "street_number": "12",
+                                            "postal_code": "20100", "city": "Milano", "province": "MI", "floor": "3", "has_elevator": True,
+                                            "site_contact_phone": "3331234567", "property_type": "APPARTAMENTO"}, headers=h, timeout=15)
+    assert r.status_code in (200, 201), r.text
+    pytest.site_id = r.json()["id"]
+    return pytest.site_id
 
 
 class TestCustomerCreation:
@@ -92,7 +118,7 @@ class TestCustomerCreation:
         num2 = d["customer_number"]
         assert num2.startswith("CLI-")
         # progressive strictly greater
-        assert int(num2.split("-")[1]) == int(num1.split("-")[1]) + 1, (num1, num2)
+        assert int(num2.split("-")[1]) > int(num1.split("-")[1]), (num1, num2)  # progressivo (tollerante a creazioni parallele di altri test)
         pytest.company_customer_id = d["id"]
 
     def test_private_missing_name_400(self, h):
@@ -181,7 +207,7 @@ class TestLegacyCustomer:
 
 class TestSitesAndTimeline:
     def test_create_site_generates_system_event(self, h):
-        cid = pytest.private_customer_id
+        cid = _ensure_private_customer(h)
         payload = {
             "customer_id": cid,
             "name": "TEST Abitazione principale",
@@ -208,7 +234,7 @@ class TestSitesAndTimeline:
         assert sys_events, f"No SYSTEM_EVENT for site: {items}"
 
     def test_post_timeline_manual_call(self, h):
-        cid = pytest.private_customer_id
+        cid = _ensure_private_customer(h)
         r = requests.post(f"{API}/customers/{cid}/timeline",
                           json={"category": "CALL", "channel": "PHONE", "body": "TEST Cliente richiama venerdì"},
                           headers=h, timeout=15)
@@ -218,7 +244,7 @@ class TestSitesAndTimeline:
         assert d["event_source"] == "MANUAL"
 
     def test_post_timeline_system_readonly(self, h):
-        cid = pytest.private_customer_id
+        cid = _ensure_private_customer(h)
         r = requests.post(f"{API}/customers/{cid}/timeline",
                           json={"category": "SYSTEM_EVENT", "body": "hack"},
                           headers=h, timeout=15)
@@ -226,7 +252,7 @@ class TestSitesAndTimeline:
         assert _extract_code(r) == "SYSTEM_EVENT_READONLY", r.text
 
     def test_post_timeline_invalid_category(self, h):
-        cid = pytest.private_customer_id
+        cid = _ensure_private_customer(h)
         r = requests.post(f"{API}/customers/{cid}/timeline",
                           json={"category": "BOGUS_XX", "body": "x"},
                           headers=h, timeout=15)
@@ -238,8 +264,8 @@ class TestSitesAndTimeline:
 
 class TestQuotesWithSite:
     def test_create_quote_with_valid_site(self, h):
-        cid = pytest.private_customer_id
-        sid = pytest.site_id
+        cid = _ensure_private_customer(h)
+        sid = _ensure_site(h)
         r = requests.post(f"{API}/quotes",
                           json={"customer_id": cid, "site_id": sid, "title": "TEST Preventivo M1"},
                           headers=h, timeout=15)
@@ -250,8 +276,15 @@ class TestQuotesWithSite:
 
     def test_create_quote_site_not_owned_by_customer(self, h):
         # site belongs to private customer; try binding to company customer
-        cid = pytest.company_customer_id
-        sid = pytest.site_id
+        sid = _ensure_site(h)
+        # un cliente DIVERSO dal proprietario del cantiere (ricreato se lo stato condiviso manca: xdist loadscope)
+        cid = getattr(pytest, "company_customer_id", None)
+        if not cid:
+            ts = str(int(time.time() * 1000))[-8:]
+            rc = requests.post(f"{API}/customers", json={"customer_type": "COMPANY", "company_name": f"TEST ACME {ts}", "vat_number": f"IT{ts}000",
+                                                          "email": f"acme.{ts}@example.com", "phone": "0212345678"}, headers=h, timeout=15)
+            assert rc.status_code in (200, 201), rc.text
+            cid = pytest.company_customer_id = rc.json()["id"]
         r = requests.post(f"{API}/quotes",
                           json={"customer_id": cid, "site_id": sid, "title": "TEST wrong site"},
                           headers=h, timeout=15)
@@ -259,7 +292,7 @@ class TestQuotesWithSite:
         assert "Cantiere non valido" in (r.json().get("detail") or ""), r.text
 
     def test_create_quote_site_without_customer(self, h):
-        sid = pytest.site_id
+        sid = _ensure_site(h)
         r = requests.post(f"{API}/quotes",
                           json={"site_id": sid, "title": "TEST no cust"},
                           headers=h, timeout=15)

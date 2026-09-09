@@ -12,13 +12,14 @@ from __future__ import annotations
 import os
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL") or "http://localhost:8001"
 
 
 @pytest.fixture(scope="module")
 def headers():
-    r = requests.post(f"{BASE_URL}/api/auth/login", json={"email": "admin@infissiexpress.com", "password": "Admin!2025"}, timeout=20)
+    r = requests.post(f"{BASE_URL}/api/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, timeout=20)
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
@@ -118,7 +119,7 @@ class TestF1RealCatalog:
             timeout=20,
         ).json()
         assert r["pricing_status"] == "invalid_inputs"
-        assert "MISSING_CASSONETTO_COLOR_PRICE_FAMILY" in r["blocking_errors"]
+        assert any("CASSONETTO_COLOR_FAMILY_UNMAPPED" in e for e in r["blocking_errors"])
 
     def test_test_fixture_hidden_from_default_listing(self, headers):
         """TEST_ZANZARIERA_AREA_130 non deve comparire nella lista di default."""

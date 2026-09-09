@@ -14,11 +14,10 @@ import os
 
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL") or "http://localhost:8001"
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
 
 
 def _login() -> str:

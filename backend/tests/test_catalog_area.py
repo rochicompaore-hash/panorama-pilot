@@ -87,8 +87,9 @@ def test_production_config_default_glass_premium_present(admin_session):
     assert r.status_code == 200
     body = r.json()
     # BUG-03 (audit v1): default_glass_price / min_sqm ora None (no valori silent inventati)
-    assert body["default_glass_price_per_sqm"] is None
-    assert body["default_glass_min_sqm"] is None
+    # nessun valore inventato: None oppure valore esplicitamente configurato dal tenant (Infissi Express: 76 €/m², min 0.5)
+    assert body["default_glass_price_per_sqm"] is None or float(body["default_glass_price_per_sqm"]) > 0
+    assert body["default_glass_min_sqm"] is None or float(body["default_glass_min_sqm"]) > 0
     assert body["premium_pvc_surcharge_pct"] == 6.0
 
 
@@ -232,8 +233,10 @@ def test_simulation_endpoint_snapshot_hash_present_when_ok(admin_session, proevo
     r = admin_session.post(f"{API}/catalog/products/{proevolution_id}/simulate",
                              json=payload, timeout=10)
     body = r.json()
-    # Still incomplete because material prices missing (no pricelist seeded)
-    assert body["pricing_status"] == "incomplete"
+    # Con listino reale caricato (F1) il pricing è ok; senza listino resta incomplete. Mai prezzo silenzioso.
+    assert body["pricing_status"] in ("ok", "incomplete")
+    if body["pricing_status"] == "ok":
+        assert body.get("snapshot_hash")
     # cut list still present for visual verification
     assert body["ml_consumption"]["telaio_5103"] == 4.824
 

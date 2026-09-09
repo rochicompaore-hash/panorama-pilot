@@ -2,12 +2,12 @@
 import os
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PWD = "Admin!2025"
+ADMIN_PWD = ADMIN_PASSWORD
 
 
 @pytest.fixture(scope="module")
@@ -100,10 +100,10 @@ class TestDeliveryAndENEA:
         assert abs(float(enea_lines[0].get("base_price") or 0) - 100.0) < 0.01, enea_lines[0].get("base_price")
 
         fs = q4.get("financial_snapshot") or {}
-        assert fs.get("financial_snapshot_status") == "INCOMPLETE", fs.get("financial_snapshot_status")
+        # ENEA costing definitivo (50 € standard / 120 € assicurata, msg 620): il costo interno è configurato,
+        # quindi nessun MISSING_INTERNAL_COST_ENEA e snapshot non bloccato da ENEA.
         errs = fs.get("financial_snapshot_errors") or []
-        assert "MISSING_INTERNAL_COST_ENEA" in errs, errs
-        assert fs.get("commission_status") == "NEEDS_COST_CONFIGURATION", fs.get("commission_status")
+        assert "MISSING_INTERNAL_COST_ENEA" not in errs, errs
         assert q4.get("withholding_applicable") is True
 
 

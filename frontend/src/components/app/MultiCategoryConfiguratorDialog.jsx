@@ -431,18 +431,22 @@ function PricingModelRenderer({ model, inputs, setInputs, product, category }) {
   }, [category?.code]);
 
   if (model === "FORMULA_TECHNICAL") {
+    // PO msg 627: solo configurazioni realmente prezzabili sono selezionabili (fail closed lato API in ogni caso).
+    const quotable = product?.quotable_configurations || { WINDOW: [1, 2], DOOR_WINDOW: [1, 2] };
+    const wt = inputs.window_type || "WINDOW";
+    const sashOptions = quotable[wt] || [];
     return (
       <Card className="rounded-sm border-border p-4 space-y-3" data-testid="cfg-technical">
         <div className="text-xs font-bold flex items-center gap-1"><Info size={12} /> Configurazione tecnica autorevole</div>
         <div className="grid grid-cols-2 gap-3">
           <SelectField
             label="TIPO SERRAMENTO"
-            value={inputs.window_type || "WINDOW"}
-            onChange={(v) => set("window_type", v)}
-            options={[["WINDOW","FINESTRA"],["DOOR_WINDOW","PORTAFINESTRA"]]}
+            value={wt}
+            onChange={(v) => setInputs((s) => ({ ...s, window_type: v, number_of_sashes: (quotable[v] || []).includes(Number(s.number_of_sashes)) ? s.number_of_sashes : (quotable[v] || [1])[0] }))}
+            options={[["WINDOW","FINESTRA"],["DOOR_WINDOW","PORTAFINESTRA"]].filter(([k]) => (quotable[k] || []).length)}
             testid="cfg-tech-wtype"
           />
-          <NumField label="N. ante" value={inputs.number_of_sashes || 1} onChange={(v) => set("number_of_sashes", v)} testid="cfg-tech-sashes" min={1} max={4} />
+          <SelectField label="N. ante" value={String(inputs.number_of_sashes || 1)} onChange={(v) => set("number_of_sashes", Number(v))} options={sashOptions.map((n) => [String(n), `${n} ant${n === 1 ? "a" : "e"}`])} testid="cfg-tech-sashes" />
           <NumField label="Larghezza (mm)" value={inputs.width_mm} onChange={(v) => set("width_mm", v)} testid="cfg-tech-width" />
           <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-tech-height" />
           <SelectField label="Apertura" value={inputs.opening_configuration || "ANTA_RIBALTA"} onChange={(v) => set("opening_configuration", v)} options={[["ANTA_RIBALTA","Anta-ribalta"],["BATTENTE","Battente"],["FISSA","Fissa"]]} testid="cfg-tech-opening" />

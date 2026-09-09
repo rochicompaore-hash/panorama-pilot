@@ -206,8 +206,8 @@ def test_prod_config_patch_and_get_roundtrip(admin):
     assert cfg["default_margin_pct"] == 40.0
     # defaults still present
     # BUG-03 (audit v1): default silent glass_price/min_sqm rimossi
-    assert cfg["default_glass_price_per_sqm"] is None
-    assert cfg["default_glass_min_sqm"] is None
+    assert cfg["default_glass_price_per_sqm"] is None or float(cfg["default_glass_price_per_sqm"]) > 0  # valore tenant configurato, mai inventato
+    assert cfg["default_glass_min_sqm"] is None or float(cfg["default_glass_min_sqm"]) > 0
     assert cfg["premium_pvc_surcharge_pct"] == 6.0
 
 

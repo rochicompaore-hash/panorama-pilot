@@ -389,10 +389,8 @@ class TestSignatureSuccess:
         rsp = anon.get(f"{API}/public/quotes/{raw}/signed-pdf")
         assert rsp.status_code == 200
         signed_pages = len(PdfReader(io.BytesIO(rsp.content)).pages)
-        # NOTE: signature template renders as 2 pages → signed = orig + 2 pages.
-        # Manual smoke test confirmed 6 pages for a 4-page original.
-        assert signed_pages > orig_pages, f"expected more pages than original ({orig_pages}), got {signed_pages}"
-        assert signed_pages == orig_pages + 2, f"expected exactly {orig_pages}+2 pages, got {signed_pages}"
+        # La pagina di firma è una sola: signed = orig + 1 (nessuna pagina bianca iniziale).
+        assert signed_pages == orig_pages + 1, f"expected exactly {orig_pages}+1 pages, got {signed_pages}"
 
     def test_signed_pdf_footer_on_every_page(self, admin_session, a_lead):
         try:

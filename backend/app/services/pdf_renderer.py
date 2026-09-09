@@ -156,8 +156,35 @@ def validate_quote_for_definitive(quote: dict, company: dict, template: dict) ->
     return errs
 
 
+def _services_included(quote: dict) -> List[dict]:
+    """Solo servizi realmente inclusi (PO msg 626 §8). Nessun servizio dichiarato se escluso."""
+    out: List[dict] = []
+    if quote.get("installation_mode") == "SUPPLY_AND_INSTALLATION":
+        out.append({"code": "INSTALLATION", "label": "Posa in opera"})
+    if quote.get("dismantling_mode") == "INCLUDED":
+        out.append({"code": "DISMANTLING", "label": "Smontaggio serramenti esistenti"})
+    if quote.get("disposal_mode") == "INCLUDED":
+        out.append({"code": "DISPOSAL", "label": "Smaltimento materiali di risulta"})
+    enea = quote.get("enea_practice_code")
+    if enea == "ENEA_STANDARD":
+        out.append({"code": "ENEA_STANDARD", "label": "Pratica ENEA Standard"})
+    elif enea == "ENEA_INSURED":
+        out.append({"code": "ENEA_INSURED", "label": "Pratica ENEA Assicurata"})
+    seen = {o["code"] for o in out}
+    for l in quote.get("lines") or []:
+        for svc in l.get("automatic_services") or []:
+            t = (svc.get("service_type") or "").upper()
+            if t == "PROFILATURA" and "PROFILING" not in seen:
+                out.append({"code": "PROFILING", "label": "Profilatura perimetrale"}); seen.add("PROFILING")
+        for svc in l.get("manual_extra_services") or []:
+            code = f"EXTRA:{svc.get('service_code') or svc.get('service_name')}"
+            if code not in seen and svc.get("service_name"):
+                out.append({"code": code, "label": svc["service_name"]}); seen.add(code)
+    return out
+
+
 def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[dict],
-                   payment_terms: dict, kind: str = "definitive") -> dict:
+                   payment_terms: dict, kind: str = "definitive", general_terms: Optional[dict] = None) -> dict:
     """Freeze all data required to render the PDF. This becomes the immutable
     document of record and MUST be sufficient to re-render an identical PDF later.
     """
@@ -210,6 +237,7 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "valid_until": quote.get("valid_until"),
         "customer": quote.get("customer_snapshot") or {"name": quote.get("customer_name")},
         "site_address": quote.get("site_address"),
+        "site": quote.get("site_snapshot"),
         "sales_rep": quote.get("sales_rep_snapshot") or {"name": quote.get("sales_rep_name")},
         "openings": quote.get("openings") or [],
         "environments": quote.get("environments") or [],
@@ -221,7 +249,7 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         # msg 402 — payment terms / delivery policy / sconto pagamento (solo dati cliente, nessun dato interno)
         "commercial_subtotal": quote.get("commercial_subtotal") or 0,
         "global_discount_amount": quote.get("global_discount_amount") or 0,
-        "global_discount_label": ("Sconto promozionale" if quote.get("promo_code") else f"Sconto {quote.get('global_discount_value')}%") if (quote.get("global_discount_amount") or 0) > 0 else None,
+        "global_discount_label": ("Sconto promozionale" if quote.get("promo_code") else f"Sconto {float(quote.get('global_discount_value') or 0):g}%") if (quote.get("global_discount_amount") or 0) > 0 else None,
         "payment_terms_code": quote.get("payment_terms_code"),
         "payment_terms_label": quote.get("payment_terms_label"),
         "payment_schedule": quote.get("payment_schedule") or [],
@@ -237,10 +265,14 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "dismantling_mode": quote.get("dismantling_mode"),
         "vat_amount": quote.get("vat_amount"),
         "total": quote.get("total"),
-        "vat_breakdown": _compute_vat_breakdown(quote.get("lines") or []),
+        "vat_breakdown": _compute_vat_breakdown(quote.get("lines") or [], float(quote.get("subtotal") or 0)),
         "notes": quote.get("notes"),
         "version": quote.get("version"),
         "visual_schemes": _build_visual_schemes(quote),
+        "services_included": _services_included(quote),
+        "delivery_label": ("Consegna standard" if (quote.get("delivery_mode") or "STANDARD") == "STANDARD" else "Consegna accelerata"),
+        "general_terms_version": (general_terms or {}).get("version"),
+        "general_terms_snapshot_id": (general_terms or {}).get("id"),
     }
     return {
         "kind": kind,
@@ -269,6 +301,7 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
                      "mandatory": c.get("mandatory", False)} for c in clauses],
         "payment_terms": payment_terms,
         "quote": quote_snap,
+        "general_terms": general_terms,
     }
 
 
@@ -314,7 +347,7 @@ def _build_visual_schemes(quote: dict) -> List[dict]:
         pos = op.get("code") or op.get("display_name") or "Riga aggiuntiva"
         if key not in schemes:
             schemes[key] = {
-                "positions": [], "description": l.get("description") or spec.get("product_name") or spec.get("product_type"),
+                "positions": [], "spec": spec, "description": l.get("description") or spec.get("product_name") or spec.get("product_type"),
                 "product_type": spec.get("product_type"), "details": _visual_details(spec),
                 "is_bicolor": bool(vs.get("is_bicolor")),
                 "svg_exterior": vs.get("svg_exterior"), "svg_interior": vs.get("svg_interior"),
@@ -324,12 +357,16 @@ def _build_visual_schemes(quote: dict) -> List[dict]:
     return list(schemes.values())
 
 
-def _compute_vat_breakdown(lines: List[dict]) -> List[dict]:
-    """Group by VAT rate → [{rate, taxable, tax, total}]."""
+def _compute_vat_breakdown(lines: List[dict], net_subtotal: float = 0.0) -> List[dict]:
+    """Group by VAT rate → [{rate, taxable, tax, total}].
+    Gli imponibili di riga vengono riproporzionati sull'imponibile netto (sconti globali/pagamento/consegna)
+    così che IVA e totale del PDF coincidano con quote.vat_amount / quote.total."""
+    gross = sum(float(l.get("subtotal_line") or 0) for l in lines)
+    factor = (net_subtotal / gross) if (gross > 0 and net_subtotal > 0) else 1.0
     buckets: Dict[float, Dict[str, float]] = {}
     for l in lines:
         rate = float(l.get("vat_rate") or 0.22)
-        taxable = float(l.get("subtotal_line") or 0)
+        taxable = float(l.get("subtotal_line") or 0) * factor
         b = buckets.setdefault(rate, {"rate": rate, "taxable": 0.0, "tax": 0.0})
         b["taxable"] += taxable
         b["tax"] += taxable * rate

@@ -92,10 +92,17 @@ def _base_bom_payload() -> Dict[str, Any]:
 # =========================================================
 class TestGatingActive:
     def test_bom_simulate_active_returns_prices(self, admin_headers):
-        r = requests.post(f"{API}/pricing-hub/bom-simulate",
-                          headers=admin_headers, json=_base_bom_payload(), timeout=20)
-        assert r.status_code == 200
-        d = r.json()
+        import time as _t
+        # test_pricelist_gating_iter22 (altro worker xdist) switcha SELL-DEMO a draft/archived per pochi secondi:
+        # attende che il listino torni attivo prima di asserire (nessun cambiamento di comportamento del backend).
+        for _ in range(8):
+            r = requests.post(f"{API}/pricing-hub/bom-simulate",
+                              headers=admin_headers, json=_base_bom_payload(), timeout=20)
+            assert r.status_code == 200
+            d = r.json()
+            if (d.get("materials_price") or 0) > 0:
+                break
+            _t.sleep(1.5)
         assert (d.get("materials_price") or 0) > 0
         sp = d.get("sell_pricelist") or {}
         assert sp.get("pricelist_status") == "active"

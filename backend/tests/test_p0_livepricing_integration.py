@@ -8,10 +8,11 @@ from __future__ import annotations
 import os
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://serramento-ops.preview.emergentagent.com").rstrip("/")
 
-ADMIN = ("admin@infissiexpress.com", "Admin!2025")
+ADMIN = (ADMIN_EMAIL, ADMIN_PASSWORD)
 COMMERCIAL = ("commercial_test@infissiexpress.com", "CommTest!2026")
 
 PID_TAP = "1ddf23e0-cc3e-444f-91af-cdfd5e270bc2"

@@ -14,6 +14,7 @@ from app.services.color_engine import (
 )
 from app.services.visual_spec import render_svg, build_visual
 from app.services.pdf_renderer import build_snapshot
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 WINDOW_PID = "8e1cafd0-9707-47c7-8939-b97c9a404021"
@@ -57,7 +58,7 @@ def test_render_svg_deterministic_and_view_colors():
 # ---------------- API ----------------
 @pytest.fixture(scope="module")
 def tok():
-    r = requests.post(f"{BASE_URL}/api/auth/login", json={"email": "admin@infissiexpress.com", "password": "Admin!2025"})
+    r = requests.post(f"{BASE_URL}/api/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
     r.raise_for_status()
     d = r.json()
     return d.get("access_token") or d.get("token")
@@ -212,4 +213,27 @@ def test_save_reload_modify_pdf_parity(tok, quote):
     assert r.status_code == 200, r.text
     assert r.json()["size_bytes"] > 10000
 
+    requests.delete(f"{BASE_URL}/api/quotes/{qid}", headers=h)
+
+
+# ---------------- PO msg 627: 3/4 ante = DISABLED_FAIL_CLOSED (nessun dato ferramenta/ricetta autoritativo) ----------------
+def test_quotable_configurations_exposed(tok):
+    r = requests.get(f"{BASE_URL}/api/multi-cat/products/{WINDOW_PID}", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 200
+    q = r.json()["quotable_configurations"]
+    assert q == {"WINDOW": [1, 2], "DOOR_WINDOW": [1, 2]}
+
+
+@pytest.mark.parametrize("n", [3, 4])
+def test_3_4_sash_fail_closed_api(tok, n):
+    d = _cfg_window(tok, "003", "003", "WHITE_MASS", sashes=n)
+    assert d["pricing_status"] == "not_available"
+    assert "CONFIGURATION_NOT_AVAILABLE_FOR_QUOTING" in d["blocking_errors"][0]
+    assert d.get("commercial_snapshot") is None
+    h = {"Authorization": f"Bearer {tok}"}
+    cust = requests.get(f"{BASE_URL}/api/customers?limit=1", headers=h).json()
+    qid = requests.post(f"{BASE_URL}/api/quotes", json={"title": "3-4 SASH BLOCK", "customer_id": (cust.get("items") or cust)[0]["id"]}, headers=h).json()["id"]
+    cfg = {"window_type": "WINDOW", "number_of_sashes": n, "width_mm": 2000, "height_mm": 1400, "color_internal": "003", "color_external": "003", "glass_type": "DOUBLE_STANDARD", "quantity": 1}
+    r = requests.post(f"{BASE_URL}/api/quotes/{qid}/lines", json=_line_payload(cfg, WINDOW_PID, "FORMULA_TECHNICAL", "FINESTRE", "PROEVOLUTION"), headers=h)
+    assert r.status_code == 400 and "CONFIGURATION_NOT_AVAILABLE_FOR_QUOTING" in r.text
     requests.delete(f"{BASE_URL}/api/quotes/{qid}", headers=h)

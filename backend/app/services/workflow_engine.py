@@ -199,6 +199,15 @@ async def ensure_survey_from_contract(*, tenant_id: str, contract: Dict[str, Any
     """Idempotente: crea Survey to_schedule se non esiste. Ritorna survey_id."""
     db = get_db()
     contract_id = contract["_id"] if "_id" in contract else contract.get("id")
+    # Evento timeline contract.signed (idempotente) — visibile al cliente come "Contratto firmato"
+    if contract.get("contract_status") == "signed" and not await db.timeline_events.find_one(
+            {"tenant_id": tenant_id, "contract_id": contract_id, "event_type": "contract.signed"}):
+        await log_timeline_event(
+            tenant_id=tenant_id, domain="contract", event_type="contract.signed", ref_id=contract_id,
+            contract_id=contract_id, quote_id=contract.get("quote_id"), customer_id=contract.get("customer_id"),
+            new_status="signed", actor_id=actor_id, source="system", is_customer_visible=True,
+            customer_label="Contratto firmato", customer_stage="contract_signed",
+        )
     existing = await db.surveys.find_one({
         "tenant_id": tenant_id, "contract_id": contract_id, "deleted_at": None,
     })

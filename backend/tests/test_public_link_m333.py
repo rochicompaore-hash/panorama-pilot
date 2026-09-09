@@ -222,7 +222,8 @@ class TestPublicPortal:
         assert d["quote_revision"]
         assert d["has_pdf"] is True
         assert isinstance(d["total"], (int, float))
-        assert set(d["allowed_actions"]).issubset({"view", "download"})
+        # M3.3.4: il token default include anche sign/request_changes/reject
+        assert set(d["allowed_actions"]).issubset({"view", "download", "download_signed", "sign", "request_changes", "reject"})
         assert set(d["allowed_actions"]) >= {"view", "download"}
         # No internal identifiers
         raw_json = r.text
@@ -396,7 +397,6 @@ class TestPermissions:
 
 
 class TestExpiredQuote:
-    @pytest.mark.xfail(strict=True, reason="Backend bug: PublicQuoteResponse.valid_until typed as Optional[str] but snapshot stores datetime object → 500 on public GET when valid_until is set. See action_items.")
     def test_expired_quote_flag(self, admin_session, a_lead):
         # Create quote, set valid_until in past, regenerate PDF, create link.
         qid = _create_quote_with_line(admin_session, a_lead)

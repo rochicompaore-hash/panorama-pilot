@@ -217,9 +217,11 @@ async def _resolve_quote_full(tenant_id: str, quote_id: str) -> Optional[dict]:
     if q.get("customer_id"):
         cust = await db.customers.find_one({"_id": q["customer_id"]})
         if cust: q["customer_snapshot"] = {
-            "name": cust.get("name"), "vat_number": cust.get("vat_number"),
+            "name": cust.get("name") or cust.get("display_name") or cust.get("company_name")
+                    or f"{cust.get('first_name') or ''} {cust.get('last_name') or ''}".strip() or None,
+            "vat_number": cust.get("vat_number"),
             "tax_code": cust.get("tax_code"), "email": cust.get("email"),
-            "phone": cust.get("phone"),
+            "phone": cust.get("phone") or cust.get("mobile"),
         }
     elif q.get("lead_id"):
         lead = await db.leads.find_one({"_id": q["lead_id"]})
@@ -227,6 +229,11 @@ async def _resolve_quote_full(tenant_id: str, quote_id: str) -> Optional[dict]:
             "name": lead.get("name") or f"{lead.get('first_name','')} {lead.get('last_name','')}".strip(),
             "email": lead.get("email"), "phone": lead.get("phone"),
         }
+    # Site (cantiere) full data — PDF V2 header
+    if q.get("site_id"):
+        site = await db.sites.find_one({"_id": q["site_id"]})
+        if site:
+            q["site_snapshot"] = {k: site.get(k) for k in ("name", "address", "street_number", "postal_code", "city", "province", "floor", "has_elevator", "site_contact_phone")}
     # Sales rep
     if q.get("sales_rep_id"):
         u = await db.users.find_one({"_id": q["sales_rep_id"]})
@@ -305,10 +312,14 @@ async def _generate_pdf(qid: str, body: GeneratePdfRequest, request: Request, us
     else:
         pt = (template.get("default_payment_terms") or {})
 
+    # Condizioni Generali — In sintesi (versionate; congelate su ACCEPTED)
+    from app.services.general_terms import resolve_general_terms_for_quote
+    general_terms = await resolve_general_terms_for_quote(db, quote)
+
     # Build snapshot
     snapshot = build_snapshot(
         quote=quote, company=company, template=template, clauses=clauses,
-        payment_terms=pt, kind="preview" if is_preview else "definitive",
+        payment_terms=pt, kind="preview" if is_preview else "definitive", general_terms=general_terms,
     )
     snapshot_hash = compute_snapshot_hash(snapshot)
 
@@ -456,6 +467,15 @@ async def _generate_pdf(qid: str, body: GeneratePdfRequest, request: Request, us
         "size_bytes": pdf_doc["size_bytes"], "generated_at": now.isoformat(),
         "validation_errors": validation_errors,
     }
+
+
+@router.get("/quote-pdfs/{pid}/snapshot")
+async def get_pdf_snapshot(pid: str, user: dict = Depends(require_permission("quotes.view"))):
+    """Snapshot immutabile del PDF (audit interno: verifica assenza dati interni, parità visual)."""
+    d = await get_db().quote_pdfs.find_one({"_id": pid, "tenant_id": user["tenant_id"]}, {"pdf_base64": 0})
+    if not d:
+        raise HTTPException(status_code=404, detail="PDF non trovato")
+    return {"id": d["_id"], "kind": d.get("kind"), "snapshot_hash": d.get("snapshot_hash"), "snapshot": d.get("snapshot")}
 
 
 @router.get("/quote-pdfs/{pid}/download")

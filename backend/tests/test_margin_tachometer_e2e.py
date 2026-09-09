@@ -16,13 +16,12 @@ import requests
 import uuid
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
 COMMERCIAL_EMAIL = "commercial_test@infissiexpress.com"
 COMMERCIAL_PASSWORD = "CommTest!2026"
 GOLDEN_QUOTE_ID = "3b4fd98a-fc62-457d-9d66-494742e5fc90"
 
 from app.services.margin_engine import COMMERCIAL_SAFE_KEYS  # policy msg 396 §6 / msg 402 §36: tachometer sì, PRE margin no
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 ADMIN_ONLY_KEYS = {
     "supply_cost", "installation_cost", "other_direct_costs",
     "pre_commission_contribution", "commission_base",

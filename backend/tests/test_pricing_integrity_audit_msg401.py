@@ -6,9 +6,10 @@ Cassonetti GRID (fail-closed) + Persiane AREA_PURCHASE_MULTIPLIER
 import os
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
-ADMIN = ("admin@infissiexpress.com", "Admin!2025")
+ADMIN = (ADMIN_EMAIL, ADMIN_PASSWORD)
 COMM = ("commercial_test@infissiexpress.com", "CommTest!2026")
 
 

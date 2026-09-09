@@ -471,7 +471,7 @@ Attendo il tuo collaudo manuale del nuovo endpoint.
 API_URL=https://serramento-ops.preview.emergentagent.com
 TOKEN=$(curl -s -X POST "$API_URL/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@infissiexpress.com","password":"Admin!2025"}' \
+  -d '{"email":"admin@infissiexpress.com","password":"<ADMIN_PASSWORD>"}' \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 
 # Calcolo ProEvolution 900x1500 BIANCO doppio standard

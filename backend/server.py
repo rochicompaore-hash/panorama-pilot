@@ -50,6 +50,7 @@ from app.routers.pipelines import router as pipelines_router
 from app.routers.leads import router as leads_router
 from app.routers.customers import router as customers_router
 from app.routers.customer_timeline import router as customer_timeline_router
+from app.routers.customer_portal import router as cp_core_router, admin_router as cp_admin_router
 from app.routers.contacts import router as contacts_router
 from app.routers.simple_services import router as simple_services_router
 from app.routers.margin_control import router as margin_control_router
@@ -262,6 +263,7 @@ FINANCE_BI_ROUTERS = [
     catalog_admin_router,
 ]
 PUBLIC_ROUTERS = [
+    cp_core_router, cp_admin_router,
     public_admin_router, public_router_open,
     public_site_router, platform_site_router,
 ]

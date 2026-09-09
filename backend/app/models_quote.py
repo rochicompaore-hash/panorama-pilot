@@ -194,6 +194,9 @@ class Quote(BaseDoc):
     withholding_applicable: bool = False
     withholding_rate: float = 0.11
     enea_practice_code: Optional[str] = None
+    # Condizioni Generali versionate (PO msg 626 §14) — congelate su ACCEPTED
+    general_terms_version: Optional[str] = None
+    general_terms_snapshot_id: Optional[str] = None
 
 
 class QuoteCreate(BaseModel):

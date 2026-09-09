@@ -20,7 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.models_multi_category import (
     PricingModel,
@@ -507,6 +507,27 @@ def _pack_product(product: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+async def quotable_configurations(db, tenant_id: str, product_key: str) -> Dict[str, List[int]]:
+    """Configurazioni (window_type -> numero ante) realmente prezzabili con dati autoritativi:
+    ricetta tecnica + regola ferramenta + tempo produzione tutti presenti. Nessuna invenzione (PO msg 627 §2-§4)."""
+    pk = (product_key or "").upper()
+    recipes = set()
+    async for r in db.technical_recipes.find({"tenant_id": {"$in": [tenant_id, "*"]}, "product_key": pk, "active": True, "deleted_at": None}, {"recipe_code": 1}):
+        recipes.add(r.get("recipe_code"))
+    hw = set()
+    async for h in db.hardware_rules.find({"active": True, "deleted_at": None}, {"opening_type": 1, "number_of_sashes": 1}):
+        hw.add((h.get("opening_type"), h.get("number_of_sashes")))
+    pt = set()
+    async for t in db.production_time_configs.find({"active": True, "deleted_at": None}, {"recipe_code": 1}):
+        pt.add(t.get("recipe_code"))
+    out: Dict[str, List[int]] = {}
+    for wt in ("WINDOW", "DOOR_WINDOW"):
+        ok = [n for n in (1, 2, 3, 4) if f"{wt}_{n}_SASH" in recipes and f"{wt}_{n}_SASH" in pt and (wt, n) in hw]
+        if ok:
+            out[wt] = ok
+    return out
+
+
 async def resolve_and_compute(
     product: Dict[str, Any],
     category: Optional[Dict[str, Any]],
@@ -601,6 +622,21 @@ async def _resolve_and_compute_core(
         from app.services.pricing_v3 import PricingRequest, compute_pricing
 
         ti = req.technical_inputs or {}
+        # PO msg 627: una configurazione selezionabile DEVE essere prezzabile -> altrimenti FAIL CLOSED esplicito.
+        from app.db import get_db as _gdb
+        _wt = str(ti.get("window_type") or "WINDOW").upper()
+        _n = int(ti.get("number_of_sashes") or 1)
+        _q = await quotable_configurations(_gdb(), tenant_id, ti.get("product_key") or product.get("key") or "")
+        if _n not in (_q.get(_wt) or []):
+            return ConfigureResponse(
+                pricing_status="not_available",
+                pricing_model=model,
+                calculated_at=now,
+                product=_pack_product(product),
+                category=category or {},
+                inputs_echo=inputs_echo,
+                blocking_errors=[f"CONFIGURATION_NOT_AVAILABLE_FOR_QUOTING: {_wt} {_n} ante non prezzabile (dati tecnici autoritativi assenti). Configurazioni disponibili: {_q}"],
+            )
         try:
             pr = PricingRequest(
                 tenant_id=tenant_id,

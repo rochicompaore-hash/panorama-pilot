@@ -58,7 +58,7 @@ def _make_customer(sess) -> str:
     suffix = uuid.uuid4().hex[:8]
     r = sess.post(f"{API}/customers", json={
         "first_name": f"TEST_WF_{suffix}", "last_name": "Cliente",
-        "email": f"wf_{suffix}@test.local",
+        "email": f"wf_{suffix}@test.local", "tax_code": "RSSMRA80A01H501U",
     }, timeout=15)
     assert r.status_code in (200, 201), f"customer create: {r.status_code} {r.text[:200]}"
     return r.json()["id"]

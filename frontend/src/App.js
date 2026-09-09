@@ -34,6 +34,7 @@ import PricelistsPage from "@/pages/PricelistsPage";
 import TemplatesPage from "@/pages/TemplatesPage";
 import ClausesPage from "@/pages/ClausesPage";
 import PublicQuotePage from "@/pages/PublicQuotePage";
+import CustomerPortal from "@/pages/CustomerPortal";
 import OnboardingWizard from "@/pages/OnboardingWizard";
 import {
   SurveysPage, SalesOrdersPage, SuppliersPage, PurchaseOrdersPage,
@@ -110,6 +111,7 @@ function App() {
       <Routes>
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/customer-portal/*" element={<CustomerPortal />} />
         <Route path="/p/:token" element={<PublicQuotePage />} />
         <Route path="/p/schedule/:token" element={<PublicSchedulePage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

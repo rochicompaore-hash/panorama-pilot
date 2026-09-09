@@ -279,20 +279,13 @@ class TestQuoteSendBlocked:
             try:
                 db = client[db_name]
                 # 1) Inserisci opening_product con blocking_errors
-                await db.opening_products.insert_one({
-                    "_id": op_id,
-                    "tenant_id": tenant_id,
-                    "quote_id": qid,
-                    "code": op_id,
-                    "name": "TEST product w/ blocking error",
-                    "quantity": 1,
-                    "deleted_at": None,
-                    "blocking_errors": [{
-                        "code": "PRICELIST_NOT_PUBLISHED",
-                        "message": "Test blocking error",
-                        "severity": "blocking",
-                    }],
-                })
+                # AUDIT V1 BUG-01: il guard legge q.lines[].pricing_snapshot (opening_products è legacy/inesistente)
+                await db.quotes.update_one({"_id": qid, "tenant_id": tenant_id}, {"$push": {"lines": {
+                    "id": op_id, "category": "finestre", "description": "TEST product w/ blocking error", "quantity": 1,
+                    "base_price": 0, "unit_price_final": 0, "subtotal_line": 0,
+                    "pricing_snapshot": {"pricing_status": "invalid_inputs", "blocking_errors": [{
+                        "code": "PRICELIST_NOT_PUBLISHED", "message": "Test blocking error", "severity": "blocking"}]},
+                }}})
                 return True
             finally:
                 client.close()
@@ -301,7 +294,7 @@ class TestQuoteSendBlocked:
             client = AsyncIOMotorClient(mongo_url)
             try:
                 db = client[db_name]
-                await db.opening_products.delete_one({"_id": op_id})
+                await db.quotes.update_one({"_id": qid}, {"$pull": {"lines": {"id": op_id}}})
                 await db.quotes.delete_one({"_id": qid})
             finally:
                 client.close()
@@ -318,6 +311,8 @@ class TestQuoteSendBlocked:
                 f"Attesa 400 su sent con prodotti bloccati, got {rs.status_code}: {rs.text}"
             try:
                 detail = rs.json().get("detail", "")
+                if isinstance(detail, dict):
+                    detail = detail.get("message") or str(detail)
             except Exception:
                 detail = rs.text
             assert "Preventivo non inviabile" in detail, \

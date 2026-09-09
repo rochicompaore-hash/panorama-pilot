@@ -145,7 +145,7 @@ class TestAutosave:
         rid = f"r-{uuid.uuid4().hex[:8]}"
         r = s.post(f"{BASE_URL}/api/quotes/{qid}/autosave",
                    json={"version": draft_quote["version"],
-                         "fields": {"notes": "test", "payment_terms": "30/70"},
+                         "fields": {"notes": "test", "payment_terms": "FULL_UPFRONT"},
                          "request_id": rid},
                    headers=admin_h)
         assert r.status_code == 200, f"autosave failed: {r.status_code} {r.text}"
@@ -159,7 +159,8 @@ class TestAutosave:
         assert g.status_code == 200
         gd = g.json()
         assert gd["notes"] == "test"
-        assert gd["payment_terms"] == "30/70"
+        # payment_terms non è autosalvabile (whitelist): resta la policy impostata via PATCH
+        assert gd["payment_terms"] != "FULL_UPFRONT" and "payment_terms" not in r.json()["autosaved_fields"]
 
     def test_version_conflict_returns_409(self, s, admin_h, draft_quote):
         qid = draft_quote["id"]

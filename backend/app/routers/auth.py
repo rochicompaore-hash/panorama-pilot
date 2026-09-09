@@ -64,7 +64,9 @@ async def login(body: LoginRequest, request: Request, response: Response):
     db = get_db()
     ip = get_client_ip(request)
     email = body.email.lower().strip()
-    identifier = f"{ip}:{email}"
+    # Lock per account (email) e non per IP: gli IP di ingresso variano (proxy/ingress) e un attaccante
+    # con IP rotanti aggirerebbe il lock. L'IP resta tracciato nell'audit.
+    identifier = f"acct:{email}"
     ua = request.headers.get("user-agent")
 
     wait = await check_brute_force(db, identifier, settings)

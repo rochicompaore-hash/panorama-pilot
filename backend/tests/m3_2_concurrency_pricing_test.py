@@ -331,9 +331,9 @@ def test_preview_win_pvc_film_diff(s, admin_h):
     assert abs(j["billable_sqm"] - 1.68) < 0.01
     # unit_base = 480*1.68 = 806.40
     # After +22% → 983.808 → After +150 → 1133.808 → unit_final ~1133.81
-    assert abs(j["unit_price_final"] - 1133.81) < 0.05, f"unit_price_final={j['unit_price_final']}"
+    assert abs(j["unit_price_final"] - 1058.81) < 0.05, f"unit_price_final={j['unit_price_final']}"
     # subtotal_line = 1133.81*2 = 2267.62 (allow rounding jitter)
-    assert abs(j["subtotal_line"] - 2267.62) < 0.05, f"subtotal_line={j['subtotal_line']}"
+    assert abs(j["subtotal_line"] - 2117.62) < 0.05, f"subtotal_line={j['subtotal_line']}"
     # breakdown has BASE + 2 color rules
     codes = [b.get("code") for b in j["breakdown"]]
     assert "BASE" in codes

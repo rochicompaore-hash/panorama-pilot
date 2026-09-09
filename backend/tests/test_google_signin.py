@@ -1,6 +1,7 @@
 """Tests for Emergent-managed Google sign-in wiring + classic login regression."""
 import os
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://serramento-ops.preview.emergentagent.com').rstrip('/')
 
@@ -21,7 +22,7 @@ def test_google_session_missing_body_returns_422():
 # --- Classic login regression ---
 def test_classic_login_and_me():
     r = requests.post(f"{BASE_URL}/api/auth/login",
-                      json={"email": "admin@infissiexpress.com", "password": "Admin!2025"},
+                      json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
                       timeout=20)
     assert r.status_code == 200, r.text
     tok = r.json().get("access_token")
@@ -31,4 +32,4 @@ def test_classic_login_and_me():
     assert me.status_code == 200, me.text
     body = me.json()
     email = body.get("email") or body.get("user", {}).get("email")
-    assert email == "admin@infissiexpress.com"
+    assert email == ADMIN_EMAIL

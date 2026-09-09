@@ -191,4 +191,4 @@ class TestGoldenViaApi:
             "width_mm": 500, "height_mm": 250, "quantity": 1,
             "options": {"color_code": "999", "depth_mm": 163, "ceiling_liner": "SI"}}}, timeout=20).json()
         assert d["pricing_status"] == "invalid_inputs"
-        assert "MISSING_CASSONETTO_COLOR_PRICE_FAMILY" in d["blocking_errors"]
+        assert any("CASSONETTO_COLOR_FAMILY_UNMAPPED" in e for e in d["blocking_errors"])

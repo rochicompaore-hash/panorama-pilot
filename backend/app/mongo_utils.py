@@ -1,6 +1,7 @@
 """Mongo helpers: serialize/deserialize documents with UUID _id and ISO dates."""
 from __future__ import annotations
 from datetime import datetime, date
+from bson import ObjectId
 from typing import Any, Dict, Optional
 
 
@@ -34,4 +35,7 @@ def from_mongo(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if "_id" in d:
         d.setdefault("id", d["_id"])
         d.pop("_id", None)
+    for k, v in d.items():
+        if isinstance(v, ObjectId):
+            d[k] = str(v)
     return d

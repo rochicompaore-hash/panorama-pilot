@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import pytest
 import requests
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL") or os.environ.get("BASE_URL")
 if not BASE_URL:
@@ -17,8 +18,6 @@ if not BASE_URL:
                 BASE_URL = line.split("=", 1)[1].strip()
                 break
 
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PASSWORD = "Admin!2025"
 PROEVOLUTION_TEST_PRODUCT_ID = "8e1cafd0-9707-47c7-8939-b97c9a404021"
 
 

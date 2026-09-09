@@ -102,10 +102,10 @@ def test_create_quote_number_and_revision(created_quote):
     q = created_quote
     assert q["revision"] == 0
     assert q["revision_label"] == "R00"
-    assert q["number"].startswith("PREV-"), q["number"]
+    assert q["number"].startswith("PRV-"), q["number"]
     assert q["number"].endswith("-R00")
     # Extract numeric part
-    core = q["number"].split("-R")[0]  # PREV-YYYY-NNNNN
+    core = q["number"].split("-R")[0]  # PRV-YYYY-NNNNN
     n_int = q["number_int"]
     assert n_int >= 1350, f"expected >=1350, got {n_int}"
     assert q["quote_status"] == "draft"
@@ -302,9 +302,10 @@ def test_convert_to_contract(s, admin_h, created_quote):
 
 def test_convert_already_converted(s, admin_h, created_quote):
     qid = created_quote["id"]
+    # M3.3.6 — idempotenza: la seconda conversione restituisce il contratto esistente (200), nessun duplicato
     r = s.post(f"{BASE_URL}/api/quotes/{qid}/convert-to-contract", headers=admin_h)
-    assert r.status_code == 400
-    assert "già convertito" in r.json()["detail"]
+    assert r.status_code == 200
+    assert r.json()["id"] == created_quote["_contract_id"]
 
 
 def test_convert_draft_quote_rejected(s, admin_h, seed_lead):

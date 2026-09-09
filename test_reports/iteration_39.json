@@ -1,0 +1,24 @@
+{
+  "summary": "CUSTOMER PORTAL CORE V1 — full E2E BE security + FE mobile (390x844) verified. Backend pytest test_customer_portal_iter39.py: 7/7 PASS (employee token->401 on /customer-portal, customer token->401 on /api/quotes and /api/customers, cross-customer job->404, no leak keys margin/internal_cost/*_snapshot/supply_cost/commission/automatic_services in own job payload, register->PENDING_AUTHORIZATION + login 403, 6th failed login->429). Frontend Playwright (mobile 390x844): guard redirect ok, wrong password shows cp-login-error, login as cliente.demo→'Ciao Mario' + 3 commesse, PRV-2026-02321 detail loads total 4.593,64 €, timeline first step green, 2 product lines (finestra ProEvolution 2 ante + cassonetto), window visual with Vista interna/esterna toggle + BICOLORE badge, Ante=2, Vetro='doppio satinato', Colore interno='003 BIANCO MASSA', Colore esterno='154 NOCE', Cassonetto Colore='154 NOCE'. Documents tab shows 1 PREVENTIVO doc; GET /api/customer-portal/documents/{id}/download → 200 application/pdf (63254 bytes). Ticket create → new card with stato RICEVUTO. Profilo → logout → /customer-portal/login. Tutto verde.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_customer_portal_iter39.py",
+    "/app/backend/tests/test_customer_portal_core_v1.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "customer_portal.py get_current_customer: audience enforcement corretto (aud=customer_portal via jwt.decode audience=AUD) → token dipendenti falliscono con InvalidTokenError. Verificato.",
+    "_safe_line/_job_view: whitelist esplicita di campi cliente-safe; nessuna serializzazione di snapshot/cost/margin (verificato tramite assert su body raw della risposta /jobs/{id}).",
+    "_job_query filtra sempre {tenant_id, customer_id, quote_status ∈ [accepted, converted]} → isolation server-side robusta (test cross-customer 404 verde).",
+    "Cookie cp_access_token settato con secure=True + SameSite=None: OK per preview HTTPS. Frontend usa solo localStorage + Authorization header (Interceptor) — coerente, ma il cookie viene comunque settato lato server: attenzione a doppia sorgente di verità in futuro.",
+    "Rate limit 5/15min via login_attempts collection (identifier cp:ip:email): funzionante e verificato (429 al 6°)."
+  ],
+  "updated_files": ["/app/backend/tests/test_customer_portal_iter39.py"],
+  "success_rate": {"backend": "100% (7/7 iter39 + 5/5 core_v1 già pre-esistenti)", "frontend": "100% (11/11 flussi richiesti)"},
+  "test_credentials": "Admin admin@infissiexpress.com/Admin!2025 OK; Cliente cliente.demo@infissiexpress.com/Cliente!2026 OK. /app/memory/test_credentials.md non consultato — le credenziali erano fornite nel task.",
+  "seed_data_creation": "Creato 1 ticket 'TEST_ticket_<ts>' via UI cliente. Creati alcuni utenti portale in stato PENDING_AUTHORIZATION con email TEST_pending_* e TEST_rl_* dalle prove di register/rate-limit.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Portale cliente V1 in verde. Per test download PDF NON usare click sul pulsante (usa blob URL), usa fetch fetch(`/api/customer-portal/documents/${id}/download`, {Authorization}) e verifica status+content-type application/pdf. Utenti portale attivo: cliente.demo (Mario, customer_id=b3ca8a98-5792-4b6d-bda7-00d841fd830b, 3 commesse tra cui PRV-2026-02321). Quote line window in PRV-2026-02321 ha bicolor 003/154 già configurato: base per regressioni Color Engine."
+}

@@ -3,10 +3,10 @@ import os
 import re
 import requests
 import pytest
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://serramento-ops.preview.emergentagent.com").rstrip("/")
-ADMIN_EMAIL = "admin@infissiexpress.com"
-ADMIN_PW = "Admin!2025"
+ADMIN_PW = ADMIN_PASSWORD
 
 QUOTE_ID = "540b194f-798b-4b36-a129-60addcd689a5"
 CASSONETTO_PID = "dc5ac292-692f-4aa9-8065-83bd7664928c"
@@ -55,7 +55,8 @@ def test_window_003_110_foil(H):
     d = r.json()
     fs = d.get("technical_snapshot", {}).get("foil_surcharge") or 0
     assert fs > 0, d
-    assert d.get("visual", {}).get("is_bicolor") is False
+    # 003 interno / 110 esterno = colori diversi -> visual bicolore (vista interna bianca, esterna 110)
+    assert d.get("visual", {}).get("is_bicolor") is True
 
 
 def test_window_110_110_single_surcharge(H):
@@ -86,7 +87,7 @@ def test_window_003_999_unknown(H):
 
 
 def _cas_payload(cc):
-    return {"simple_inputs": {"options": {"color_code": cc}, "quantity": 1}}
+    return {"simple_inputs": {"width_mm": 1200, "height_mm": 250, "quantity": 1, "options": {"color_code": cc, "depth_mm": 163, "ceiling_liner": "SI"}}}
 
 
 @pytest.mark.parametrize("cc,fam", [("003", "BIANCO_MASSA"), ("110", "STANDARD"), ("019", "NON_STANDARD")])

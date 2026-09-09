@@ -47,6 +47,7 @@ async def next_contract_number(db, tenant_id: str) -> tuple[str, int, int]:
         {"$inc": {"current": 1}, "$setOnInsert": {
             "tenant_id": tenant_id, "type": "contract",
             "prefix": "CT-", "padding": 5,
+            "key": "contract_number_ct", "label": "Contratti (CT-)", "deleted_at": None,
         }},
         upsert=True, return_document=True,
     )
