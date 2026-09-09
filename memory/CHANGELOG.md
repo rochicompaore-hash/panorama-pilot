@@ -24,3 +24,8 @@
 - `memory/CONNECTOR_AUDIT_REPORT.md` (analisi, nessun codice): MUST-HAVE = SDI via intermediario, email inbound, riconciliazione bancaria, export contabilità, monitoring/backup.
 - Governance: foil 10% ACTIVE; EXPRESS delivery fail-closed (EXPRESS_DELIVERY_NOT_READY_FOR_CUSTOMER_USE, UI disabilitata); ENEA internal cost riportato a NEEDS_PO_COSTING (snapshot INCOMPLETE); profilatura costo NEEDS_PO_COSTING. Verificato testing agent iteration_35.
 - Preventivatore in FUNCTIONAL FREEZE. Prossimo: PRE-RELEASE CLEANUP residuo → Release Gate.
+
+## 2026-09-08 — Emergent-managed Google sign-in (msg 405)
+- `POST /api/auth/google/session` scambia il session_id Emergent (chiamata server-side a session-data) ed emette i token app esistenti (bearer + cookie), audit `auth.login_google`. Fail-closed: 403 `GOOGLE_ACCOUNT_NOT_LINKED` se l'email non corrisponde a `users.email`/`users.google_login_emails` (nessun auto-provisioning in tenant).
+- Frontend: bottone "Accedi con Google" (redirect da `window.location.origin`), `AuthCallback` su `#session_id=`, AuthContext skip loadMe durante callback. Admin `admin@infissiexpress.com` collegato a `rochicompaore@gmail.com`.
+- Verificato testing agent iteration_36 (wiring + fail-closed + regressione login classico). Area Cliente / import contratti: IN ATTESA decisione PO (freeze) e accesso Drive (401).

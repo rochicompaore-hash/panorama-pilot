@@ -1,0 +1,18 @@
+{
+  "summary": "Verified Emergent-managed Google sign-in wiring (fail-closed) + classic login regression. Backend 3/3 pytest pass. Frontend flows all pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_google_signin.py", "/app/test_reports/pytest/google_signin.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "auth.py google_session_exchange correctly queries users by {email OR google_login_emails} with deleted_at:null and no auto-provisioning (no insert). Fail-closed 401 for invalid session and 403 GOOGLE_ACCOUNT_NOT_LINKED verified in code (403 path not exercisable without a valid Emergent session).",
+    "Login.jsx builds redirect exactly as: https://auth.emergentagent.com/?redirect=<encoded origin>/ — no hardcoded frontend URL, uses window.location.origin. Note: navigating the browser to that URL is followed by an Emergent-side 302 to /oauth/ — this is expected and out of app scope."
+  ],
+  "updated_files": ["/app/backend/tests/test_google_signin.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "seed_data_creation": "None. DB users not modified (only read-verified that admin@infissiexpress.com has google_login_emails=['rochicompaore@gmail.com']).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Google fail-closed 403 GOOGLE_ACCOUNT_NOT_LINKED can only be exercised with a real Emergent session_id whose email is not linked — cannot be simulated offline. All wiring verified: POST /api/auth/google/session invalid→401 'Sessione Google non valida o scaduta', missing body→422, valid classic login→200 with access_token, GET /api/auth/me→200. Frontend: [data-testid=login-google-btn] 'Accedi con Google' → redirect to auth.emergentagent.com with ?redirect=<origin>/ param (Emergent then 302s to /oauth/). Callback #session_id=fake → [data-testid=auth-callback] visible, POST returns 401, lands on /login with [data-testid=login-error]='Sessione Google non valida o scaduta', hash cleared."
+}

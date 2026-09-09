@@ -341,3 +341,69 @@ async def accept_invitation(body: AcceptInvitationRequest, request: Request):
         ip=get_client_ip(request),
     )
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Emergent-managed Google sign-in (msg 405)
+# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+# Il redirect è deciso dal frontend con window.location.origin; qui si scambia solo il session_id.
+# Policy fail-closed: l'identità Google deve corrispondere a un utente app esistente (email o
+# google_login_emails) — nessun auto-provisioning in un tenant (RBAC / tenant isolation).
+# ---------------------------------------------------------------------------
+EMERGENT_SESSION_DATA_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
+
+
+class GoogleSessionRequest(BaseModel):
+    session_id: str
+
+
+@router.post("/google/session", response_model=LoginResponse)
+async def google_session_exchange(body: GoogleSessionRequest, request: Request, response: Response):
+    import httpx
+    db = get_db()
+    ip = get_client_ip(request)
+    ua = request.headers.get("user-agent")
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(EMERGENT_SESSION_DATA_URL, headers={"X-Session-ID": body.session_id})
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Servizio di autenticazione Google non raggiungibile")
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="Sessione Google non valida o scaduta")
+    data = r.json()
+    email = (data.get("email") or "").lower().strip()
+    if not email:
+        raise HTTPException(status_code=401, detail="Identità Google priva di email")
+
+    user_doc = await db.users.find_one({
+        "deleted_at": None,
+        "$or": [{"email": email}, {"google_login_emails": email}],
+    })
+    if not user_doc or not user_doc.get("is_active", True):
+        await _audit_login_failure(db, email, ip, ua, user_doc, "google_account_not_linked")
+        raise HTTPException(status_code=403, detail={
+            "code": "GOOGLE_ACCOUNT_NOT_LINKED",
+            "message": "Questo account Google non è collegato a nessun utente della piattaforma. Chiedi all'amministratore di collegarlo.",
+        })
+
+    now = datetime.now(timezone.utc)
+    await db.user_sessions.insert_one({
+        "_id": f"gs_{now.timestamp():.0f}_{user_doc['_id'][:8]}",
+        "user_id": user_doc["_id"], "tenant_id": user_doc["tenant_id"],
+        "provider": "google_emergent", "google_sub": data.get("id"), "google_email": email,
+        "session_token": data.get("session_token"),
+        "expires_at": now + timedelta(days=7), "created_at": now, "ip": ip, "user_agent": ua,
+    })
+    await db.users.update_one({"_id": user_doc["_id"]}, {"$set": {
+        "google_last_login_at": now.isoformat(), "google_picture": data.get("picture"),
+    }})
+    access, refresh = await create_login_session(db, user_doc, ip, ua, settings)
+    await record_audit(action="auth.login_google", tenant_id=user_doc["tenant_id"], user_id=user_doc["_id"],
+                       user_email=user_doc["email"], ip=ip, user_agent=ua, after={"google_email": email})
+    _set_auth_cookies(response, access, refresh)
+    if data.get("session_token"):
+        response.set_cookie("session_token", data["session_token"], httponly=True, secure=True,
+                            samesite="none", path="/", max_age=7 * 24 * 3600)
+    user_doc = from_mongo(user_doc)
+    return LoginResponse(access_token=access, refresh_token=refresh, user=_to_public(user_doc),
+                         must_change_password=False)

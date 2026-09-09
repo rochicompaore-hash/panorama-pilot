@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import "@/App.css";
 import { useAuth } from "@/contexts/AuthContext";
 import Login from "@/pages/Login";
@@ -75,7 +75,36 @@ function Protected({ children }) {
   return children;
 }
 
+/** Emergent Google Auth callback — legge il fragment #session_id=... e lo scambia sul backend. */
+function AuthCallback() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { loginWithGoogleSession } = useAuth();
+  const processed = React.useRef(false);
+  const [err, setErr] = React.useState(null);
+  React.useEffect(() => {
+    if (processed.current) return;
+    processed.current = true;
+    const sid = new URLSearchParams(location.hash.replace(/^#/, "")).get("session_id");
+    (async () => {
+      try {
+        await loginWithGoogleSession(sid);
+        window.history.replaceState(null, "", window.location.pathname);
+        navigate("/", { replace: true });
+      } catch (e) {
+        const d = e.response?.data?.detail;
+        setErr((d && (d.message || d)) || e.message);
+        window.history.replaceState(null, "", "/login");
+      }
+    })();
+  }, [location.hash, loginWithGoogleSession, navigate]);
+  if (err) return <Navigate to="/login" replace state={{ googleError: String(err) }} />;
+  return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground" data-testid="auth-callback">Accesso con Google in corso…</div>;
+}
+
 function App() {
+  const location = useLocation();
+  if (location.hash?.includes("session_id=")) return <AuthCallback />;
   return (
     <div className="App">
       <Routes>

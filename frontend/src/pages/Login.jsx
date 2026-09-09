@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthLayout from "@/layouts/AuthLayout";
@@ -16,7 +16,8 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const location = useLocation();
+  const [error, setError] = useState(location.state?.googleError || "");
   const [loading, setLoading] = useState(false);
 
   const submit = async (e) => {
@@ -83,6 +84,21 @@ export default function Login() {
           </p>
         </div>
       </form>
+      <div className="mt-6 space-y-3">
+        <div className="text-center text-xs text-muted-foreground">oppure</div>
+        <Button
+          type="button" variant="outline" className="w-full rounded-sm h-11 gap-2"
+          data-testid="login-google-btn"
+          onClick={() => {
+            // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+            const redirectUrl = window.location.origin + "/";
+            window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+          }}
+        >
+          Accedi con Google
+        </Button>
+        <p className="text-[11px] text-muted-foreground text-center">L'account Google deve essere collegato a un utente della piattaforma dall'amministratore.</p>
+      </div>
     </AuthLayout>
   );
 }
