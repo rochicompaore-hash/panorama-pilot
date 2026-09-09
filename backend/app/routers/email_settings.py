@@ -102,6 +102,10 @@ async def send_test(
         "original_to": result.get("original_to"),
         "error": result.get("error"),
         "attempt_count": result.get("attempt_count"),
+        "sent_at": result.get("sent_at") or result.get("updated_at") or result.get("created_at"),
+        "provider_message_id": result.get("provider_message_id") or result.get("message_id"),
+        # accettazione provider ≠ consegna: DELIVERED solo con webhook provider (non configurato)
+        "delivery_status": result.get("delivery_status"),
     }
 
 

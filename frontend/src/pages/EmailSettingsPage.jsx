@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, formatApiError } from "@/api/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -180,7 +181,9 @@ function KV({ label, value, testid }) {
 
 // ---------------------------------------------------------------- Test send
 function TestSendCard({ cfg }) {
-  const [to, setTo] = useState("");
+  const { user } = useAuth();
+  // PO msg 406 §18: destinatario predefinito = email dell'admin loggato (modificabile), nessun indirizzo hardcoded
+  const [to, setTo] = useState(user?.email || "");
   const [template, setTemplate] = useState("USER_INVITATION");
   const [lastResult, setLastResult] = useState(null);
 
@@ -253,6 +256,9 @@ function TestSendCard({ cfg }) {
           <KV label="Destinatario effettivo" value={lastResult.actual_to} />
           <KV label="Delivery mode" value={lastResult.delivery_mode} />
           <KV label="Provider" value={lastResult.provider} />
+          <KV label="Data/ora" value={lastResult.sent_at || new Date().toLocaleString("it-IT")} />
+          {lastResult.provider_message_id && <KV label="Provider message ID" value={<code className="text-xs">{lastResult.provider_message_id}</code>} />}
+          <KV label="Consegna" value={lastResult.delivery_status || "NON VERIFICABILE (accettazione provider ≠ consegna)"} />
           <KV label="Tentativi" value={lastResult.attempt_count} />
           {lastResult.error && (
             <KV label="Errore" value={<code className="text-xs text-red-600">{lastResult.error}</code>} />

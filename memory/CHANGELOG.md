@@ -29,3 +29,7 @@
 - `POST /api/auth/google/session` scambia il session_id Emergent (chiamata server-side a session-data) ed emette i token app esistenti (bearer + cookie), audit `auth.login_google`. Fail-closed: 403 `GOOGLE_ACCOUNT_NOT_LINKED` se l'email non corrisponde a `users.email`/`users.google_login_emails` (nessun auto-provisioning in tenant).
 - Frontend: bottone "Accedi con Google" (redirect da `window.location.origin`), `AuthCallback` su `#session_id=`, AuthContext skip loadMe durante callback. Admin `admin@infissiexpress.com` collegato a `rochicompaore@gmail.com`.
 - Verificato testing agent iteration_36 (wiring + fail-closed + regressione login classico). Area Cliente / import contratti: IN ATTESA decisione PO (freeze) e accesso Drive (401).
+
+## 2026-09-09 — msg 406: Email test UI allineata + Customer Portal V1 piano operativo
+- Impostazioni email → "Invio di test": destinatario predefinito = admin loggato (modificabile), data/ora, provider_message_id, riga "Consegna" (accettazione ≠ consegna). Verificato in browser: stato reale = `configuration_required` (EMAIL_PROVIDER=mock, MAIL_DELIVERY_MODE=test, MAIL_PASSWORD assente) → NESSUNA email reale inviabile finché il PO non fornisce credenziali SMTP/Resend.
+- Customer Portal V1: NON iniziato; piano esecutivo per lotti + blocker in `memory/CUSTOMER_PORTAL_V1.md`. Drive: 401 (serve service account read-only). Google login reale: test manuale PO pendente.
