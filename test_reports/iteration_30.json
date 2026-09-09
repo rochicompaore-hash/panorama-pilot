@@ -22,7 +22,7 @@
     "/app/backend/tests/test_multi_category_v1_e2e.py"
   ],
   "success_rate": {"backend": "100% (16/16)", "frontend": "100% happy path admin desktop"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (tenant Infissi Express, permissions=['*'])",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (tenant Infissi Express, permissions=['*'])",
   "seed_data_creation": "Nessuna nuova seed. Il test frontend ha aggiunto 1 riga TEST_ZANZARIERA_AREA_130 (195€) al preventivo esistente PRV-2026-01715 tramite multi-cat-confirm.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

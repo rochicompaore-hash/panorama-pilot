@@ -79,14 +79,23 @@ def test_window_special_needs_po_pricing_never_unknown(auth, code):
     assert "UNKNOWN_COLOR_CODE" not in errs, errs
 
 
-@pytest.mark.xfail(reason="BUG msg631: backend silently defaults empty color_external to WHITE_MASS "
-                          "instead of returning COLOR_CODE_REQUIRED (see multi_category_pricing.py:649)",
-                   strict=False)
 def test_window_missing_external_code_required(auth):
     d = _configure_window(auth, "", cename="Ignored")
     errs = " ".join(d.get("blocking_errors") or [])
-    assert d["pricing_status"] != "ok", f"unexpected ok; visual_ext={d.get('visual',{}).get('spec',{}).get('exterior_color_code')}"
+    assert d["pricing_status"] == "incomplete" and d.get("technical_snapshot") is None
     assert "COLOR_CODE_REQUIRED" in errs, errs
+
+
+def test_window_missing_external_name_required(auth):
+    d = _configure_window(auth, "096", cename="")
+    errs = " ".join(d.get("blocking_errors") or [])
+    assert d["pricing_status"] == "incomplete" and "COLOR_NAME_REQUIRED" in errs, errs
+
+
+def test_window_bicolor_missing_internal_code_required(auth):
+    d = _configure_window(auth, "154", cename="Noce", ci="", ciname="", mode="BICOLOR")
+    errs = " ".join(d.get("blocking_errors") or [])
+    assert d["pricing_status"] == "incomplete" and "COLOR_CODE_REQUIRED" in errs and "internal" in errs, errs
 
 
 # ---------------- CASSONETTO matrix ----------------

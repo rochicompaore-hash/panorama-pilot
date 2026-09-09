@@ -14,7 +14,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_release_gate_iter40.py"],
   "success_rate": {"backend": "100% (8/8 iter40)", "frontend": "100% (tutti i flussi richiesti)"},
-  "test_credentials": "Admin admin@infissiexpress.com/Admin!2025 OK; Cliente cliente.demo@infissiexpress.com/Cliente!2026 OK (letto /app/memory/test_credentials.md).",
+  "test_credentials": "Admin admin@infissiexpress.com/<ROTATED_OLD_PASSWORD> OK; Cliente cliente.demo@infissiexpress.com/<REDACTED_CUSTOMER_DEMO_PASSWORD> OK (letto /app/memory/test_credentials.md).",
   "seed_data_creation": "Nessun dato applicativo creato. Solo login_attempts di tentativi falliti per email TEST_bf_nonexistent_iter40@example.com. Quote DRAFT 540b194f... arricchita con 2 nuove righe (ProEvolution 2 ante 1200x1400 003 + Cassonetto 500x250 color 110) come da flusso richiesto.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

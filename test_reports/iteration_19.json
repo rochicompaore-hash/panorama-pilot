@@ -32,7 +32,7 @@
     "/app/backend/tests/test_bom_engine_blocco_a.py (nuovo — 23 test, 22 pass, 1 fail intenzionale che espone il bug snapshot_hash)"
   ],
   "success_rate": {"backend": "95.7% (22/23)", "frontend": "n/a (backend-only)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (superadmin tenant Infissi Express)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (superadmin tenant Infissi Express)",
   "seed_data_creation": "Il test factory `small_bom_factory` crea 5 BOM template ad-hoc con code prefix `TEST_BLOCCOA_*` (WASTE_PCT, SCRAP_MM, SCRAP_PC, MIN_BILL, FULL_BAR) per verificare le nuove logiche di sfrido/minimo/full-bar. Cleanup: yield-finally elimina tutti gli id creati via DELETE /parametric/bom-templates/{id}. Idempotente: se il test viene rerun, il factory rimuove eventuali template preesistenti con lo stesso code prima di ricreare.",
   "retest_needed": true,
   "should_main_agent_self_test": true,

@@ -38,7 +38,7 @@
     "/app/backend/tests/test_full_regression_iter18.py (new — 49 tests, 49/49 pass, ~7.5s w/ xdist)"
   ],
   "success_rate": {"backend": "100% (49/49)", "frontend": "n/a (backend-only per request)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (superadmin)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (superadmin)",
   "seed_data_creation": "Test creates: TEST_ITER18_* customers, TEST_ITER18_LEAD/PUB/PRV/LEGACY quotes+leads, TEST_LE_* legal entity (incomplete, for negative test), completed fiscal fields on the two default LEs if they were incomplete. All scratch data prefixed with TEST_ITER18_ or TEST_ prefix and tenant-scoped. Scratch tenant entitlement for ai_cfo dep test is inserted+deleted in the same test (cleanup guaranteed via finally).",
   "retest_needed": false,
   "should_main_agent_self_test": false,

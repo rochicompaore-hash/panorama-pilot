@@ -46,5 +46,12 @@ Da rieseguire sul DB di produzione subito prima del deploy (release identifier =
 ## 6. Smoke test produzione (dati controllati, nessun cliente reale)
 Checklist §11-§15 PO: login admin · Google login · customer/site/quote create · configurazione finestra (003/110, bicolore) · live price · visual · save/reload · sconto globale · payment terms · ENEA (100/50 standard, 350/120 assicurata → OTHER_DIRECT_COSTS) · margin/tachometer (FINAL_COMPANY_MARGIN) · PDF V2 (Roboto, #12a16b, no leak) · accepted snapshot · contratto · portale cliente A/B isolation (404) · download documento · ticket · OTP firma pubblica (one-time use). Monitorare 5xx/auth/DB/Redis/PDF/signature errors.
 
+## 6-bis. FINAL CLOSE (PO msg 783) — esito verifiche pre-deploy (2026-09-09)
+- COLOR_INPUT_V2 = PASS (browser: save→reload→modifica; '096' resta "096"; nome ripopolato; BICOLOR 003/154 4 campi ok; fail-closed codice/nome vuoto ora anche a livello API `configure` → `incomplete` + COLOR_CODE_REQUIRED/COLOR_NAME_REQUIRED). Screenshot: `/app/test_reports/screenshots/iter45_final_reload_modify_096_GRIGIO.jpeg`.
+- CONTRACT_SOURCE_VISUAL_VERIFY = VERIFIED_WITH_LEGAL_NOTE: il PDF sorgente (pag. 7) mostra chiaramente "3, 5, 6,9,12,15, 1, 6, 21." → canonico allineato alla sorgente (nessuna interpretazione "16"); LEGAL_REVIEW_RECOMMENDED sull'elenco (contiene "1" e "6" ripetuto) — nessuna modifica senza approvazione PO. Verifiche a campione OK (Art. 7, Art. 13 "DEI PRODOTTI").
+- Credential hygiene: rimossa password admin corrente hardcoded in `tests/test_prod_gate_iter41.py` (ora `tests._creds`), redatti i report `test_reports/*.json` e i memo `memory/*.md`; fixture legacy (`test_release_gate_iter40`, `test_customer_portal_iter39`, `test_iter45_po_smoke`) passate a env (`TEST_CUSTOMER_DEMO_*`). Secret scanner = clean.
+- Backup pre-deploy preview: `/app/backups/20260909T172813Z` (138 collection, 30.200 doc, release 8abe5e9).
+- Deploy: NON eseguibile dall'agente — richiede click "Deploy" in Emergent dopo aver impostato i Custom Secrets (Deployments → Secrets → Custom Keys) e Redis esterno (Emergent non fornisce Redis gestito).
+
 ## 7. Verdetto corrente
 PRODUCTION_CONFIG = FAIL (secret produzione mancanti: Redis managed, email provider live, flag prod) · REDIS = FAIL · CREDENTIAL_ROTATION = PASS (preview) · BACKUP = PASS (preview; da ripetere su prod) · DEPLOY = NOT EXECUTED · PRODUCTION_STATUS = **NOT_READY** fino a configurazione secret da parte del PO.

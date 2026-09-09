@@ -89,7 +89,7 @@ C) POST /pricing/compute → GLAZING_BEAD unit=2.1 total=8.35, sale=985.30€
 
 ```
 1. Login: https://serramento-ops.preview.emergentagent.com
-   admin@infissiexpress.com / Admin!2025
+   admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>
 2. Menu → Configurazione tecnica → Configurazione tecnica (nuovo motore)
 3. Tab "Costo officina": cambia 180 → 200 → Salva
 4. Chiama /api/pricing/compute → labor_cost = 150 (era 135)

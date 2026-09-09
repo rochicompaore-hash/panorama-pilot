@@ -45,7 +45,7 @@
     "backend": "100% (34/34 security-audit tests) — 2 informational deviations reported as minor",
     "frontend": "not tested (backend only per review request)"
   },
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (tenant A superadmin). Test-only users created & cleaned up automatically: test_viewer_*@secaudit-test.com / ViewerPass!2025, test_nosearch_*@secaudit-test.com, test_noaudit_*@secaudit-test.com, test_secaudit_admin_b@secaudit-test.com / TenantB!2025.",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (tenant A superadmin). Test-only users created & cleaned up automatically: test_viewer_*@secaudit-test.com / ViewerPass!2025, test_nosearch_*@secaudit-test.com, test_noaudit_*@secaudit-test.com, test_secaudit_admin_b@secaudit-test.com / TenantB!2025.",
   "seed_data_creation": "Second tenant 'TEST_SecAudit_TenantB' inserted directly into mongo (companies + roles + users + pipelines + leads + customers + contacts + attachments + activities). Autouse module-scope fixture cleans up ALL tenant B data + all @secaudit-test.com users + all TEST_-prefixed roles at end of run. Verified DB is clean after full test run (no residuals).",
   "retest_needed": false,
   "should_main_agent_self_test": false,

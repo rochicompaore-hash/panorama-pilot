@@ -27,7 +27,7 @@
     "/app/backend/tests/test_email_extra_iter28.py (nuovo — 9 test aggiuntivi)"
   ],
   "success_rate": {"backend": "100% (45/45)", "frontend": "n/a (backend-only)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (da tests/_creds.py)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (da tests/_creds.py)",
   "seed_data_creation": "Nessun seed permanente. Il test reseed usa run_email_templates_seed() che è già idempotente. I test PATCH template creano/rimuovono override tenant nella stessa run.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

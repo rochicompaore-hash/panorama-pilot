@@ -45,7 +45,7 @@
     "/app/backend/app/routers/production.py (FIX - patch_bom: removed conflicting version $set)"
   ],
   "success_rate": {"backend": "100% (51/51)", "frontend": "n/a (backend-only per request)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin *) — rochicompaore@gmail.com / Platform#Owner_2026!Secure (PO) — admin.tenant@infissiexpress.com / Tenant#Admin!2026Ok (Tenant Admin)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (Super Admin *) — rochicompaore@gmail.com / Platform#Owner_2026!Secure (PO) — admin.tenant@infissiexpress.com / Tenant#Admin!2026Ok (Tenant Admin)",
   "seed_data_creation": "Test creates disposable TEST_RC1_* customers, surveys, sales-orders, purchase-orders, suppliers, items (with TEST_STOCK_* codes), stock-locations, BOMs, production-orders, cutting-lists, qc-checks, installation-plans/reports, service-tickets, payment-plans, payments, ai-cfo suggestions. All isolated to Super Admin tenant. Nothing modifies existing production/seed data. Runs cleanly in ~9s with 2 parallel workers.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

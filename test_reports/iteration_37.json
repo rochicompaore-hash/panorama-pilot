@@ -38,7 +38,7 @@
     "/app/backend/tests/test_msg407_pdf_rbac.py (new)"
   ],
   "success_rate": {"backend": "100% (13/13 msg407 pytest)", "frontend": "100% functional flows, 2 UI polish bugs"},
-  "test_credentials": "Admin admin@infissiexpress.com / Admin!2025 ; Commercial commercial_test@infissiexpress.com / CommTest!2026 — both verified working.",
+  "test_credentials": "Admin admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> ; Commercial commercial_test@infissiexpress.com / CommTest!2026 — both verified working.",
   "seed_data_creation": "Created 2 test quotes via API (UI-MSG407 76c8908f…, UI-MSG407-B 540b194f…) and 2 quotes from backend test_msg407_pdf_rbac.py fixtures. No seed data modified. Promo seeds (PROMO10 valid, EXPIRED5/OFF20 invalid, TENANTB15 cross-tenant) confirmed working per test_promo_codes[…] pytest results.",
   "retest_needed": true,
   "main_agent_can_self_test": true,

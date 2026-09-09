@@ -29,7 +29,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_owner_and_gating_iter23.py", "/app/test_reports/iteration_23.json"],
   "success_rate": {"backend": "96% (27/28 pass) — 1 fail: verifica DB ruolo tenant_owner", "frontend": "N/A (testing type: backend only)"},
-  "test_credentials": "Owner: pilot@panoramapilot.com / *** (letta da env OWNER_INIT_PASSWORD_TEST, mai stampata). Admin Infissi: admin@infissiexpress.com / Admin!2025. IDs: SELL-DEMO=4db4b91f-22c9-422b-aa7f-e235967b6698, BOM-WIN-2A=76d7b931-09b7-419f-bb79-1e47281a915e, contract PDF=899c4115-d4be-41a3-8d57-b1cdfb488754, tenant PanoramaPilot=ae9168f6-d96e-4c5d-bb33-25acbb9a8410, tenant Infissi=5e353147-2416-4ef7-aa3f-3e0007435c42.",
+  "test_credentials": "Owner: pilot@panoramapilot.com / *** (letta da env OWNER_INIT_PASSWORD_TEST, mai stampata). Admin Infissi: admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>. IDs: SELL-DEMO=4db4b91f-22c9-422b-aa7f-e235967b6698, BOM-WIN-2A=76d7b931-09b7-419f-bb79-1e47281a915e, contract PDF=899c4115-d4be-41a3-8d57-b1cdfb488754, tenant PanoramaPilot=ae9168f6-d96e-4c5d-bb33-25acbb9a8410, tenant Infissi=5e353147-2416-4ef7-aa3f-3e0007435c42.",
   "seed_data_creation": "Nessun seed persistente. SELL-DEMO modificato temporaneamente in draft/archived durante i test bloccanti e ripristinato ad active via autouse fixture (verificato in Mongo post-run: ipl_status=active). Il provision_owner.py è stato rieseguito durante il test di idempotenza — ha aggiunto un 2° role duplicato per PanoramaPilot (bug preesistente, non introdotto dai test).",
   "retest_needed": true,
   "should_main_agent_self_test": true,

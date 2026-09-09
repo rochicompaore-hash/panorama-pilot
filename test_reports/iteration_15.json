@@ -39,7 +39,7 @@
     "/app/backend/tests/test_m7_treasury_consolidation.py (new — 38 tests)"
   ],
   "success_rate": {"backend": "100% (38/38)", "frontend": "n/a (backend-only)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin, also acts as Platform Owner via is_superadmin bypass)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (Super Admin, also acts as Platform Owner via is_superadmin bypass)",
   "seed_data_creation": "Tests dynamically create: landing_leads TEST_* (dedup pattern), CRM leads (auto-linked), legal_entities TEST_LE_* (fresh incomplete), intercompany_transactions with doc_ref TEST-IC-*, receivables+payables (linked via pair_id), fixed_costs 'TEST_YearlyIns_*', personnel_costs 'TEST_Person_*', budget_scenarios 'TEST_SimGrowth', tenant_entitlements for fake TEST-TENANT-* (isolated). All identifiable by TEST_ prefix.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

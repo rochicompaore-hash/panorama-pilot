@@ -4,7 +4,7 @@
     "critical": [],
     "minor": [
       {"endpoint": "openapi.json ingress", "issue": "GET https://<preview>/openapi.json ritorna text/html (SPA catch-all) invece dello schema. Solo /api/* è proxato al backend. Non è un bug del refactor, ma vale la pena documentare che l'OpenAPI non è pubblico via ingress; nei test si accede via http://localhost:8001/openapi.json."},
-      {"endpoint": "tests/test_parametric_m6.py:13", "issue": "Docstring conteneva credenziale in chiaro 'admin@infissiexpress.com / Admin!2025'. Rimossa in questa iterazione (sostituita con riferimento a env vars). Consigliato aggiungere un pre-commit grep che blocchi pattern password-like nei file test."}
+      {"endpoint": "tests/test_parametric_m6.py:13", "issue": "Docstring conteneva credenziale in chiaro 'admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>'. Rimossa in questa iterazione (sostituita con riferimento a env vars). Consigliato aggiungere un pre-commit grep che blocchi pattern password-like nei file test."}
     ]
   },
   "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},

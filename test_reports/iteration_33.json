@@ -18,7 +18,7 @@
     "/app/backend/tests/test_pricing_integrity_audit_msg401.py (new — 14 tests)"
   ],
   "success_rate": {"backend": "100% (14/14)", "frontend": "100% (8/8 goldens)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 + commercial_test@infissiexpress.com / CommTest!2026",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> + commercial_test@infissiexpress.com / CommTest!2026",
   "seed_data_creation": "Ephemeral TEST_ quotes created per persiana automatic_services scenario (I + SUPPLY_ONLY). Test quote e2a78d76-8c81-4d73-ab78-d228d8c44906 used for browser E2E (line 329,01 € added and persisted on reload).",
   "retest_needed": false,
   "main_agent_can_self_test": true,

@@ -74,7 +74,7 @@ def tok():
 
 def _cfg_window(tok, ci, ce, mode="BICOLOR", sashes=2, glass="DOUBLE_STANDARD"):
     body = {"technical_inputs": {"product_key": "PROEVOLUTION", "window_type": "WINDOW", "number_of_sashes": sashes, "width_mm": 1200,
-                                 "height_mm": 1400, "color_internal": ci, "color_external": ce, "color_mode": mode, "glass_type": glass,
+                                 "height_mm": 1400, "color_internal": ci, "color_internal_name": f"Colore {ci}", "color_external": ce, "color_external_name": f"Colore {ce}", "color_mode": mode, "glass_type": glass,
                                  "quantity": 1, "opening_configuration": "ANTA_RIBALTA", "hinge_side": "DX"}}
     r = requests.post(f"{BASE_URL}/api/multi-cat/products/{WINDOW_PID}/configure", json=body, headers={"Authorization": f"Bearer {tok}"})
     r.raise_for_status()
@@ -175,7 +175,7 @@ def test_save_reload_modify_pdf_parity(tok, quote):
     h = {"Authorization": f"Bearer {tok}"}
     qid = quote["id"]
     cfg = {"window_type": "WINDOW", "number_of_sashes": 2, "width_mm": 1200, "height_mm": 1400, "color_mode": "BICOLOR",
-           "color_internal": "110", "color_external": "154", "glass_type": "DOUBLE_SATIN", "opening_configuration": "ANTA_RIBALTA", "hinge_side": "DX", "quantity": 1}
+           "color_internal": "110", "color_internal_name": "Grigio", "color_external": "154", "color_external_name": "Noce", "glass_type": "DOUBLE_SATIN", "opening_configuration": "ANTA_RIBALTA", "hinge_side": "DX", "quantity": 1}
     r = requests.post(f"{BASE_URL}/api/quotes/{qid}/lines", json=_line_payload(cfg, WINDOW_PID, "FORMULA_TECHNICAL", "FINESTRE", "PROEVOLUTION"), headers=h)
     assert r.status_code == 200, r.text
     line = r.json()
@@ -204,7 +204,7 @@ def test_save_reload_modify_pdf_parity(tok, quote):
     assert r.json()["configuration_snapshot"]["color_code"] == "096" and r.json()["visual_spec"]["spec"]["roller_box_color"] == {"code": "096", "name": "Rovere", "hex": r.json()["visual_spec"]["spec"]["roller_box_color"]["hex"], "classification": "STANDARD"}
 
     # MODIFY: 110/154 -> 003/110, 1 anta
-    cfg2 = dict(cfg, color_mode="WHITE_IN_FOIL_OUT", color_internal="003", color_external="110", number_of_sashes=1)
+    cfg2 = dict(cfg, color_mode="WHITE_IN_FOIL_OUT", color_internal="003", color_internal_name="Bianco massa", color_external="110", color_external_name="Grigio", number_of_sashes=1)
     r = requests.put(f"{BASE_URL}/api/quotes/{qid}/lines/{line['id']}/reconfigure", json=_line_payload(cfg2, WINDOW_PID, "FORMULA_TECHNICAL", "FINESTRE", "PROEVOLUTION"), headers=h)
     assert r.status_code == 200, r.text
     mod = r.json()

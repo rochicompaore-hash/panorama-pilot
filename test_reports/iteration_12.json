@@ -40,7 +40,7 @@
     "/app/backend/tests/test_parametric_m6.py (NUOVO - 26 test, ~330 righe, copertura M6.PAR)"
   ],
   "success_rate": {"backend": "100% (25/25 pass + 1 xfail documentato)", "frontend": "n/a (backend-only)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin) — test_parametric@example.com / Test!2026Param (utente Viewer creato dal test per verifiche permessi)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (Super Admin) — test_parametric@example.com / Test!2026Param (utente Viewer creato dal test per verifiche permessi)",
   "seed_data_creation": "Il test crea/riusa l'utente test_parametric@example.com (ruolo Viewer, tenant Infissi Express) per verificare che quotes.view_costs sia effettivamente richiesto e che pricing.mode.override sia rifiutato. Il seed parametrico è già presente all'avvio del backend (idempotente). Nessuna modifica ai dati di produzione.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

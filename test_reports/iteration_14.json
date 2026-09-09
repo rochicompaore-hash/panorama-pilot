@@ -50,7 +50,7 @@
     "/app/backend/tests/conftest.py (NUOVO — carica backend/.env e frontend/.env per pytest)"
   ],
   "success_rate": {"backend": "96% (24 passed / 1 xfailed known-bug / 1 skipped data-dep)", "frontend": "n/a (backend-only)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (Super Admin)",
   "seed_data_creation": "Test creano dinamicamente: user_groups TEST_GRP_*, assignment_rules 'TEST Rule MI/MB', lead_webhook_configs slug 'test-wh-*', leads TEST via webhook receive, consents, templates TEST_TPL_*, handoffs con idempotency_key 'test-*'. Tutti i dati sono taggabili tramite prefisso TEST_ o pattern 'test-'.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

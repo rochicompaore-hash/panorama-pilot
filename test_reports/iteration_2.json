@@ -58,7 +58,7 @@
     "backend": "100% (37/37 M2 tests, plus M1 baseline still 34/34 per iteration_1)",
     "frontend": "100% of tested M2 flows (17/17 checks)"
   },
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (from /app/memory/test_credentials.md)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (from /app/memory/test_credentials.md)",
   "seed_data_creation": "M2 tests create TEST_*-prefixed and freshly-uuid'd leads/customers/contacts/tasks/appointments/goals/whatsapp-logs. Kanban+timeline data intentionally left in DB for UI verification. Onboarding wizard state was completed=true at end (used seq/prefixes reset to PRV-/ORD-). One TEST_Pipe_XXXX custom pipeline was left in DB. Recommend the main agent optionally purge tenant with a `find({tags:'TEST'})` batch delete before real user testing.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

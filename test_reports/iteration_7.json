@@ -44,7 +44,7 @@
     "backend": "100% relative to implemented behavior (16 passed, 1 xfail documenting a spec-vs-impl discrepancy on missing_site — see action_items[0])",
     "frontend": "100% (Templates + Clauses admin pages verified, QuoteEditor PDF preview & generate flows verified with toast + PDF history card entries PREVIEW+DEFINITIVE + hash snapshot displayed)"
   },
-  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>",
   "seed_data_creation": "Several TEST_M332_PDF draft quotes on top of existing seed lead (leads[0]). Test file cleans clause CL_ANNULLAMENTO text back to original after the patch-history test.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

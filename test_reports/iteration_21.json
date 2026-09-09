@@ -29,7 +29,7 @@
     "/app/backend/tests/test_fase2_pdf_otp_storage.py"
   ],
   "success_rate": {"backend": "100% (18/18 pass, 1 skip per limiti env)", "frontend": "100% (10/10 checks pass)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin). Contratto test: 899c4115-d4be-41a3-8d57-b1cdfb488754 (signed)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (Super Admin). Contratto test: 899c4115-d4be-41a3-8d57-b1cdfb488754 (signed)",
   "seed_data_creation": "Generati 20 PDF versions (v1-v20) per il contratto CON-2026-00024 durante test generate. TEST_ CSV upload jobs creati via importer per verifica storage_key. Contratto in draft transizionato a ready_for_signature per test OTP.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

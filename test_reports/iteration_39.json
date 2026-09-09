@@ -16,7 +16,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_customer_portal_iter39.py"],
   "success_rate": {"backend": "100% (7/7 iter39 + 5/5 core_v1 già pre-esistenti)", "frontend": "100% (11/11 flussi richiesti)"},
-  "test_credentials": "Admin admin@infissiexpress.com/Admin!2025 OK; Cliente cliente.demo@infissiexpress.com/Cliente!2026 OK. /app/memory/test_credentials.md non consultato — le credenziali erano fornite nel task.",
+  "test_credentials": "Admin admin@infissiexpress.com/<ROTATED_OLD_PASSWORD> OK; Cliente cliente.demo@infissiexpress.com/<REDACTED_CUSTOMER_DEMO_PASSWORD> OK. /app/memory/test_credentials.md non consultato — le credenziali erano fornite nel task.",
   "seed_data_creation": "Creato 1 ticket 'TEST_ticket_<ts>' via UI cliente. Creati alcuni utenti portale in stato PENDING_AUTHORIZATION con email TEST_pending_* e TEST_rl_* dalle prove di register/rate-limit.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

@@ -70,7 +70,7 @@
     "backend": "100% (32/32)",
     "frontend": "100% (all E2E steps: login, sidebar, list, create dialog, add opening, add line, discount recompute, send, accept, convert-to-contract)"
   },
-  "test_credentials": "admin@infissiexpress.com / Admin!2025. Test users auto-created via invitation flow with pattern test_m3_view_*@example.com / ViewOnly!2025.",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>. Test users auto-created via invitation flow with pattern test_m3_view_*@example.com / ViewOnly!2025.",
   "seed_data_creation": "No manual DB seed. Tests reuse existing tenant, existing leads, and create additional TEST_-prefixed quotes/openings/lines. Viewer user created via /api/users + /api/auth/accept-invitation flow.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

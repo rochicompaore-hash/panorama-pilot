@@ -51,7 +51,7 @@ def scenario(tok):
     q = requests.post(f"{BASE_URL}/api/quotes", json={"title": "PDF V2 scenario", "customer_id": cid, "site_id": site["id"]}, headers=h).json()
     qid = q["id"]
     op = requests.post(f"{BASE_URL}/api/quotes/{qid}/openings", json={"code": "V1", "room": "Soggiorno", "description": "Finestra soggiorno", "width_mm": 1250, "height_mm": 1450}, headers=h).json()
-    wcfg = {"window_type": "WINDOW", "number_of_sashes": 2, "width_mm": 1200, "height_mm": 1400, "color_mode": "BICOLOR", "color_internal": "003", "color_external": "154",
+    wcfg = {"window_type": "WINDOW", "number_of_sashes": 2, "width_mm": 1200, "height_mm": 1400, "color_mode": "BICOLOR", "color_internal": "003", "color_internal_name": "BIANCO MASSA", "color_external": "154", "color_external_name": "NOCE",
             "glass_type": "DOUBLE_SATIN", "opening_configuration": "ANTA_RIBALTA", "quantity": 2}
     r = requests.post(f"{BASE_URL}/api/quotes/{qid}/lines", json=_line(wcfg, WINDOW_PID, "FORMULA_TECHNICAL", "FINESTRE", "PROEVOLUTION", op["id"], 2, "ProEvolution 2 ante"), headers=h)
     assert r.status_code == 200, r.text

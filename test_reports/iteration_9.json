@@ -32,7 +32,7 @@
     "backend": "66.7% (2/3 test PASS: future date + no-leak PASS; past date FAIL per is_expired=false invece di true — la fix del 500 è OK, ma è emerso bug secondario minore)",
     "frontend": "100% (clipboard fix verificato: toast graceful mostrato, nessun overlay React runtime error, 0 pageerror)"
   },
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (super admin wildcard *)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (super admin wildcard *)",
   "seed_data_creation": "Diverse quote TEST_M333_BUGFIX_* create durante il test (con line e PDF generati). Tutte draft, isolate al tenant super-admin.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

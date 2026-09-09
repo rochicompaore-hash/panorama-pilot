@@ -44,7 +44,7 @@
     "/app/backend/tests/test_public_signature_m334.py (NEW — 26 tests, ~500 lines)"
   ],
   "success_rate": {"backend": "100% (26/26)", "frontend": "n/a (backend-only per request)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin wildcard *)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (Super Admin wildcard *)",
   "seed_data_creation": "~15 disposable quotes created (TEST_M334_*) each with 1 line + PDF + public link. All draft/signed/rejected/change_requested variants isolated to Super Admin tenant. Signed quotes leave signed PDF records in quote_pdfs. Notifications and customer_requests documents also created for testing. Nothing modifies existing production/seed data.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

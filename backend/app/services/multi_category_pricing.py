@@ -637,6 +637,24 @@ async def _resolve_and_compute_core(
                 inputs_echo=inputs_echo,
                 blocking_errors=[f"CONFIGURATION_NOT_AVAILABLE_FOR_QUOTING: {_wt} {_n} ante non prezzabile (dati tecnici autoritativi assenti). Configurazioni disponibili: {_q}"],
             )
+        # COLOR INPUT V2 fail-closed (PO msg 712/§4): codice o nome vuoto → mai prezzo, mai default silenzioso a WHITE_MASS.
+        _mode = str(ti.get("color_mode") or "").upper()
+        if _mode and _mode != "WHITE_MASS":
+            _sides = [("external", "color_external", "color_external_name")]
+            if _mode == "BICOLOR":
+                _sides.append(("internal", "color_internal", "color_internal_name"))
+            _cerrs = []
+            for _side, _ck, _nk in _sides:
+                if not str(ti.get(_ck) or "").strip():
+                    _cerrs.append(f"COLOR_CODE_REQUIRED: codice colore {_side} obbligatorio")
+                elif not str(ti.get(_nk) or "").strip():
+                    _cerrs.append(f"COLOR_NAME_REQUIRED: nome colore {_side} obbligatorio")
+            if _cerrs:
+                return ConfigureResponse(
+                    pricing_status="incomplete", pricing_model=model, calculated_at=now,
+                    product=_pack_product(product), category=category or {}, inputs_echo=inputs_echo,
+                    blocking_errors=_cerrs,
+                )
         try:
             pr = PricingRequest(
                 tenant_id=tenant_id,

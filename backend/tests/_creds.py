@@ -63,6 +63,9 @@ PLATFORM_OWNER: tuple[str, str] | None = (
 # Passwords for test-only accounts are generated per session by default so no
 # secret ever lands in the repo. Callers may override via TEST_LIMITED_PASSWORD
 # in dev to keep a stable value across debug runs.
+CUSTOMER_DEMO_EMAIL: str = _optional("TEST_CUSTOMER_DEMO_EMAIL", "cliente.demo@infissiexpress.com") or "cliente.demo@infissiexpress.com"
+CUSTOMER_DEMO_PASSWORD: str | None = _optional("TEST_CUSTOMER_DEMO_PASSWORD")
+
 LIMITED_EMAIL: str = _optional("TEST_LIMITED_EMAIL", "test_limited@example.com") or "test_limited@example.com"
 LIMITED_PASS: str = _optional("TEST_LIMITED_PASSWORD") or ("T!" + _secrets.token_urlsafe(12))
 

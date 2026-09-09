@@ -32,7 +32,7 @@
     "/app/backend/tests/test_p0_livepricing_integration.py (new integration test — 5 tests passing)"
   ],
   "success_rate": {"backend": "100% (13/13: 8 unit + 5 integration)", "frontend": "100% (all E2E scenarios PASS)"},
-  "test_credentials": "Admin admin@infissiexpress.com / Admin!2025; Commerciale commercial_test@infissiexpress.com / Commercial!2025",
+  "test_credentials": "Admin admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>; Commerciale commercial_test@infissiexpress.com / Commercial!2025",
   "seed_data_creation": "None — used existing DRAFT quote PRV-2026-01723-R00. One extra Tapparella line was added during E2E on this quote (176 € subtotal).",
   "retest_needed": false,
   "should_main_agent_self_test": false,

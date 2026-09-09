@@ -22,7 +22,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "n/a (skipped per request)", "frontend": "87% (7/8 flows fully green; 1 with auto-select bug)"},
-  "test_credentials": "Admin: admin@infissiexpress.com / Admin!2025; Commercial: commercial_test@infissiexpress.com / CommTest!2026",
+  "test_credentials": "Admin: admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>; Commercial: commercial_test@infissiexpress.com / CommTest!2026",
   "seed_data_creation": "Ephemeral: customer CLI-000081 (existing) → new site CANT-2026-00015 (Via Test E2E 10, 20100 Milano MI, floor 2, elevator SI, phone 3331234567) → Quote PRV-2026-02244-R00 id=35cccba2-63a2-4e1e-a1ab-604d28a36fda with 3 lines (ProEvolution 1300×1600 qty2 Triplo satinato, Cassonetto 700×250/326/003 qty1, Persiana Orient RAL 1200×1500 qty2) + 1 preview PDF f7057dd3-2ea3-4dbf-87fa-dbed7d8430bf.",
   "retest_needed": true,
   "main_agent_can_self_test": true,

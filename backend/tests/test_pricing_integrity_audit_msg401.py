@@ -108,12 +108,15 @@ class TestCassonettoGrid:
         assert errs and str(errs[0]).startswith("DIMENSION_TO_CONFIRM"), errs
 
     def test_failclosed_missing_color(self, admin_token, prod):
-        r = self._configure(admin_token, prod, 500, 250, 163, "SI", "999")
+        # COLOR INPUT V2 (msg 712): codice vuoto → fail-closed; codice non mappato → NON_STANDARD prezzato (mai UNMAPPED).
+        r = self._configure(admin_token, prod, 500, 250, 163, "SI", "")
         assert r.status_code == 200
         j = r.json()
-        assert j.get("pricing_status") in ("invalid_inputs", "invalid")
-        errs = j.get("blocking_errors") or []
-        assert any(("CASSONETTO_COLOR_FAMILY_UNMAPPED" in str(e)) or ("MISSING_CASSONETTO_COLOR_PRICE_FAMILY" in str(e)) for e in errs), errs
+        assert j.get("pricing_status") != "ok"
+        assert any("MISSING_COLOR_CODE" in str(e) for e in (j.get("blocking_errors") or [])), j.get("blocking_errors")
+        r = self._configure(admin_token, prod, 500, 250, 163, "SI", "999")
+        j = r.json()
+        assert j.get("pricing_status") == "ok" and j["simple_snapshot"]["finish_family"] == "NON_STANDARD", j
 
 
 # ---------------- PERSIANE AREA_PURCHASE_MULTIPLIER ----------------

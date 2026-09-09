@@ -38,7 +38,7 @@
     "/app/backend/tests/test_blocco_bcd_iter20.py"
   ],
   "success_rate": {"backend": "95% (19/20 pass, 1 xfail bug noto)", "frontend": "90% (4/4 pagine caricano, 1 bug critico fixato in loco, 1 UX minor aperto)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>",
   "seed_data_creation": "Creati rule sets test (TEST_RS_*), CSV import job test, 1 nuovo contratto CT-2026-00002 generato da preventivo attivo e firmato (con variante). Cleanup: N/A (i dati di test sono TEST_ prefixed).",
   "retest_needed": true,
   "should_main_agent_self_test": true,

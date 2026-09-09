@@ -351,7 +351,7 @@ Per un test economico **con esito `ok`** e prezzo finale > 0, occorre popolare i
 | **Tag release** | `preview-full-test-v1` |
 | **Documento issues** | `/app/memory/PREVIEW_KNOWN_ISSUES_V1.md` |
 | **Inventario** | questo file (`PREVIEW_FULL_TEST_v1_INVENTORY.md`) |
-| **Credenziali collaudo** | vedi `/app/memory/test_credentials.md` (Super Admin: `admin@infissiexpress.com` / `Admin!2025`) |
+| **Credenziali collaudo** | vedi `/app/memory/test_credentials.md` (Super Admin: `admin@infissiexpress.com` / `<ROTATED_OLD_PASSWORD>`) |
 | **Screenshot desktop login** | `/tmp/preview_login.png` |
 | **Screenshot desktop dashboard** | `/tmp/preview_dashboard.png` |
 | **Screenshot mobile** | ⚠️ non catturato in questo run — layout responsive testabile dal browser |

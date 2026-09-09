@@ -22,7 +22,7 @@
     "/app/backend/tests/test_quote_structure_iter17.py (new — 5 focused tests, 5/5 pass)"
   ],
   "success_rate": {"backend": "100% (26/26)", "frontend": "n/a (backend-only per request)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (superadmin)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (superadmin)",
   "seed_data_creation": "Created tenant-scoped TEST_LOCK17_*, TEST_DRAFT17_*, TEST_IDEMP17_*, TEST_ORPHTREE17_*, TEST_CLEAN17_* quotes attached to first existing customer. All discoverable by title prefix TEST_*17.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

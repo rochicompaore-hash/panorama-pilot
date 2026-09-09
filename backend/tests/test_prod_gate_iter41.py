@@ -2,6 +2,7 @@
 Rotazione credenziali, portale sospeso, regressione rapida.
 NON stampa mai secrets/password.
 """
+import pytest
 import os
 import requests
 from dotenv import load_dotenv
@@ -16,10 +17,9 @@ if not BASE:
             BASE = line.split("=", 1)[1].strip()
 BASE = BASE.rstrip("/")
 
-ADMIN_EMAIL = "admin@infissiexpress.com"
-# NB: read current password from memory file — never hardcode in report
-CURRENT_ADMIN_PWD = "R!J0m34OlNsVtZjvqmVC"
-OLD_ADMIN_PWD = "Admin!2025"
+from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD as CURRENT_ADMIN_PWD
+# Vecchia password ruotata: mai in chiaro nel repo — solo via env (ROTATED_OLD_ADMIN_PASSWORD), altrimenti skip.
+OLD_ADMIN_PWD = os.environ.get("ROTATED_OLD_ADMIN_PASSWORD", "")
 
 QUOTE_ID = "c80f2e37-878a-4dab-b557-1476a546d6d3"
 
@@ -36,6 +36,8 @@ def test_auth_rotation_new_password_ok():
 
 
 def test_auth_rotation_old_password_rejected():
+    if not OLD_ADMIN_PWD:
+        pytest.skip("ROTATED_OLD_ADMIN_PASSWORD non impostata (rotazione già verificata)")
     r = _login(ADMIN_EMAIL, OLD_ADMIN_PWD)
     assert r.status_code in (401, 403), f"expected 401/403 got {r.status_code}"
 

@@ -43,7 +43,7 @@ def flow(h):
     q = requests.post(f"{BASE_URL}/api/quotes", json={"title": "Contract SoT", "customer_id": cid}, headers=h).json()
     qid = q["id"]
     op = requests.post(f"{BASE_URL}/api/quotes/{qid}/openings", json={"code": "V1", "room": "Cucina", "width_mm": 1200, "height_mm": 1400}, headers=h).json()
-    cfg = {"window_type": "WINDOW", "number_of_sashes": 2, "width_mm": 1200, "height_mm": 1400, "color_mode": "BICOLOR", "color_internal": "003", "color_external": "154",
+    cfg = {"window_type": "WINDOW", "number_of_sashes": 2, "width_mm": 1200, "height_mm": 1400, "color_mode": "BICOLOR", "color_internal": "003", "color_internal_name": "BIANCO MASSA", "color_external": "154", "color_external_name": "NOCE",
            "glass_type": "DOUBLE_SATIN", "opening_configuration": "ANTA_RIBALTA", "quantity": 1}
     line = {"opening_id": op["id"], "category": "finestre", "product_key": "PROEVOLUTION", "quantity": 1, "width_mm": 1200, "height_mm": 1400,
             "base_price": 1, "unit_price_final": 1, "subtotal_line": 1, "description": "ProEvolution 2 ante", "source": "MULTI_CATEGORY_V1",

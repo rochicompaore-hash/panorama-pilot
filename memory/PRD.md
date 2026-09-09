@@ -1489,7 +1489,7 @@ Con TEMPORARY multiplier 2.5/3.0/3.5 e included_services 30/200/500 €: BASE 50
 ## 2026-09-09 — CUSTOMER PORTAL CORE V1 = PASS (Lotti 1-2 + documenti + assistenza)
 - Backend `routers/customer_portal.py`: auth separata (JWT aud=customer_portal, cookie httpOnly + bearer), register → PENDING_AUTHORIZATION (mai accesso automatico), login lock per account (5 tentativi/15 min), forgot/reset; admin `/api/admin/customer-portal/users` (crea/autorizza/sospende, permessi customers.view/edit). Dati: `/jobs` (quote accepted/converted del customer), `/jobs/{id}` (righe customer-safe + visual_spec + timeline + payment_schedule), `/documents` (+ download PDF definitivi), `/tickets` (lista/crea → RICEVUTO). Isolation server-side {tenant_id, customer_id}; 404 cross-customer; zero chiavi interne.
 - Frontend `pages/CustomerPortal.jsx` (route `/customer-portal/*`, mobile-first, bottom nav Home/Documenti/Assistenza/Profilo) riusa `ProductVisualSVG`.
-- Test: `tests/test_customer_portal_core_v1.py` 5/5 + testing agent iteration_39 (BE 7/7, FE mobile tutto verde). Demo: cliente.demo@infissiexpress.com / Cliente!2026.
+- Test: `tests/test_customer_portal_core_v1.py` 5/5 + testing agent iteration_39 (BE 7/7, FE mobile tutto verde). Demo: cliente.demo@infissiexpress.com / <REDACTED_CUSTOMER_DEMO_PASSWORD>.
 - Lotti futuri (P1): libreria tecnica/certificazioni/manuali, ENEA docs, contratto/rilievo/verbali nel portale (richiede document service con `customer_visible`).
 
 ## 2026-09-09 — PRE-RELEASE CLEANUP (in corso → vedi esito suite)
@@ -1509,3 +1509,10 @@ Con TEMPORARY multiplier 2.5/3.0/3.5 e included_services 30/200/500 €: BASE 50
 - Frontend `ContractViewerPage.jsx`: card Condizioni Generali (versione, hash, 31 articoli, approvazione clausole); checkbox firma cita artt. 1341/1342.
 - Test: `tests/test_contract_source_of_truth.py` 9/9 (struttura canonica, approvazione clausole, fail-closed versione, summary consistency, quote PDF summary-only, INVARIANCE IDENTICAL, PDF contratto completo, parità economica, freeze) + `test_contract_legacy_fallback.py` 2/2 + testing agent iteration_44 (BE+FE verde). LEGAL_REVIEW_RECOMMENDED: seconda approvazione nel documento sorgente riporta "3, 5, 6,9,12,15, 1, 6, 21" (trascritto 16) — nessuna correzione automatica.
 - Pre-esistenti non correlati: `test_release_gate_iter40`/`test_customer_portal_iter39` usano credenziali hardcoded ruotate → 401/429.
+
+## 2026-09-09 — FINAL CLOSE (msg 783) = NOT_READY (prerequisiti infra produzione)
+- COLOR_INPUT_V2 = PASS (browser save→reload→modifica, "096" preservato, nomi ripopolati, BICOLOR ok; fail-closed codice/nome vuoto anche a livello API `configure` → `incomplete` COLOR_CODE_REQUIRED/COLOR_NAME_REQUIRED — fix blocker in `multi_category_pricing.py`). Screenshot `test_reports/screenshots/iter45_final_reload_modify_096_GRIGIO.jpeg`. Testing agent iteration_45.
+- CONTRACT_SOURCE_VISUAL_VERIFY = VERIFIED_WITH_LEGAL_NOTE: pag. 7 mostra chiaramente "3, 5, 6,9,12,15, 1, 6, 21." → canonico allineato alla sorgente; LEGAL_REVIEW_RECOMMENDED. CONTRACT_EXACT_TERMS = PASS (terms-verify IDENTICAL; 14 test SoT verdi).
+- Credential hygiene: password admin corrente rimossa da `tests/test_prod_gate_iter41.py`, redatti report/memo, fixture legacy → env (`TEST_CUSTOMER_DEMO_EMAIL/PASSWORD` in backend/.env); demo portale resta SOSPESO (iter39 skip motivato). Secret scanner clean.
+- Full suite: 1111 passed; i 14 fail sotto -n 4 erano flake da rate-limit/stale fixture → tutti verdi rieseguiti (security_audit, pricelist_gating, quote_structure, prod_gate, ci_guards, cassonetto 999→NON_STANDARD).
+- Backup preview `/app/backups/20260909T172813Z`. deployment_agent: READY (codice). PRODUCTION_CONFIG = FAIL (REDIS_URL managed, EMAIL live, APP_ENV/flag prod, CORS/APP_BASE_URL) → da impostare dal PO in Deployments → Secrets → Custom Keys; Emergent non fornisce Redis gestito. Deploy = azione manuale utente (pulsante Deploy). Runbook aggiornato §6-bis.

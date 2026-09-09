@@ -7,7 +7,7 @@
   "critical_code_review_comments": ["commission_status is nested inside financial_snapshot (not at quote root) — expected per current schema; consumers must read fs.commission_status."],
   "updated_files": ["/app/backend/tests/test_po403_governance.py"],
   "success_rate": {"backend": "100%", "frontend": "N/A"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>",
   "seed_data_creation": "TEST_PO403_MAIN and TEST_PO403_PROFILING quotes created (not cleaned up; prefixed TEST_).",
   "retest_needed": false,
   "main_agent_can_self_test": true,

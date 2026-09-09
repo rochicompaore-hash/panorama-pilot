@@ -26,7 +26,7 @@
     "/app/backend/tests/test_pricelist_gating_iter22.py"
   ],
   "success_rate": {"backend": "100% (16/16 pass)", "frontend": "N/A — testing type: backend only"},
-  "test_credentials": "Super Admin: admin@infissiexpress.com / Admin!2025 — tenant_id 5e353147-2416-4ef7-aa3f-3e0007435c42. SELL-DEMO id 4db4b91f-22c9-422b-aa7f-e235967b6698. BOM-WIN-2A id 76d7b931-09b7-419f-bb79-1e47281a915e. Contratto PDF preview id 899c4115-d4be-41a3-8d57-b1cdfb488754. Role Commerciale id c9015476-9167-48f9-a7e3-9cf594c78f9d (usato per test redazione costi).",
+  "test_credentials": "Super Admin: admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> — tenant_id 5e353147-2416-4ef7-aa3f-3e0007435c42. SELL-DEMO id 4db4b91f-22c9-422b-aa7f-e235967b6698. BOM-WIN-2A id 76d7b931-09b7-419f-bb79-1e47281a915e. Contratto PDF preview id 899c4115-d4be-41a3-8d57-b1cdfb488754. Role Commerciale id c9015476-9167-48f9-a7e3-9cf594c78f9d (usato per test redazione costi).",
   "seed_data_creation": "Test crea temporaneamente: (a) 1 quote 'TEST_ITER22_quote_send_blocked' + 1 opening_product 'TEST_OP_*' con blocking_errors — entrambi cleanup deterministico via motor a fine test; (b) 1 utente 'test_low_*@test.com' con ruolo Commerciale — cleanup via DELETE /api/users. SELL-DEMO ipl_status modificato temporaneamente a 'draft'/'archived' durante test bloccanti e ripristinato a 'active' via autouse fixture + teardown_module (safety double-net). Verificato manualmente: SELL-DEMO=='active' post-run.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

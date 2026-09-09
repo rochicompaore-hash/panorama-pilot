@@ -24,7 +24,7 @@
     "backend": "100% (22/22 = 10 unit test_pricing_scope + 12 integration test_autosave_scope_preview)",
     "frontend": "100% (autosave indicator idle→saved, version v.1→v.2 single edit, v.2→v.3 debounced batch of 3 edits, sent-quote inputs disabled + indicator absent, configurator qty=1 → 1133,81 € and qty=2 → 2117,62 € NOT 2267,62)"
   },
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (super admin).",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (super admin).",
   "seed_data_creation": "Session-scoped TEST_ quotes created via API on top of existing seed leads (no manual DB manipulation). Autosave draft quote id 4e4f24a5-1194-4654-96c3-57d66a3c7b94 (title 'TEST_UI_Autosave_iter6') and consolidated quote id a32a4520-73d2-4723-a973-829d7476531d (title 'TEST_UI_Sent_iter6', status=sent) left in DB for main-agent re-verification.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

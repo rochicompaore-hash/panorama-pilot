@@ -194,9 +194,9 @@ CLAUSE_APPROVAL = {
     ),
     "article_numbers": ["2-bis", "3", "3-bis", "3-ter", "3-quater", "4", "5", "5-bis", "6", "7", "9", "10", "11-bis", "12", "13", "14", "15", "16", "17", "21", "22", "23", "24"],
     "second_approval_text": (
-        "IL COMMITTENTE ai sensi e per gli effetti degli artt. 1341 e 1342 Cod. Civ., approva espressamente le seguenti clausole: 3, 5, 6, 9, 12, 15, 16, 21."
+        "IL COMMITTENTE ai sensi e per gli effetti degli artt. 1341 e 1342 Cod. Civ., approva espressamente le seguenti clausole: 3, 5, 6,9,12,15, 1, 6, 21."
     ),
-    "legal_review_note": "LEGAL_REVIEW_RECOMMENDED: nel documento sorgente la seconda approvazione riporta '3, 5, 6,9,12,15, 1, 6, 21' (trascritto come 16). Testo mantenuto, nessuna correzione automatica.",
+    "legal_review_note": "LEGAL_REVIEW_RECOMMENDED: verifica visiva del documento sorgente (pag. 7) — la seconda approvazione riporta chiaramente '3, 5, 6,9,12,15, 1, 6, 21.' (elenco separato '1, 6'). Trascritto fedelmente, nessuna reinterpretazione.",
 }
 
 # Punti firma previsti dal documento ufficiale

@@ -37,7 +37,7 @@
     "/app/backend/app/routers/surveys.py (FIX BUG: aggiunto contract_id e quote_id come query params sul GET /api/surveys — il filtro precedente li ignorava, causando E2E test di prendere una survey random della lista. Ora il filtro contract_id funziona come atteso dalla review §5)"
   ],
   "success_rate": {"backend": "100% (11/11 pass + 1 skip N/A documentato)", "frontend": "n/a (backend-only)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (Super Admin) — utilizzato per l'intero E2E",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (Super Admin) — utilizzato per l'intero E2E",
   "seed_data_creation": "I test creano dinamicamente customers TEST_WF_{uuid} → quotes con opening V1 → contracts firmati → surveys auto-create → technical_schedules (idempotenti per survey_id) → executive_orders (idempotenti per ts_id). Ogni test class che modifica stato usa un contratto isolato per evitare state-pollution tra worker xdist. Nessuna modifica ai dati di produzione.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

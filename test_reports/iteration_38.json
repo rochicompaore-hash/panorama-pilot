@@ -27,7 +27,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_p0_visuals_frontend_context.py (new spot-check per FE regression)"],
   "success_rate": {"backend": "100% (22/22 P0 pytest + 7/7 nuovi spot-check)", "frontend": "100% dei flussi P0 (11/11)"},
-  "test_credentials": "Admin admin@infissiexpress.com / Admin!2025 — OK. Login POST /api/auth/login → access_token in localStorage 'ie_access_token'.",
+  "test_credentials": "Admin admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> — OK. Login POST /api/auth/login → access_token in localStorage 'ie_access_token'.",
   "seed_data_creation": "Aggiunte 2 righe alla quote 540b194f... via UI durante il test (una window 110/154 poi editata a 154/154, un cassonetto 110). Non sono state modificate seed produzione.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

@@ -25,7 +25,7 @@
     "/app/backend/tests/test_m1_part2_customers_sites_timeline.py"
   ],
   "success_rate": {"backend": "100% (15/15)", "frontend": "100% happy path (desktop + mobile)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>",
   "seed_data_creation": "Test crea customers/sites/quotes con prefissi TEST_/UITEST/MobMario. Alcuni cleanup DELETE eseguiti sui customer creati dai test pytest; i dati creati dal test playwright (2 clienti PRIVATE, 1 sito, 2 preventivi, eventi timeline) restano nel DB tenant Infissi Express.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

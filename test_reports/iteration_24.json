@@ -23,7 +23,7 @@
     "/app/test_reports/iteration_24.json"
   ],
   "success_rate": {"backend": "100% (22/22 pass)", "frontend": "N/A (backend only)"},
-  "test_credentials": "Owner: pilot@panoramapilot.com / *** (letto da env OWNER_INIT_PASSWORD_TEST, mai stampato). Admin Infissi: admin@infissiexpress.com / Admin!2025. IDs: SELL-DEMO=4db4b91f-22c9-422b-aa7f-e235967b6698, tenant PanoramaPilot=ae9168f6-d96e-4c5d-bb33-25acbb9a8410, role attivo tenant_owner id=e4a05b01-2b75-4273-908d-417af991b407.",
+  "test_credentials": "Owner: pilot@panoramapilot.com / *** (letto da env OWNER_INIT_PASSWORD_TEST, mai stampato). Admin Infissi: admin@infissiexpress.com / <ROTATED_OLD_PASSWORD>. IDs: SELL-DEMO=4db4b91f-22c9-422b-aa7f-e235967b6698, tenant PanoramaPilot=ae9168f6-d96e-4c5d-bb33-25acbb9a8410, role attivo tenant_owner id=e4a05b01-2b75-4273-908d-417af991b407.",
   "seed_data_creation": "Nessun seed persistente creato. Rerun di /app/backend/scripts/provision_owner.py durante il test di idempotenza: NON ha creato nuovi role (state.role='updated'), NON ha creato nuovi user (state.user='existing_no_change'), NON ha creato nuovi tenant. SELL-DEMO passato temporaneamente a 'draft' durante test gating, poi ripristinato a 'active' (verificato in Mongo post-run: ipl_status='active'). Duplicati role restano soft-deleted con deleted_at popolato (comportamento atteso).",
   "retest_needed": false,
   "should_main_agent_self_test": false,

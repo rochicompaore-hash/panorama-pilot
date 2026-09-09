@@ -45,7 +45,7 @@
     "backend": "100% (22/22)",
     "frontend": "100% (all E2E: pricelists rules list, DEFAULT badge, rule editor create+validate+save+delete, quote open, configurator dialog, product select, live pricing base 806,40 €, wizard step Colorazione, film_diff option, live re-price 2.267,62 €, breakdown with both COLOR_FILM_DIFF_PCT + COLOR_FILM_DIFF_FIXED, add-to-quote confirm, new line visible in table)"
   },
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (super admin, has records.force_override and pricelists.manage via wildcard '*').",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (super admin, has records.force_override and pricelists.manage via wildcard '*').",
   "seed_data_creation": "No manual DB seeding. Tests reuse existing default pricelist IE_DEFAULT_2026, existing leads/customers, and create TEST_-prefixed quotes/lines/rules/customers. Test rule TEST_R{ts} created and deleted via UI to verify roundtrip.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

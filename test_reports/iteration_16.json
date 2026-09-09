@@ -49,7 +49,7 @@
     "/app/backend/tests/test_quote_structure_iter16.py (new — 21 tests, 20 pass)"
   ],
   "success_rate": {"backend": "95% (20/21 — 1 failure exposes a real backend bug)", "frontend": "n/a (backend-only)"},
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (superadmin)",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (superadmin)",
   "seed_data_creation": "Tests create scoped-under-tenant TEST_QS_* and TEST_LEGACY_* / TEST_LOCK_* quotes with attached environments/openings/products. Uses first existing customer (or creates TEST_QS_* if none). Sent quote created for lock test is left in `sent` state (harmless, discoverable by title prefix TEST_LOCK_).",
   "retest_needed": true,
   "should_main_agent_self_test": true,

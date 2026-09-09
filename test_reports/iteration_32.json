@@ -26,7 +26,7 @@
     "/app/backend/tests/test_margin_tachometer_e2e.py (new — 5 tests)"
   ],
   "success_rate": { "backend": "100%", "frontend": "100%" },
-  "test_credentials": "admin@infissiexpress.com/Admin!2025 (Super Admin) + commercial_test@infissiexpress.com/Commercial!2025",
+  "test_credentials": "admin@infissiexpress.com/<ROTATED_OLD_PASSWORD> (Super Admin) + commercial_test@infissiexpress.com/Commercial!2025",
   "seed_data_creation": "Test creates ephemeral customer+quote per run for §24 BUONO, §15 CRITICO, §18 FREEZE. Golden §23 uses precreated 3b4fd98a-fc62-457d-9d66-494742e5fc90.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

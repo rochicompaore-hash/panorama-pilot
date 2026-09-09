@@ -40,7 +40,7 @@
     "backend": "57/58 = 98.3% (52/52 CI + 5/6 supplementary)",
     "frontend": "100% (product simulator page + sidebar verificati)"
   },
-  "test_credentials": "admin@infissiexpress.com / Admin!2025 (via tests/_creds.py). Test user 'Commerciale' creato dinamicamente via /api/users invitation flow (email: test_commerciale_<ts>@example.com, password: Comm3rc!ale2025) — teardown DELETE user.",
+  "test_credentials": "admin@infissiexpress.com / <ROTATED_OLD_PASSWORD> (via tests/_creds.py). Test user 'Commerciale' creato dinamicamente via /api/users invitation flow (email: test_commerciale_<ts>@example.com, password: Comm3rc!ale2025) — teardown DELETE user.",
   "seed_data_creation": "Il fixture Commerciale crea 1 nuovo utente per test-run che viene soft-deletato in teardown. Nessun'altra mutazione DB persistente. patch a production_config lascia hourly_cost=30/prod_time=30/margin=40 (comportamento atteso, richiesto dalla suite CI).",
   "retest_needed": true,
   "should_main_agent_self_test": true,
