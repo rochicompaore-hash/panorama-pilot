@@ -58,6 +58,70 @@ async def next_contract_number(db, tenant_id: str) -> tuple[str, int, int]:
     return number, n, padding
 
 
+_FORBIDDEN_LINE_KEYS = ("internal_cost", "margin", "margin_abs", "margin_pct", "cost_price",
+                        "technical_snapshot", "financial_snapshot", "pricing_snapshot")
+
+
+def vat_regime_from_breakdown(vat_breakdown: list) -> Dict[str, Any]:
+    rates = sorted({int(round(float(b.get("rate") or 0) * 100)) for b in vat_breakdown if float(b.get("taxable") or 0) > 0})
+    if not rates:
+        rates = [22]
+    code = str(rates[0]) if len(rates) == 1 else "MISTA " + "/".join(str(r) for r in rates)
+    return {"code": code, "rates": rates, "reduced": any(r < 22 for r in rates),
+            "declaration_required": any(r < 22 for r in rates)}
+
+
+def build_economic_snapshot(quote: dict) -> Dict[str, Any]:
+    """Termini economici del preventivo accettato — mai ricostruiti dal catalogo corrente (msg 782 §13-§16)."""
+    from app.services.pdf_renderer import _compute_vat_breakdown, _services_included, _build_visual_schemes
+    lines = quote.get("lines") or []
+    breakdown = _compute_vat_breakdown(lines, float(quote.get("subtotal") or 0))
+    discount_total = float(quote.get("global_discount_amount") or 0) + float(quote.get("payment_discount_amount") or 0)
+    return {
+        "lines": [{k: v for k, v in l.items() if k not in _FORBIDDEN_LINE_KEYS} for l in lines],
+        "visual_schemes": _build_visual_schemes(quote),
+        "services_included": _services_included(quote),
+        "commercial_subtotal": quote.get("commercial_subtotal") or 0,
+        "global_discount_amount": quote.get("global_discount_amount") or 0,
+        "global_discount_value": quote.get("global_discount_value") or 0,
+        "payment_discount_amount": quote.get("payment_discount_amount") or 0,
+        "delivery_surcharge_amount": quote.get("delivery_surcharge_amount") or 0,
+        "discount_total": round(discount_total, 2),
+        "subtotal": quote.get("subtotal") or 0,
+        "vat_amount": quote.get("vat_amount") or 0,
+        "total": quote.get("total") or 0,
+        "vat_breakdown": breakdown,
+        "vat_regime": vat_regime_from_breakdown(breakdown),
+        "payment_terms": {
+            "code": quote.get("payment_terms_code") or quote.get("payment_terms"),
+            "label": quote.get("payment_terms_label"),
+            "schedule": quote.get("payment_schedule") or [],
+            "financing_mode": quote.get("financing_mode"),
+        },
+        "delivery_mode": quote.get("delivery_mode"),
+        "delivery_customer_text": quote.get("delivery_customer_text"),
+        "installation_mode": quote.get("installation_mode"),
+        "dismantling_mode": quote.get("dismantling_mode"),
+        "disposal_mode": quote.get("disposal_mode"),
+        "tax_deduction_requested": bool(quote.get("tax_deduction_requested")),
+        "enea_practice_code": quote.get("enea_practice_code"),
+    }
+
+
+async def frozen_general_terms_for_contract(db, quote: dict) -> Dict[str, Any]:
+    """Testo canonico integrale della GENERAL_TERMS_VERSION congelata sul preventivo (fallback: corrente)."""
+    from app.services.general_terms import resolve_general_terms_for_quote
+    from app.services.general_terms_canonical import get_canonical
+    summary = await resolve_general_terms_for_quote(db, quote)
+    canon = get_canonical(summary.get("version"))
+    latest_pdf = await db.quote_pdfs.find_one(
+        {"quote_id": quote["_id"], "tenant_id": quote["tenant_id"], "deleted_at": None},
+        sort=[("generated_at", -1)],
+    )
+    return {**canon, "summary_snapshot_id": summary.get("id"), "summary_version": summary.get("summary_version"),
+            "quote_snapshot_id": latest_pdf["_id"] if latest_pdf else None}
+
+
 async def build_contract_snapshot(db, tenant_id: str, quote: dict,
                                   payment_terms: Dict[str, Any]) -> dict:
     """Assemble the immutable snapshot of a quote used for contract generation."""
@@ -80,17 +144,26 @@ async def build_contract_snapshot(db, tenant_id: str, quote: dict,
         "tenant_id": tenant_id, "quote_id": quote_id, "deleted_at": None,
     }).to_list(2000)
     clauses = quote.get("clauses") or []
+    general_terms = await frozen_general_terms_for_contract(db, quote)
+    economics = build_economic_snapshot(quote)
+    payment_terms = payment_terms or economics["payment_terms"]
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "quote_id": quote_id,
         "quote_number": quote.get("number"),
         "quote_revision": quote.get("revision", 0),
+        "quote_revision_id": f"{quote_id}#R{int(quote.get('revision') or 0):02d}",
+        "quote_snapshot_id": general_terms.get("quote_snapshot_id"),
+        "accepted_at": quote.get("accepted_at"),
+        "general_terms": general_terms,
+        "general_terms_version": general_terms["version"],
+        "general_terms_hash": general_terms["general_terms_hash"],
+        "general_terms_snapshot_id": general_terms.get("summary_snapshot_id"),
+        "economics": economics,
         "quote_totals": {
-            "subtotal": quote.get("subtotal"), "discount": quote.get("discount"),
-            "tax": quote.get("tax"), "total": quote.get("total"),
-            "materials_cost": quote.get("materials_cost"),
-            "margin": quote.get("margin"),
+            "subtotal": economics["subtotal"], "discount": economics["discount_total"],
+            "tax": economics["vat_amount"], "total": economics["total"],
         },
         "environments": [from_mongo(e) for e in environments],
         "openings": [from_mongo(o) for o in openings],
@@ -100,7 +173,8 @@ async def build_contract_snapshot(db, tenant_id: str, quote: dict,
             "address": company.get("address"), "email": company.get("email"),
             "phone": company.get("phone"), "logo_url": company.get("logo_url"),
         },
-        "customer": from_mongo(customer) if customer else {},
+        "customer": from_mongo(customer) if customer else (quote.get("customer_snapshot") or {}),
+        "site_address": quote.get("site_address") or quote.get("site_snapshot"),
         "clauses": clauses,
         "payment_terms": payment_terms,
         "_products_count": len(opening_products),

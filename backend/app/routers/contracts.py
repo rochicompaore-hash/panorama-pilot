@@ -141,6 +141,12 @@ async def generate_from_quote(body: GenerateFromQuoteRequest, request: Request,
         "customer_id": quote.get("customer_id"),
         "quote_snapshot": snapshot,
         "snapshot_hash": snap_hash,
+        "general_terms_version": snapshot["general_terms_version"],
+        "general_terms_hash": snapshot["general_terms_hash"],
+        "general_terms_snapshot_id": snapshot.get("general_terms_snapshot_id"),
+        "quote_revision_id": snapshot["quote_revision_id"],
+        "quote_snapshot_id": snapshot.get("quote_snapshot_id"),
+        "accepted_at": snapshot.get("accepted_at"),
         "contract_status": "draft",
         "state_history": [{
             "state": "draft", "at": now.isoformat(),
@@ -574,6 +580,29 @@ async def contract_timeline(cid: str, user: dict = Depends(require_permission("c
         "signature_hash": doc.get("signature_hash"),
         "signed_at": doc.get("signed_at").isoformat() if doc.get("signed_at") else None,
     }
+
+
+@router.get("/{cid}/terms-verify")
+async def contract_terms_verify(cid: str, user: dict = Depends(require_permission("contracts.view"))):
+    """INVARIANCE CHECK (msg 782 §19): il blocco condizioni del contratto deve essere IDENTICO alla versione canonica."""
+    from app.services.general_terms_canonical import canonical_terms_text, canonical_hash, get_canonical
+    db = get_db()
+    doc = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(404, "Contratto non trovato")
+    gt = (doc.get("quote_snapshot") or {}).get("general_terms")
+    if not gt:
+        return {"contract_id": cid, "status": "CONTRACT_TERMS_SOURCE_MISSING", "identical": False}
+    stored_text = canonical_terms_text(gt.get("articles") or [], gt.get("clause_approval") or {})
+    try:
+        canon = get_canonical(gt.get("version"))
+    except KeyError:
+        return {"contract_id": cid, "status": "UNKNOWN_VERSION", "version": gt.get("version"), "identical": False}
+    identical = stored_text == canon["full_text"] and canonical_hash(stored_text) == doc.get("general_terms_hash") == canon["general_terms_hash"]
+    return {"contract_id": cid, "version": gt.get("version"), "identical": identical,
+            "status": "IDENTICAL" if identical else "DIVERGENT",
+            "stored_hash": canonical_hash(stored_text), "canonical_hash": canon["general_terms_hash"],
+            "articles_count": len(gt.get("articles") or []), "canonical_articles_count": canon["articles_count"]}
 
 
 # =====================================================================

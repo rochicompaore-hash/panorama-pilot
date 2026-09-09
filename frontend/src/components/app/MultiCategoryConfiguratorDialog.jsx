@@ -13,6 +13,24 @@ import { toast } from "sonner";
 import { ProductVisualSVG } from "@/components/app/ProductVisualSVG";
 
 const WHITE_MASS_CODE = "003";
+const WHITE_MASS_NAME = "Bianco massa";
+
+/** COLOR INPUT V2 (msg 631): il commerciale inserisce CODICE + NOME; la classificazione (003 / standard / special) è del backend. */
+function ColorCodeNameInput({ label, code, name, onChange, testid }) {
+  return (
+    <div className="grid grid-cols-3 gap-2" data-testid={testid}>
+      <div className="space-y-1">
+        <Label className="text-xs">{label} · Codice</Label>
+        <Input value={code || ""} onChange={(e) => onChange(e.target.value.toUpperCase(), name)} placeholder="es. 110" className="h-9 font-mono-plex" data-testid={`${testid}-code`} data-invalid={!code ? "true" : undefined} />
+      </div>
+      <div className="col-span-2 space-y-1">
+        <Label className="text-xs">Nome colore</Label>
+        <Input value={name || ""} onChange={(e) => onChange(code, e.target.value)} placeholder="es. Rovere / Grigio antracite" className="h-9" data-testid={`${testid}-name`} data-invalid={!name ? "true" : undefined} />
+      </div>
+      {(!code || !name) && <div className="col-span-3 text-[11px] text-amber-700" data-testid={`${testid}-required`}>{!code ? "COLOR_CODE_REQUIRED: codice colore obbligatorio." : "COLOR_NAME_REQUIRED: nome colore obbligatorio."}</div>}
+    </div>
+  );
+}
 const COLOR_MODES = [
   ["WHITE_MASS", "Bianco massa (003)"],
   ["WHITE_IN_FOIL_OUT", "Bianco interno + pellicolato esterno"],
@@ -72,7 +90,9 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
         const cfg = initialConfig.configuration_snapshot || initialConfig.product_config || {};
         const legacy = (c) => (c === "WHITE_MASS" ? WHITE_MASS_CODE : c);
         const colorFix = prod.pricing_model === "FORMULA_TECHNICAL"
-          ? { color_mode: deriveColorMode(cfg), color_internal: legacy(cfg.color_internal) || WHITE_MASS_CODE, color_external: legacy(cfg.color_external) || WHITE_MASS_CODE }
+          ? { color_mode: deriveColorMode(cfg), color_internal: legacy(cfg.color_internal) || WHITE_MASS_CODE, color_external: legacy(cfg.color_external) || WHITE_MASS_CODE,
+              color_internal_name: cfg.color_internal_name || (legacy(cfg.color_internal) === WHITE_MASS_CODE || !cfg.color_internal ? WHITE_MASS_NAME : legacy(cfg.color_internal)),
+              color_external_name: cfg.color_external_name || (legacy(cfg.color_external) === WHITE_MASS_CODE || !cfg.color_external ? WHITE_MASS_NAME : legacy(cfg.color_external)) }
           : {};
         setInputs({ ...cfg, ...colorFix, quantity: initialConfig.quantity || cfg.quantity || 1, width_mm: cfg.width_mm ?? initialConfig.width_mm, height_mm: cfg.height_mm ?? initialConfig.height_mm });
         setPreview(null);
@@ -109,6 +129,7 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
     }
     if (p.pricing_model === "FORMULA_TECHNICAL") {
       defaults.color_mode = "WHITE_MASS"; defaults.color_internal = WHITE_MASS_CODE; defaults.color_external = WHITE_MASS_CODE;
+      defaults.color_internal_name = WHITE_MASS_NAME; defaults.color_external_name = WHITE_MASS_NAME;
       defaults.opening_configuration = "ANTA_RIBALTA"; defaults.hinge_side = "DX";
     }
     if (p.pricing_model === "AREA_PURCHASE_MULTIPLIER") {
@@ -129,14 +150,25 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
   };
 
   // -------- live pricing preview (debounced) --------
+  React.useEffect(() => {
+    if (preview?.blocking_errors?.length) {
+      document.querySelector('[data-testid="multi-cat-preview"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [preview?.blocking_errors?.length]);
+
   const runPreview = React.useCallback(async () => {
     if (!selectedProduct) return;
     setLoading(true);
     try {
       let body;
+      if (selectedProduct.pricing_model === "GRID" && inputs.color_code && !inputs.color_name) {
+        setPreview({ pricing_status: "incomplete", blocking_errors: ["COLOR_NAME_REQUIRED: inserisci il nome colore."], visual: null });
+        setLoading(false);
+        return;
+      }
       if (selectedProduct.pricing_model === "FORMULA_TECHNICAL") {
-        if (!inputs.color_internal || !inputs.color_external) {
-          setPreview({ pricing_status: "incomplete", blocking_errors: ["COLOR_REQUIRED: seleziona il colore pellicolato."], visual: null });
+        if (!inputs.color_internal || !inputs.color_external || !inputs.color_internal_name || !inputs.color_external_name) {
+          setPreview({ pricing_status: "incomplete", blocking_errors: [(!inputs.color_internal || !inputs.color_external) ? "COLOR_CODE_REQUIRED: inserisci il codice colore." : "COLOR_NAME_REQUIRED: inserisci il nome colore."], visual: null });
           setLoading(false);
           return;
         }
@@ -148,8 +180,10 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
             width_mm: Number(inputs.width_mm || 0),
             height_mm: Number(inputs.height_mm || 0),
             color_mode: inputs.color_mode || deriveColorMode(inputs),
-            color_internal: inputs.color_internal,
-            color_external: inputs.color_external,
+            color_internal: String(inputs.color_internal).trim(),
+            color_internal_name: inputs.color_internal_name,
+            color_external: String(inputs.color_external).trim(),
+            color_external_name: inputs.color_external_name,
             opening_configuration: inputs.opening_configuration || "ANTA_RIBALTA",
             hinge_side: inputs.hinge_side || "DX",
             glass_type: inputs.glass_type || "DOUBLE_STANDARD",
@@ -164,7 +198,7 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
           quantity: Number(inputs.quantity || 1),
           variant: inputs.variant || undefined,
           options: {
-            ...(inputs.color_code ? { color_code: inputs.color_code } : {}),
+            ...(inputs.color_code ? { color_code: String(inputs.color_code).trim(), color_name: inputs.color_name || undefined } : {}),
             ...(inputs.depth_mm ? { depth_mm: Number(inputs.depth_mm) } : {}),
             ...(inputs.ceiling_liner ? { ceiling_liner: inputs.ceiling_liner } : {}),
             ...(typeof inputs.orientable === "boolean" ? { orientable: inputs.orientable } : {}),
@@ -344,12 +378,12 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
                 category={selectedCat}
               />
             </div>
-            {/* RIGHT: live visual + price */}
-            <div className="lg:col-span-2 space-y-3">
+            {/* RIGHT: live visual + price (sticky su desktop mentre i campi a sinistra scorrono) */}
+            <div className="lg:col-span-2 space-y-3 lg:sticky lg:top-16 self-start">
               {preview?.visual?.svg_exterior && (
                 <Card className="rounded-sm border-border p-3" data-testid="multi-cat-visual">
                   <div className="overline mb-2">Schema prodotto (live)</div>
-                  <ProductVisualSVG visual={preview.visual} size={260} testid="cfg-visual" />
+                  <ProductVisualSVG visual={preview.visual} size={200} testid="cfg-visual" />
                 </Card>
               )}
               <Card className="rounded-sm border-border p-4" data-testid="multi-cat-preview">
@@ -491,8 +525,7 @@ function PricingModelRenderer({ model, inputs, setInputs, product, category }) {
           <SelectField label="Cielino" value={inputs.ceiling_liner || "SI"} onChange={(v) => set("ceiling_liner", v)} options={[["SI","Con cielino"],["NO","Senza cielino"]]} testid="cfg-grid-ceiling" />
           <NumField label="Quantità" value={inputs.quantity || 1} onChange={(v) => set("quantity", v)} testid="cfg-qty" min={1} />
         </div>
-        <ColorPicker productCategory="CASSONETTI" value={inputs.color_code} onChange={(v) => set("color_code", v)} testid="cfg-grid-color" />
-        {!inputs.color_code && <div className="text-[11px] text-amber-700" data-testid="cfg-grid-color-hint">Seleziona il colore del cassonetto (obbligatorio per il prezzo di listino).</div>}
+        <ColorCodeNameInput label="Colore cassonetto" code={inputs.color_code} name={inputs.color_name} onChange={(c, n) => setInputs((s) => ({ ...s, color_code: c, color_name: n }))} testid="cfg-grid-color" />
       </Card>
     );
   }
@@ -587,10 +620,13 @@ function WindowColorSection({ inputs, setInputs }) {
   const mode = inputs.color_mode || deriveColorMode(inputs);
   const patch = (p) => setInputs((s) => ({ ...s, ...p }));
   const setMode = (m) => {
-    if (m === "WHITE_MASS") patch({ color_mode: m, color_internal: WHITE_MASS_CODE, color_external: WHITE_MASS_CODE });
-    else if (m === "WHITE_IN_FOIL_OUT") patch({ color_mode: m, color_internal: WHITE_MASS_CODE, color_external: inputs.color_external !== WHITE_MASS_CODE ? inputs.color_external : undefined });
-    else if (m === "FOIL_BOTH_SAME") { const c = inputs.color_external !== WHITE_MASS_CODE ? inputs.color_external : undefined; patch({ color_mode: m, color_internal: c, color_external: c }); }
-    else patch({ color_mode: m, color_internal: inputs.color_internal !== WHITE_MASS_CODE ? inputs.color_internal : undefined, color_external: inputs.color_external !== WHITE_MASS_CODE ? inputs.color_external : undefined });
+    const W = { code: WHITE_MASS_CODE, name: WHITE_MASS_NAME };
+    const keepExt = inputs.color_external !== WHITE_MASS_CODE ? { code: inputs.color_external, name: inputs.color_external_name } : { code: undefined, name: undefined };
+    const keepInt = inputs.color_internal !== WHITE_MASS_CODE ? { code: inputs.color_internal, name: inputs.color_internal_name } : { code: undefined, name: undefined };
+    if (m === "WHITE_MASS") patch({ color_mode: m, color_internal: W.code, color_internal_name: W.name, color_external: W.code, color_external_name: W.name });
+    else if (m === "WHITE_IN_FOIL_OUT") patch({ color_mode: m, color_internal: W.code, color_internal_name: W.name, color_external: keepExt.code, color_external_name: keepExt.name });
+    else if (m === "FOIL_BOTH_SAME") patch({ color_mode: m, color_internal: keepExt.code, color_internal_name: keepExt.name, color_external: keepExt.code, color_external_name: keepExt.name });
+    else patch({ color_mode: m, color_internal: keepInt.code, color_internal_name: keepInt.name, color_external: keepExt.code, color_external_name: keepExt.name });
   };
   return (
     <div className="space-y-3 pt-2 border-t border-border" data-testid="cfg-window-color" data-color-mode={mode}>
@@ -601,16 +637,16 @@ function WindowColorSection({ inputs, setInputs }) {
       {mode === "WHITE_IN_FOIL_OUT" && (
         <>
           <div className="text-[11px] text-muted-foreground" data-testid="cfg-color-int-auto">Interno: <b>003 — BIANCO MASSA</b> (automatico)</div>
-          <ColorPicker productCategory="FINESTRE" label="Colore esterno (pellicolato)" excludeCodes={[WHITE_MASS_CODE]} value={inputs.color_external} onChange={(v) => patch({ color_external: v })} testid="cfg-color-ext" />
+          <ColorCodeNameInput label="Colore esterno (pellicolato)" code={inputs.color_external} name={inputs.color_external_name} onChange={(c, n) => patch({ color_external: c, color_external_name: n })} testid="cfg-color-ext" />
         </>
       )}
       {mode === "FOIL_BOTH_SAME" && (
-        <ColorPicker productCategory="FINESTRE" label="Colore pellicolato (interno = esterno)" excludeCodes={[WHITE_MASS_CODE]} value={inputs.color_external} onChange={(v) => patch({ color_internal: v, color_external: v })} testid="cfg-color-both" />
+        <ColorCodeNameInput label="Colore pellicolato (interno = esterno)" code={inputs.color_external} name={inputs.color_external_name} onChange={(c, n) => patch({ color_internal: c, color_internal_name: n, color_external: c, color_external_name: n })} testid="cfg-color-both" />
       )}
       {mode === "BICOLOR" && (
         <>
-          <ColorPicker productCategory="FINESTRE" label="Colore interno" value={inputs.color_internal} onChange={(v) => patch({ color_internal: v })} testid="cfg-color-int" />
-          <ColorPicker productCategory="FINESTRE" label="Colore esterno" value={inputs.color_external} onChange={(v) => patch({ color_external: v })} testid="cfg-color-ext" />
+          <ColorCodeNameInput label="Colore interno" code={inputs.color_internal} name={inputs.color_internal_name} onChange={(c, n) => patch({ color_internal: c, color_internal_name: n })} testid="cfg-color-int" />
+          <ColorCodeNameInput label="Colore esterno" code={inputs.color_external} name={inputs.color_external_name} onChange={(c, n) => patch({ color_external: c, color_external_name: n })} testid="cfg-color-ext" />
           {inputs.color_internal && inputs.color_internal === inputs.color_external && (
             <div className="text-[11px] text-amber-700" data-testid="cfg-color-bicolor-warn">Bicolore richiede interno ≠ esterno: usa "Pellicolato due lati stesso colore".</div>
           )}

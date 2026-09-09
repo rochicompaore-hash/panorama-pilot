@@ -32,6 +32,24 @@ router = APIRouter(tags=["pdf"])
 # =========================================================
 # CLAUSES
 # =========================================================
+@router.get("/general-terms/current")
+async def general_terms_current(user: dict = Depends(require_permission("quotes.view"))):
+    """Risorsa canonica GENERAL_TERMS_VERSION corrente + summary derivato (msg 782 §3, §7)."""
+    from app.services.general_terms_canonical import get_canonical
+    from app.services.general_terms import build_summary
+    return {"canonical": get_canonical(), "summary": build_summary()}
+
+
+@router.get("/general-terms/{version}")
+async def general_terms_by_version(version: str, user: dict = Depends(require_permission("quotes.view"))):
+    from app.services.general_terms_canonical import get_canonical
+    try:
+        return get_canonical(version)
+    except KeyError:
+        raise HTTPException(404, f"GENERAL_TERMS_VERSION sconosciuta: {version}")
+
+
+
 @router.get("/clauses")
 async def list_clauses(
     category: Optional[str] = None, active: Optional[bool] = None,

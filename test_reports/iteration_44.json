@@ -1,0 +1,22 @@
+{
+  "summary": "Full backend + frontend regression for CONTRACT SOURCE OF TRUTH (PO msg 782, GT-INFISSIEXPRESS-2026-09-V1). Ran existing test_contract_source_of_truth.py (9/9 passed) covering canonical structure (31 articles, order preserved), clause approval preservation, unknown version fail-closed, summary consistency (14 sections all with source_articles), quote PDF summary-only, contract invariance (IDENTICAL text + hash), contract PDF full articles + signatures + Foro di Lecco + 1341/1342 + Firma per esteso >=5, economic parity (subtotal/vat/total/lines/vat_regime=22/payment_terms match, no margin/internal_cost leak), and ACCEPTED freeze (quote_revision_id ends #R00, accepted_at equal, snapshot_id shared with quote). Added new test_contract_legacy_fallback.py (2/2 passed): legacy contracts (108 in DB) still return 200 on PDF preview (canonical fallback) and terms-verify returns status CONTRACT_TERMS_SOURCE_MISSING when quote_snapshot.general_terms is absent. Frontend: logged in as admin@infissiexpress.com, opened /contracts/{new_cid} — verified data-testid contract-general-terms-card, contract-gt-version='GT-INFISSIEXPRESS-2026-09-V1', contract-gt-hash (SHA-256, 31 articoli), contract-gt-articles containing 31 items including gt-article-ART_1 and gt-article-ART_24, gt-clause-approval present, accept checkbox label cites 'artt. 1341 e 1342 c.c.', and btn-preview-pdf loads pdf-preview-iframe without error. Article testids use suffixes like ART_2_BIS (underscore for non-numeric suffixes) which matches component logic.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_contract_source_of_truth.py",
+    "/app/backend/tests/test_contract_legacy_fallback.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Article data-testid uses `a.code` (e.g. gt-article-ART_2_BIS with underscore) rather than the article number '2-bis'. Requested testids like gt-article-ART_1..ART_24 are all present but non-numeric suffixes (bis/ter/quater) render as ART_2_BIS/ART_3_TER/ART_3_QUATER — worth documenting so future E2E tests use the correct code pattern.",
+    "GET /api/contracts?limit=100 list payload does not include quote_snapshot; needed detail GET per item to detect legacy contracts. Consider exposing `has_frozen_general_terms` boolean flag on the list for faster admin filters."
+  ],
+  "updated_files": ["/app/backend/tests/test_contract_legacy_fallback.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (all UI assertions passed)"},
+  "test_credentials": "admin@infissiexpress.com (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created quote 85f9ba26-... + contract faf205eb-... for UI verification. Both deleted via Mongo at end of run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Contract SoT canonical GT-INFISSIEXPRESS-2026-09-V1 (31 articles, 14 summary sections) is fully green backend + frontend. Legacy fallback tested against real DB (108 legacy contracts present). If regenerating: reuse a single admin login token (brute-force lockout after 5 fails, 15-min block).",
+  "rca of the issue": "N/A — no issues found."
+}

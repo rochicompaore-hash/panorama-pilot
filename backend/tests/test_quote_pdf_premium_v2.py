@@ -10,8 +10,9 @@ import requests
 
 from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 from app.services.general_terms import (
-    GENERAL_TERMS_VERSION, SECTIONS_V1, SENSITIVE_TOPICS, build_general_terms, resolve_general_terms_for_quote,
+    GENERAL_TERMS_VERSION, SUMMARY_V1, build_general_terms, resolve_general_terms_for_quote,
 )
+from app.services.general_terms_canonical import get_canonical
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 WINDOW_PID = "8e1cafd0-9707-47c7-8939-b97c9a404021"
@@ -94,7 +95,7 @@ def test_pdf_content_and_totals(scenario):
               "50%", "acconto all'ordine", "avviso merce pronta", "V1", "1200 × 1400 mm", "2 ante", "anta-ribalta", "doppio satinato",
               "003", "BIANCO MASSA", "154", "NOCE", "Cassonetto", "163 mm", "SERVIZI PREVISTI", "Posa in opera", "Smontaggio", "Pratica ENEA Standard",
               "TEMPI INDICATIVI", "oltre 90 giorni", "RIEPILOGO ECONOMICO", "Sconto 10%", "Imponibile", "IVA 22%", "TOTALE", "Schemi prodotti",
-              "Condizioni generali — in sintesi", GENERAL_TERMS_VERSION, "non sostituisce le Condizioni Generali di Contratto",
+              "CONDIZIONI CONTRATTUALI — IN SINTESI", GENERAL_TERMS_VERSION, "non modifica, sostituisce né integra le Condizioni Generali",
               "PER ACCETTAZIONE", "Luogo e data", "Firma Cliente", "timbro e firma", "Infissi Express Enerhia Srl"]:
         assert s.replace(" ", "") in txt.replace(" ", ""), f"missing: {s}"
     compact = txt.replace(" ", "")
@@ -110,20 +111,20 @@ def test_pdf_no_internal_leak(scenario):
         assert m not in txt, m
 
 
-def test_general_terms_structure_and_missing_sources():
+def test_general_terms_summary_derived_from_canonical():
+    """msg 782 §7/§20: summary collegato alla GENERAL_TERMS_VERSION, ogni punto con fonte contrattuale, nessuna clausola autonoma."""
     async def run():
         db = _db()
         tenant = (await db.quotes.find_one({}))["tenant_id"]
         return await build_general_terms(db, tenant)
     gt = asyncio.run(run())
-    assert gt["version"] == GENERAL_TERMS_VERSION and len(gt["sections"]) == len(SECTIONS_V1) == 14
-    missing = {m["topic"] for m in gt["missing_sources"]}
-    included = {s["key"] for s in gt["legal_sections"]}
-    assert included | missing == set(SENSITIVE_TOPICS)
-    for topic in ("penali", "foro_competente", "forza_maggiore", "risoluzione", "perdita_acconto", "limitazioni_responsabilita"):
-        assert topic in missing  # CONTRACT_TERMS_SOURCE_MISSING -> mai completate automaticamente
-    for s in gt["legal_sections"]:
-        assert s["source_clause_codes"]  # solo testo ufficiale da `clauses`
+    canon = get_canonical()
+    assert gt["version"] == GENERAL_TERMS_VERSION == canon["version"] and len(gt["sections"]) == len(SUMMARY_V1) == 14
+    assert gt["general_terms_hash"] == canon["general_terms_hash"] and gt["missing_sources"] == [] and gt["legal_sections"] == []
+    numbers = {a["number"] for a in canon["articles"]}
+    for s in gt["sections"]:
+        assert s["source_articles"] and set(s["source_articles"]) <= numbers, s["key"]
+    assert "non modifica, sostituisce né integra" in gt["info_notice"]
 
 
 def test_general_terms_versioned_and_frozen_on_accepted(scenario):
@@ -134,20 +135,15 @@ def test_general_terms_versioned_and_frozen_on_accepted(scenario):
         assert fresh["general_terms_version"] == GENERAL_TERMS_VERSION and fresh["general_terms_snapshot_id"]
         snap_id = fresh["general_terms_snapshot_id"]
         assert await db.general_terms_snapshots.find_one({"_id": snap_id})
-        # DRAFT: cambio clausole -> nuovo snapshot
-        await db.clauses.update_one({"tenant_id": fresh["tenant_id"], "code": "CL_GARANZIA_24"}, {"$set": {"text_backup_test": 1}})
-        tmp_code = "CL_PENALI"
-        await db.clauses.insert_one({"_id": "tmp-penali-test", "tenant_id": fresh["tenant_id"], "code": tmp_code, "title": "Penali (test)", "text": "Testo penali di test.", "deleted_at": None})
+        # ACCEPTED: congelato sullo snapshot originale anche se il documento in DB viene alterato
+        await db.general_terms_snapshots.update_one({"_id": snap_id}, {"$set": {"frozen_marker": "V1-FROZEN"}})
         try:
-            draft = await resolve_general_terms_for_quote(db, {**fresh, "id": fresh["_id"]})
-            assert draft["id"] != snap_id and any(s["key"] == "penali" for s in draft["legal_sections"])
-            # ACCEPTED: congelato sul primo snapshot anche se il catalogo clausole cambia
-            await db.quotes.update_one({"_id": q["id"]}, {"$set": {"quote_status": "accepted", "general_terms_snapshot_id": snap_id}})
+            await db.quotes.update_one({"_id": q["id"]}, {"$set": {"quote_status": "accepted"}})
             acc = await db.quotes.find_one({"_id": q["id"]})
             frozen = await resolve_general_terms_for_quote(db, {**acc, "id": acc["_id"]})
-            assert frozen["id"] == snap_id and frozen["frozen"] is True
-            assert not any(s["key"] == "penali" for s in frozen["legal_sections"])
+            assert frozen["id"] == snap_id and frozen["frozen"] is True and frozen["frozen_marker"] == "V1-FROZEN"
+            assert frozen["version"] == GENERAL_TERMS_VERSION
         finally:
-            await db.clauses.delete_one({"_id": "tmp-penali-test"})
+            await db.general_terms_snapshots.update_one({"_id": snap_id}, {"$unset": {"frozen_marker": ""}})
             await db.quotes.update_one({"_id": q["id"]}, {"$set": {"quote_status": "draft"}})
     asyncio.run(run())

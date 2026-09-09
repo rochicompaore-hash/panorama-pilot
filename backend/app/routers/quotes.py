@@ -883,6 +883,11 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
         update["viewed_at"] = now
     elif new == "accepted":
         update["accepted_at"] = now
+        # GENERAL_TERMS freeze (msg 782 §13): la versione canonica viene congelata sul preventivo accettato.
+        from app.services.general_terms import resolve_general_terms_for_quote
+        gt = await resolve_general_terms_for_quote(db, doc)
+        update["general_terms_version"], update["general_terms_snapshot_id"] = gt["version"], gt["id"]
+        update["general_terms_hash"] = gt.get("general_terms_hash")
         # Margin Engine V1 (§18 msg 392) — freeze financial snapshot on ACCEPTED.
         # If a fresh snapshot is missing, compute it once from current state so the
         # frozen fotografia economica is always present.

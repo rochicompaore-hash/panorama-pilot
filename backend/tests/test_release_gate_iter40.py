@@ -129,7 +129,7 @@ def test_pdf_preview_and_content(admin_headers):
         text += pg.extract_text() or ""
     tl = text
     # Required
-    for needle in ["PREVENTIVO", "Schemi prodotti", "GT-2026.09-V1", "PER ACCETTAZIONE"]:
+    for needle in ["PREVENTIVO", "Schemi prodotti", "GT-INFISSIEXPRESS-2026-09-V1", "PER ACCETTAZIONE"]:
         assert needle in tl, f"Missing '{needle}' in PDF text (len={len(tl)})"
     # 'TERMINI DI PAGAMENTO' with possible letter-spacing
     assert re.search(r"T\s*E\s*R\s*M\s*I\s*N\s*I\s+D\s*I\s+P\s*A\s*G\s*A\s*M\s*E\s*N\s*T\s*O", tl, re.IGNORECASE) or "TERMINI DI PAGAMENTO" in tl
@@ -161,7 +161,7 @@ def test_pdf_preview_and_content(admin_headers):
     assert r.status_code == 200, r.text
     snap = r.json()
     gt_ver = (snap.get("snapshot", {}).get("general_terms", {}) or {}).get("version") or snap.get("general_terms", {}).get("version")
-    assert gt_ver == "GT-2026.09-V1", snap
+    assert gt_ver == "GT-INFISSIEXPRESS-2026-09-V1", snap
 
 
 # --- Tenant/RBAC audience smoke ---

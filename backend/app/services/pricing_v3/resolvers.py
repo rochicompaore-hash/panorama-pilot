@@ -409,8 +409,8 @@ class TechnicalCostResolver:
             try:
                 cats[side] = (await resolve_window_color(self.db, req.tenant_id, code))["category"]
             except ValueError:
-                raise PricingError("UNKNOWN_COLOR_CODE", configuration={"side": side, "color_code": code},
-                                   hint="Colore non presente nel catalogo product_colors — selezionare un codice valido (es. 003 BIANCO MASSA)")
+                raise PricingError("COLOR_CODE_REQUIRED", configuration={"side": side, "color_code": code},
+                                   hint="Inserire il codice colore (es. 003 BIANCO MASSA)")
         try:
             return window_foil_surcharge_applicable(cats["internal"], cats["external"])
         except ValueError:

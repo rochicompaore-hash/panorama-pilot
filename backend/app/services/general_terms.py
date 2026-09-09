@@ -1,93 +1,94 @@
-"""Condizioni Generali — In sintesi (PO msg 626 §11-§14) con versioning e snapshot congelato.
+"""CONDIZIONI CONTRATTUALI — IN SINTESI (PO msg 782 §6-§8).
 
-Source of truth: testo sintetico V1 approvato dal PO + collection `clauses` (contratto ufficiale in sistema).
-Le clausole legalmente sensibili (recesso, penali, foro, forza maggiore, risoluzione, perdita acconto,
-limitazioni responsabilità, garanzia temporale) vengono incluse SOLO se esiste testualmente una clausola
-ufficiale in `clauses`; altrimenti sono marcate CONTRACT_TERMS_SOURCE_MISSING e NON vengono completate.
+Il preventivo NON crea condizioni: mostra solo un riassunto informativo derivato dalla
+GENERAL_TERMS_VERSION canonica (general_terms_canonical.py). Ogni punto è collegato agli
+articoli sorgente (`source_articles`). Snapshot congelato su ACCEPTED (mai retroattivo).
 """
 from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from uuid import uuid4
 
-GENERAL_TERMS_VERSION = "GT-2026.09-V1"
+from app.services.general_terms_canonical import GENERAL_TERMS_VERSION, canonical_hash, get_canonical
+
+GENERAL_TERMS_SUMMARY_VERSION = "GENERAL_TERMS_SUMMARY_V1"
 ACCEPTED_STATES = ("accepted", "converted", "superseded")
 
-CLOSING_NOTE = ("Il presente riepilogo ha finalità informativa e non sostituisce le Condizioni Generali di Contratto, "
-                "che costituiscono parte integrante della documentazione contrattuale.")
+SECTION_TITLE = "CONDIZIONI CONTRATTUALI — IN SINTESI"
+INFO_NOTICE = ("Il seguente riepilogo ha finalità esclusivamente informativa e non modifica, sostituisce né integra le "
+               "Condizioni Generali di Contratto. In caso di difformità, prevale esclusivamente il testo integrale delle "
+               "Condizioni Generali allegate al contratto.")
+CLOSING_NOTE = INFO_NOTICE
 
-# Sezioni approvate PO (msg 626 §12). `clause_codes` = clausole ufficiali a supporto (se presenti in sistema).
-SECTIONS_V1: List[Dict[str, Any]] = [
-    {"key": "oggetto", "title": "Oggetto della fornitura", "clause_codes": [],
-     "text": "La fornitura comprende esclusivamente i prodotti e i servizi indicati nel preventivo e nei relativi allegati. Configurazioni, quantità, colori, vetri, accessori, posa, smontaggio, smaltimento e servizi accessori sono quelli espressamente indicati nel documento."},
-    {"key": "misure", "title": "Misure e rilievo tecnico", "clause_codes": ["CL_MISURE_INDICATIVE"],
-     "text": "Le misure raccolte in fase commerciale sono indicative. Quando previsto, le misure esecutive vengono definite mediante rilievo tecnico effettuato successivamente alla conferma dell'ordine. Eventuali differenze tecniche rilevate devono essere valutate prima dell'avvio della produzione."},
-    {"key": "varianti", "title": "Varianti", "clause_codes": ["CL_VARIAZIONI", "CL_OPERE_MURARIE"],
-     "text": "Qualora il rilievo tecnico evidenzi la necessità di modificare misure, configurazioni, accessori, opere o soluzioni tecniche, eventuali variazioni economiche o tecniche devono essere comunicate e approvate prima di procedere."},
-    {"key": "pagamenti", "title": "Pagamenti", "clause_codes": ["CL_PAGAMENTI_50_50"],
-     "text": "Si applicano esclusivamente le condizioni di pagamento indicate nel presente preventivo/contratto. Per la modalità standard: 50% alla firma/conferma dell'ordine, 50% all'avviso di merce pronta. Le modalità alternative valgono solo se espressamente selezionate nel documento."},
-    {"key": "finanziamento", "title": "Finanziamento", "clause_codes": [],
-     "text": "Quando viene richiesto un finanziamento, l'approvazione è di competenza dell'istituto finanziario. La richiesta o l'invio della pratica non equivale ad approvazione. L'avvio dell'ordine segue le condizioni previste dalla pratica e dal contratto."},
-    {"key": "produzione", "title": "Produzione", "clause_codes": [],
-     "text": "L'ordine viene rilasciato alla produzione/fornitore solo dopo il completamento dei controlli economici e tecnici previsti. La configurazione definitiva è quella risultante dalla revisione approvata e dal rilievo tecnico ove previsto."},
-    {"key": "tempi", "title": "Tempi", "clause_codes": [],
-     "text": "I tempi indicati nel preventivo sono tempistiche previsionali collegate alla configurazione acquistata. Le date di produzione, merce pronta e montaggio vengono successivamente confermate secondo lo stato reale della commessa."},
-    {"key": "merce_pronta", "title": "Merce pronta", "clause_codes": [],
-     "text": "La commessa viene considerata \"merce pronta\" quando i prodotti e i componenti necessari risultano disponibili secondo il processo di controllo aziendale. L'azienda comunica al cliente l'importo eventualmente ancora dovuto e le modalità di pagamento previste."},
-    {"key": "montaggio", "title": "Montaggio", "clause_codes": ["CL_POSA_STANDARD", "CL_ACCESSIBILITA"],
-     "text": "Quando la posa è compresa, la programmazione viene effettuata dopo la disponibilità della merce e il rispetto delle condizioni economiche previste dal contratto. Il cliente deve garantire l'accessibilità del cantiere e comunicare eventuali vincoli rilevanti per l'intervento."},
-    {"key": "prodotti", "title": "Prodotti e configurazioni", "clause_codes": ["CL_IMMAGINI"],
-     "text": "Colori, vetri, aperture, dimensioni, accessori e finiture sono quelli riportati nella configurazione approvata. Prima della produzione le caratteristiche definitive devono risultare validate."},
-    {"key": "garanzia", "title": "Garanzia e assistenza", "clause_codes": ["CL_GARANZIA_24"],
-     "text": "Garanzia e assistenza sono gestite secondo le condizioni applicabili al prodotto, alla posa e al contratto. In caso di segnalazione l'azienda verifica la natura e la causa del problema prima di stabilire se l'intervento rientra in garanzia."},
-    {"key": "enea", "title": "ENEA / Detrazioni", "clause_codes": ["CL_DETRAZIONI"],
-     "text": "Quando acquistata, la pratica ENEA viene gestita secondo il servizio selezionato: ENEA STANDARD oppure ENEA ASSICURATA. L'accesso a eventuali benefici fiscali resta subordinato ai requisiti e alla documentazione applicabili."},
-    {"key": "documentazione", "title": "Documentazione", "clause_codes": [],
-     "text": "Il cliente può ricevere, quando applicabili: preventivo, contratto, rilievo tecnico, documentazione prodotto, certificazioni, manuale uso e manutenzione, documentazione ENEA, documenti di collaudo."},
-    {"key": "modifiche", "title": "Modifiche dopo la conferma", "clause_codes": ["CL_VARIAZIONI"],
-     "text": "Qualunque modifica richiesta dopo l'approvazione della configurazione deve essere valutata tecnicamente ed economicamente. Se necessario: nuova revisione e approvazione cliente prima dell'esecuzione."},
+# Sintesi customer-friendly approvata dal PO (msg 782 §8) — ogni punto ha fonte contrattuale.
+SUMMARY_V1: List[Dict[str, Any]] = [
+    {"key": "fornitura", "title": "Fornitura e configurazione", "source_articles": ["1", "2", "2-bis"],
+     "text": "La fornitura riguarda esclusivamente i prodotti e servizi riportati nel preventivo e nei relativi allegati. Le caratteristiche tecniche, dimensionali, prestazionali ed estetiche sono quelle approvate dal cliente."},
+    {"key": "ordine_varianti", "title": "Ordine e varianti", "source_articles": ["3", "3-bis", "5-bis"],
+     "text": "L'ordine viene confermato secondo quanto previsto dal contratto. Eventuali modifiche richieste successivamente devono essere valutate tecnicamente ed economicamente e, quando previsto, formalmente approvate prima di procedere."},
+    {"key": "rilievo", "title": "Rilievo tecnico", "source_articles": ["3-quater", "5"],
+     "text": "Quando previsto, il rilievo tecnico definitivo serve a verificare le misure e la corretta configurazione prima dell'avvio dell'ordine. Eventuali differenze rispetto alle informazioni preliminari sono gestite secondo quanto previsto dal contratto."},
+    {"key": "prodotti_accessori", "title": "Prodotti e accessori", "source_articles": ["3-ter"],
+     "text": "Sono compresi esclusivamente prodotti, accessori, cassonetti, tapparelle, zanzariere, persiane, servizi e lavorazioni espressamente indicati nel preventivo. Quanto non indicato non si considera automaticamente compreso."},
+    {"key": "posa_cantiere", "title": "Posa e cantiere", "source_articles": ["4", "4-bis", "11", "11-bis"],
+     "text": "Quando la posa è prevista, il cliente deve rendere il cantiere accessibile e nelle condizioni necessarie per l'esecuzione dei lavori. Eventuali opere o servizi non compresi nella fornitura restano disciplinati dal contratto."},
+    {"key": "pagamenti", "title": "Pagamenti", "source_articles": ["6", "7", "9"],
+     "text": "Si applicano le modalità di pagamento riportate nel preventivo/contratto sottoscritto. Gli avanzamenti della commessa sono subordinati alle condizioni economiche previste."},
+    {"key": "merce_pronta", "title": "Merce pronta e montaggio", "source_articles": ["6", "10", "12"],
+     "text": "Quando la commessa risulta pronta, il cliente viene informato secondo il processo previsto. Il montaggio viene programmato nel rispetto delle condizioni economiche, tecniche e organizzative applicabili."},
+    {"key": "tempi", "title": "Tempi di consegna", "source_articles": ["3-quater", "12"],
+     "text": "I tempi decorrono secondo le condizioni indicate nel contratto e dipendono dalla configurazione, dal rilievo tecnico, dalle condizioni economiche e dagli altri presupposti contrattualmente previsti."},
+    {"key": "controllo", "title": "Controllo della fornitura", "source_articles": ["13", "17"],
+     "text": "Alla consegna/installazione il cliente è tenuto a verificare la fornitura e a segnalare eventuali difformità secondo modalità e termini previsti dal contratto."},
+    {"key": "garanzia", "title": "Garanzia", "source_articles": ["14"],
+     "text": "La garanzia è regolata dalle condizioni riportate nel preventivo e nel contratto e, quando non diversamente previsto, dalla normativa applicabile. La copertura dipende anche dal corretto uso, dalla manutenzione e dalle condizioni previste dal contratto."},
+    {"key": "modifiche_recesso", "title": "Modifiche e recesso", "source_articles": ["3", "3-bis", "15", "16"],
+     "text": "Trattandosi di prodotti realizzati su misura e personalizzati, le eventuali richieste di modifica o scioglimento del contratto sono disciplinate dalle specifiche disposizioni contenute nelle Condizioni Generali."},
+    {"key": "benefici_fiscali", "title": "Benefici fiscali / bonifico", "source_articles": ["8", "11", "22"],
+     "text": "Quando il cliente intende usufruire di agevolazioni fiscali, deve rispettare le condizioni e gli adempimenti previsti dalla normativa applicabile e dal contratto."},
+    {"key": "enea", "title": "Pratica ENEA", "source_articles": ["23"],
+     "text": "Quando espressamente inclusa, la pratica ENEA costituisce un servizio accessorio alla fornitura e viene gestita secondo le condizioni contrattuali e il servizio acquistato."},
+    {"key": "legge_foro", "title": "Legge e foro", "source_articles": ["20", "21"],
+     "text": "Il contratto è regolato dalla legge italiana. Gli ulteriori aspetti, compresa la competenza territoriale, sono disciplinati dal testo integrale del contratto."},
 ]
 
-# Temi legalmente sensibili (§13): inclusi SOLO con testo ufficiale presente in `clauses`.
-SENSITIVE_TOPICS: Dict[str, Dict[str, Any]] = {
-    "recesso": {"title": "Annullamento e recesso", "clause_codes": ["CL_ANNULLAMENTO"]},
-    "garanzia_temporale": {"title": "Durata della garanzia", "clause_codes": ["CL_GARANZIA_24"]},
-    "penali": {"title": "Penali", "clause_codes": ["CL_PENALI"]},
-    "foro_competente": {"title": "Foro competente", "clause_codes": ["CL_FORO"]},
-    "forza_maggiore": {"title": "Forza maggiore", "clause_codes": ["CL_FORZA_MAGGIORE"]},
-    "risoluzione": {"title": "Risoluzione", "clause_codes": ["CL_RISOLUZIONE"]},
-    "perdita_acconto": {"title": "Acconto", "clause_codes": ["CL_ACCONTO"]},
-    "limitazioni_responsabilita": {"title": "Limitazioni di responsabilità", "clause_codes": ["CL_RESPONSABILITA"]},
-}
 
-
-async def build_general_terms(db, tenant_id: str) -> Dict[str, Any]:
-    """Compone la sintesi corrente a partire dal testo V1 + clausole ufficiali presenti nel sistema."""
-    clauses: Dict[str, dict] = {}
-    async for c in db.clauses.find({"tenant_id": tenant_id, "deleted_at": None}, {"code": 1, "title": 1, "text": 1, "version": 1}):
-        clauses[c.get("code")] = c
+def build_summary(version: str | None = None) -> Dict[str, Any]:
+    """Sintesi derivata dalla versione canonica: fail-closed se un punto cita un articolo inesistente."""
+    canon = get_canonical(version)
+    numbers = {a["number"] for a in canon["articles"]}
     sections = []
-    for s in SECTIONS_V1:
-        supported = [c for c in s["clause_codes"] if c in clauses]
-        sections.append({"key": s["key"], "title": s["title"], "text": s["text"], "source_clause_codes": supported})
-    legal_sections, missing = [], []
-    for topic, meta in SENSITIVE_TOPICS.items():
-        found = [clauses[c] for c in meta["clause_codes"] if c in clauses]
-        if found:
-            legal_sections.append({"key": topic, "title": found[0].get("title") or meta["title"],
-                                   "text": found[0].get("text"), "source_clause_codes": [f.get("code") for f in found]})
-        else:
-            missing.append({"topic": topic, "status": "CONTRACT_TERMS_SOURCE_MISSING"})
-    content = {"version": GENERAL_TERMS_VERSION, "sections": sections, "legal_sections": legal_sections,
-               "missing_sources": missing, "closing_note": CLOSING_NOTE}
+    for s in SUMMARY_V1:
+        missing = [n for n in s["source_articles"] if n not in numbers]
+        if missing:
+            raise ValueError(f"Summary '{s['key']}' cita articoli inesistenti: {missing}")
+        sections.append({**s, "source_titles": [f"Art. {a['number']} — {a['title']}" for a in canon["articles"] if a["number"] in s["source_articles"]]})
+    content = {
+        "version": canon["version"],
+        "summary_version": GENERAL_TERMS_SUMMARY_VERSION,
+        "effective_from": canon["effective_from"],
+        "general_terms_hash": canon["general_terms_hash"],
+        "articles_count": canon["articles_count"],
+        "section_title": SECTION_TITLE,
+        "info_notice": INFO_NOTICE,
+        "sections": sections,
+        "legal_sections": [],
+        "missing_sources": [],
+        "closing_note": CLOSING_NOTE,
+    }
     content["content_hash"] = hashlib.sha256(json.dumps(content, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     return content
 
 
+async def build_general_terms(db, tenant_id: str) -> Dict[str, Any]:
+    """Sintesi corrente (ONE CANONICAL SOURCE: nessuna dipendenza da `clauses`)."""
+    return build_summary()
+
+
 async def resolve_general_terms_for_quote(db, quote: dict) -> Dict[str, Any]:
-    """DRAFT: versione corrente (snapshot upsert per hash, aggiornata sul preventivo).
+    """DRAFT: versione corrente (snapshot upsert per hash).
     ACCEPTED/CONVERTED/SUPERSEDED: snapshot congelato — mai ricalcolato."""
     tenant_id = quote["tenant_id"]
     if (quote.get("quote_status") or "").lower() in ACCEPTED_STATES and quote.get("general_terms_snapshot_id"):
@@ -96,7 +97,7 @@ async def resolve_general_terms_for_quote(db, quote: dict) -> Dict[str, Any]:
             frozen["id"] = frozen.pop("_id")
             frozen["frozen"] = True
             return frozen
-    content = await build_general_terms(db, tenant_id)
+    content = build_summary()
     existing = await db.general_terms_snapshots.find_one({"tenant_id": tenant_id, "content_hash": content["content_hash"]})
     if existing:
         snap_id = existing["_id"]
@@ -106,6 +107,11 @@ async def resolve_general_terms_for_quote(db, quote: dict) -> Dict[str, Any]:
                                                      "created_at": datetime.now(timezone.utc).isoformat(), **content})
     qid = quote.get("id") or quote.get("_id")
     if quote.get("general_terms_snapshot_id") != snap_id or quote.get("general_terms_version") != content["version"]:
-        await db.quotes.update_one({"_id": qid}, {"$set": {"general_terms_version": content["version"], "general_terms_snapshot_id": snap_id}})
+        await db.quotes.update_one({"_id": qid}, {"$set": {"general_terms_version": content["version"], "general_terms_snapshot_id": snap_id,
+                                                          "general_terms_hash": content["general_terms_hash"]}})
         quote["general_terms_version"], quote["general_terms_snapshot_id"] = content["version"], snap_id
     return {"id": snap_id, "frozen": False, **content}
+
+
+__all__ = ["GENERAL_TERMS_VERSION", "GENERAL_TERMS_SUMMARY_VERSION", "SUMMARY_V1", "INFO_NOTICE", "SECTION_TITLE",
+           "build_summary", "build_general_terms", "resolve_general_terms_for_quote", "canonical_hash"]

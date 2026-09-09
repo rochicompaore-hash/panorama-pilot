@@ -273,6 +273,7 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "delivery_label": ("Consegna standard" if (quote.get("delivery_mode") or "STANDARD") == "STANDARD" else "Consegna accelerata"),
         "general_terms_version": (general_terms or {}).get("version"),
         "general_terms_snapshot_id": (general_terms or {}).get("id"),
+        "general_terms_hash": (general_terms or {}).get("general_terms_hash"),
     }
     return {
         "kind": kind,

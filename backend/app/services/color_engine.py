@@ -7,52 +7,57 @@ Due logiche completamente separate:
 from __future__ import annotations
 from typing import Any, Dict, Optional
 
-# --- CASSONETTO: mapping autoritativo PO (msg 625 §14) ---
-CASSONETTO_COLOR_FAMILY: Dict[str, str] = {
-    "003": "BIANCO_MASSA",
-    "100": "STANDARD", "096": "STANDARD", "694": "STANDARD",
-    "110": "STANDARD", "154": "STANDARD", "048": "STANDARD",
-    "019": "NON_STANDARD", "145": "NON_STANDARD", "146": "NON_STANDARD",
-    "109": "NON_STANDARD", "402": "NON_STANDARD", "663": "NON_STANDARD",
-}
+# --- COLOR INPUT V2 (msg 631): regola autoritativa unica per codice ---
+#   003 -> WHITE_MASS · 100/110/154/096/048/964 -> STANDARD · qualsiasi altro codice valido -> SPECIAL
+WHITE_MASS_CODE = "003"
+STANDARD_COLOR_CODES = frozenset({"100", "110", "154", "096", "048", "964"})
+# Codici semantici legacy (test golden / quote storiche): mantenuti solo lato backend.
+_LEGACY_MASS = {"WHITE_MASS", WHITE_MASS_CODE}
+_LEGACY_STANDARD_FOIL = {"WHITE_WOOD", "BLEACHED_CEDAR", "WALNUT", "GOLDEN_OAK", "CHERRY", "CREAM"}
+WINDOW_COLOR_MODES = ("WHITE_MASS", "WHITE_IN_FOIL_OUT", "FOIL_BOTH_SAME", "BICOLOR")
+# Cassonetto: classificazione commerciale -> PRICE FAMILY della griglia autoritativa esistente.
+# SPECIAL usa la fascia NON_STANDARD già presente (stessa corrispondenza economica, nessuna griglia duplicata).
+CASSONETTO_FAMILY_BY_CLASS = {"WHITE_MASS": "BIANCO_MASSA", "STANDARD": "STANDARD", "SPECIAL": "NON_STANDARD"}
 CASSONETTO_FAMILIES = ("BIANCO_MASSA", "STANDARD", "NON_STANDARD")
 
 
-def resolve_cassonetto_family(color_code: Optional[str]) -> str:
-    """Fail-closed: nessun fallback, nessuno STANDARD automatico."""
-    if not color_code:
-        raise ValueError("MISSING_COLOR_CODE")
-    fam = CASSONETTO_COLOR_FAMILY.get(str(color_code).strip())
-    if fam not in CASSONETTO_FAMILIES:
-        raise ValueError(f"CASSONETTO_COLOR_FAMILY_UNMAPPED:{color_code}")
-    return fam
+def normalize_color_code(code: Optional[str]) -> str:
+    """Codice come STRINGA: trim + uppercase, zeri iniziali preservati ('096' resta '096')."""
+    c = ("" if code is None else str(code)).strip().upper()
+    if not c:
+        raise ValueError("COLOR_CODE_REQUIRED")
+    return c
 
 
-# --- FINESTRE PVC ---
-WINDOW_COLOR_MODES = ("WHITE_MASS", "WHITE_IN_FOIL_OUT", "FOIL_BOTH_SAME", "BICOLOR")
-WHITE_MASS_CODE = "003"
-# Codici semantici legacy (test golden / pricing_v3) mantenuti solo lato backend.
-_LEGACY_MASS = {"WHITE_MASS", WHITE_MASS_CODE}
-_LEGACY_STANDARD_FOIL = {"WHITE_WOOD", "BLEACHED_CEDAR", "WALNUT", "GOLDEN_OAK", "CHERRY", "CREAM"}
-
-
-async def resolve_window_color(db, tenant_id: str, code: str) -> Dict[str, Any]:
-    """Ritorna {code, name, hex, category} con category ∈ MASS_COLOR | STANDARD | SPECIAL.
-
-    Raise ValueError('UNKNOWN_COLOR_CODE:<code>') se il codice non è in catalogo.
-    """
-    c = (code or "").strip().upper()
+def resolve_color_classification(code: Optional[str]) -> str:
+    c = normalize_color_code(code)
     if c in _LEGACY_MASS:
-        doc = await db.product_colors.find_one({"tenant_id": tenant_id, "code": WHITE_MASS_CODE, "deleted_at": None})
-        return {"code": WHITE_MASS_CODE, "name": (doc or {}).get("name") or "BIANCO MASSA",
-                "hex": (doc or {}).get("visual_hex") or "#F5F5F0", "category": "MASS_COLOR"}
-    if c in _LEGACY_STANDARD_FOIL:
-        return {"code": c, "name": c, "hex": "#B87333", "category": "STANDARD"}
-    doc = await db.product_colors.find_one({"tenant_id": tenant_id, "code": c, "deleted_at": None, "active": True})
-    if not doc:
-        raise ValueError(f"UNKNOWN_COLOR_CODE:{code}")
-    cat = doc.get("pvc_color_category") or ("MASS_COLOR" if doc.get("mass_color") else "STANDARD")
-    return {"code": doc["code"], "name": doc.get("name") or doc["code"], "hex": doc.get("visual_hex") or "#DDDDDD", "category": cat}
+        return "WHITE_MASS"
+    if c in STANDARD_COLOR_CODES or c in _LEGACY_STANDARD_FOIL:
+        return "STANDARD"
+    return "SPECIAL"
+
+
+def resolve_cassonetto_family(color_code: Optional[str]) -> str:
+    """Nessun fail per codice nuovo: SPECIAL -> griglia NON_STANDARD. Fail solo se il codice manca."""
+    try:
+        cls = resolve_color_classification(color_code)
+    except ValueError:
+        raise ValueError("MISSING_COLOR_CODE")
+    return CASSONETTO_FAMILY_BY_CLASS[cls]
+
+
+async def resolve_window_color(db, tenant_id: str, code: str, name: Optional[str] = None) -> Dict[str, Any]:
+    """{code, name, hex, category}. category ∈ MASS_COLOR | STANDARD | SPECIAL (dal solo codice).
+    hex opzionale (catalogo product_colors se presente, altrimenti None: mai inventato)."""
+    c = normalize_color_code(code)
+    cls = resolve_color_classification(c)
+    if c == "WHITE_MASS":
+        c = WHITE_MASS_CODE
+    doc = await db.product_colors.find_one({"tenant_id": tenant_id, "code": c, "deleted_at": None})
+    hex_ = (doc or {}).get("visual_hex") or ("#F5F5F0" if cls == "WHITE_MASS" else None)
+    nm = (name or "").strip() or (doc or {}).get("name") or ("BIANCO MASSA" if cls == "WHITE_MASS" else c)
+    return {"code": c, "name": nm, "hex": hex_, "category": "MASS_COLOR" if cls == "WHITE_MASS" else cls, "classification": cls}
 
 
 def window_foil_surcharge_applicable(cat_internal: str, cat_external: str) -> bool:

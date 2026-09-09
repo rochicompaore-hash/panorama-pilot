@@ -311,8 +311,38 @@ export default function ContractViewerPage() {
         </CardContent>
       </Card>
 
-      {/* Clausole */}
-      {(snap.clauses || []).length > 0 && (
+      {/* Condizioni Generali — testo canonico congelato */}
+      {snap.general_terms?.articles?.length > 0 && (
+        <Card data-testid="contract-general-terms-card">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span>Condizioni Generali di Contratto</span>
+              <Badge variant="outline" data-testid="contract-gt-version">{snap.general_terms.version}</Badge>
+            </CardTitle>
+            <div className="text-xs text-muted-foreground font-mono break-all" data-testid="contract-gt-hash">
+              SHA-256 {snap.general_terms.general_terms_hash} · {snap.general_terms.articles.length} articoli · in vigore dal {snap.general_terms.effective_from}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 text-sm max-h-[420px] overflow-y-auto pr-2" data-testid="contract-gt-articles">
+              {snap.general_terms.articles.map((a) => (
+                <div key={a.code} className="pb-2 border-b" data-testid={`gt-article-${a.code}`}>
+                  <div className="font-semibold">Articolo {a.number} – {a.title}</div>
+                  <div className="text-xs whitespace-pre-line text-muted-foreground">{a.text}</div>
+                </div>
+              ))}
+              <div className="pt-2" data-testid="gt-clause-approval">
+                <div className="font-semibold">{snap.general_terms.clause_approval?.title}</div>
+                <div className="text-xs whitespace-pre-line text-muted-foreground">{snap.general_terms.clause_approval?.text}</div>
+                <div className="text-xs whitespace-pre-line text-muted-foreground mt-2">{snap.general_terms.clause_approval?.second_approval_text}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Clausole legacy (contratti generati prima della versione canonica) */}
+      {!snap.general_terms && (snap.clauses || []).length > 0 && (
         <Card>
           <CardHeader><CardTitle>Condizioni e clausole ({snap.clauses.length})</CardTitle></CardHeader>
           <CardContent>
@@ -342,7 +372,7 @@ export default function ContractViewerPage() {
               <Checkbox id="accept" checked={accepted}
                          onCheckedChange={setAccepted} data-testid="check-accept-terms"/>
               <label htmlFor="accept" className="text-sm">
-                Ho letto integralmente il contratto e accetto le condizioni sopra descritte
+                Ho letto integralmente il contratto, le Condizioni Generali {snap.general_terms?.version ? `(${snap.general_terms.version})` : ""} e approvo espressamente le clausole onerose ai sensi degli artt. 1341 e 1342 c.c.
               </label>
             </div>
             <div>

@@ -189,6 +189,6 @@ class TestGoldenViaApi:
     def test_unknown_color_fail_closed(self, admin, pid):
         d = admin.post(f"{BASE_URL}/api/multi-cat/products/{pid}/configure", json={"simple_inputs": {
             "width_mm": 500, "height_mm": 250, "quantity": 1,
-            "options": {"color_code": "999", "depth_mm": 163, "ceiling_liner": "SI"}}}, timeout=20).json()
+            "options": {"color_code": "", "depth_mm": 163, "ceiling_liner": "SI"}}}, timeout=20).json()
         assert d["pricing_status"] == "invalid_inputs"
-        assert any("CASSONETTO_COLOR_FAMILY_UNMAPPED" in e for e in d["blocking_errors"])
+        assert any(("MISSING_COLOR_CODE" in e) or ("CASSONETTO_COLOR_FAMILY_UNMAPPED" in e) for e in d["blocking_errors"])

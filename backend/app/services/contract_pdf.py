@@ -33,6 +33,9 @@ def render_contract_pdf(contract: Dict[str, Any], watermark: Optional[str] = Non
         watermark: None | "draft" | "signed"
     """
     snap = contract.get("quote_snapshot") or {}
+    from app.services.general_terms_canonical import get_canonical
+    gt = snap.get("general_terms") or get_canonical()
+    economics = snap.get("economics") or {"vat_breakdown": [], "vat_regime": {"code": "22", "declaration_required": False}, "services_included": []}
     template = _env.get_template("contract_pdf.html")
     html_str = template.render(
         contract={
@@ -50,13 +53,14 @@ def render_contract_pdf(contract: Dict[str, Any], watermark: Optional[str] = Non
             "signed_ip": contract.get("signed_ip"),
             "signed_ua": contract.get("signed_ua"),
         },
+        snap=snap, gt=gt, economics=economics,
+        lines=economics.get("lines") or [],
         company=snap.get("company") or {},
         customer=snap.get("customer") or {},
-        quote={"site_address": (snap.get("customer") or {}).get("site_address")},
+        quote={"site_address": (snap.get("customer") or {}).get("site_address") or snap.get("site_address")},
         environments=snap.get("environments") or [],
         products=snap.get("products") or [],
-        clauses=snap.get("clauses") or [],
-        payment_terms=snap.get("payment_terms") or {},
+        payment_terms=(snap.get("payment_terms") if isinstance(snap.get("payment_terms"), dict) else {"description": snap.get("payment_terms")}) or {},
         totals=snap.get("quote_totals") or {},
         watermark=watermark,
         generated_at=datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC"),

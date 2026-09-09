@@ -1,0 +1,49 @@
+{
+  "summary": "COLOR INPUT V2 (msg631) end-to-end verification — backend color engine + configure API + PDF + frontend configurator (windows & cassonetti). Backend: created new pytest file test_color_input_v2_msg631.py with 19 tests covering STANDARD/SPECIAL codes matrix (100/110/154/096/048/964 STANDARD; 019/402/7016/RAL7016 SPECIAL→NEEDS_PO_PRICING never UNKNOWN_COLOR_CODE), leading-zero preservation ('096' stays '096'), free color name, cassonetto family mapping (003→BIANCO_MASSA; 110/964→STANDARD; 019/777/RAL7016→NON_STANDARD) with price>0, missing-code fail-closed, PDF text parity ('096 — Rovere personalizzato' and '003 — Bianco massa' present; classification tags BIANCO_MASSA/NON_STANDARD/SPECIAL/WHITE_MASS/+10% absent). Also re-ran the pre-existing test_p0_visuals_color_engine.py (40 tests) — all green. Frontend flow tested at 1366x768 covering default WHITE_MASS summary, mode switch to WHITE_IN_FOIL_OUT, code+name inputs (no swatches), COLOR_CODE_REQUIRED hint & confirm-blocked when empty, 096+Rovere personalizzato surcharge, 7016 NEEDS_PO_PRICING with confirm disabled, 110+Rovere confirm→line added showing 'Int. 003 · Est. 110', reload persistence, and cassonetto: input fields visible, 096 without name→COLOR_NAME_REQUIRED, 096+Rovere price>0, 777 Speciale price>0 (no UNMAPPED), confirm→line added. 1 real bug found + 1 xfail-marked known deviation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/multi-cat/products/{window_pid}/configure",
+        "issue": "When color_external is empty string, backend silently defaults it to WHITE_MASS instead of returning COLOR_CODE_REQUIRED. Contract in review request states: 'color_external vuoto → COLOR_CODE_REQUIRED'. Frontend enforces this (hint blocks the confirm button) but the API is not fail-closed: see /app/backend/app/services/multi_category_pricing.py:648-649 where `str(ti.get('color_external') or 'WHITE_MASS').upper()` silently substitutes the default. Test marked xfail: test_window_missing_external_code_required."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "MultiCategoryConfiguratorDialog (line-edit / reconfigure)",
+        "issue": "After confirming a bicolor line with color_external='110' + color_external_name='Rovere' and clicking line-edit-{id}, the cfg-color-ext-name input is repopulated with '110' (the code) instead of the saved name 'Rovere'. Root cause is either (a) color_external_name is not persisted into configuration_snapshot on save, or (b) the reconfigure init logic in MultiCategoryConfiguratorDialog does not read color_external_name from configuration_snapshot when opening in modify mode. cfg-color-ext-code is correctly repopulated with '110'.",
+        "selector": "[data-testid=\"cfg-color-ext-name\"]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_color_input_v2_msg631.py",
+    "/app/backend/tests/test_p0_visuals_color_engine.py",
+    "/app/test_reports/pytest/msg631.xml"
+  ],
+  "action_items": [
+    "Fix multi_category_pricing.py line ~648: do not silently default empty color_external to WHITE_MASS for the configure endpoint (align with frontend contract → return blocking_error COLOR_CODE_REQUIRED). Or, alternatively, formally document this as backend-tolerated (frontend already fail-closes).",
+    "Fix line-edit reconfigure flow so that cfg-color-ext-name is repopulated from the saved configuration_snapshot.color_external_name (or ensure the snapshot persists color_external_name and color_internal_name on line save)."
+  ],
+  "critical_code_review_comments": [
+    "color_engine.py: clean single-source-of-truth for classification and cassonetto family; SPECIAL routes to existing NON_STANDARD grid — good, avoids duplicate grids.",
+    "PDF text preserved 'code — name' pattern; no BIANCO_MASSA/NON_STANDARD/SPECIAL/WHITE_MASS/+10% classification tags leak into customer PDF. Note: bare word 'STANDARD' appears legitimately in unrelated PDF sections (CONSEGNA STANDARD, ENEA STANDARD) — recommend keeping test scoped to unique classification tokens.",
+    "multi_category_pricing.py:648-649 silently coerces missing color_internal/color_external to 'WHITE_MASS' — inconsistent with COLOR_CODE_REQUIRED contract; consider passing empty through and letting resolvers raise PricingError('COLOR_CODE_REQUIRED')."
+  ],
+  "updated_files": ["/app/backend/tests/test_color_input_v2_msg631.py"],
+  "success_rate": {
+    "backend": "100% (19/19 pass + 1 documented xfail; plus 40/40 pass on pre-existing test_p0_visuals_color_engine.py)",
+    "frontend": "93% (13/14 asserted checks pass; only modify_repopulate for color_external_name failed)"
+  },
+  "test_credentials": "Admin Super used from /app/memory/test_credentials.md — not disclosed.",
+  "seed_data_creation": "Test quote created and deleted within PDF parity test. On the frontend, 2 lines added to quote 540b194f-798b-4b36-a129-60addcd689a5 (one FINESTRE 003/110 and one CASSONETTO 777) — consistent with prior iteration convention of not cleaning up test-quote lines.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test_color_input_v2_msg631.py is the regression source of truth for msg631. It xfails one test (missing external color → default WHITE_MASS); after main agent's fix, remove @pytest.mark.xfail and expect PASS with blocking_errors containing COLOR_CODE_REQUIRED. PDF download endpoint is GET /api/quote-pdfs/{pid}/download (returns raw PDF bytes). Radix Select in ColorMode requires ~300-400ms after trigger click before options are hittable. Confirm button transiently disabled during ~400ms debounce + backend price mutation; poll until enabled before click.",
+  "rca of the issue": "1) COLOR_CODE_REQUIRED bypass: multi_category_pricing.py builds PricingRequest with `str(ti.get('color_external') or 'WHITE_MASS').upper()` — the `or 'WHITE_MASS'` substitution converts empty/missing to WHITE_MASS silently, so the downstream fail-closed check (resolvers.py:412) never fires. Remove the default so empty triggers normalize_color_code → raises COLOR_CODE_REQUIRED. 2) line-edit name repopulation: cfg-color-ext-name shows the code instead of the saved name — investigate configuration_snapshot writeback of color_external_name in POST /api/quotes/{qid}/lines and the initFromLine effect in MultiCategoryConfiguratorDialog.jsx."
+}

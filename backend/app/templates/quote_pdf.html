@@ -161,7 +161,7 @@
 {% set c = snap.company %}
 {% set q = snap.quote %}
 
-{% macro color_chip(code, name, hex) %}{% if code %}<span class="swatch" style="background: {{ hex or '#DDDDDD' }}"></span><b>{{ code }}</b>{% if name and name != code %} {{ name }}{% endif %}{% endif %}{% endmacro %}
+{% macro color_chip(code, name, hex) %}{% if code %}<span class="swatch" style="background: {{ hex or '#DDDDDD' }}"></span><b>{{ code }}</b>{% if name and name != code %} — {{ name }}{% endif %}{% endif %}{% endmacro %}
 
 {% macro line_spec(vs) %}
   {% if vs %}
@@ -439,33 +439,23 @@
 </div>
 {% endif %}
 
-<!-- ================= CONDIZIONI GENERALI — IN SINTESI ================= -->
+<!-- ================= CONDIZIONI CONTRATTUALI — IN SINTESI (derivata da GENERAL_TERMS_VERSION) ================= -->
 {% if snap.general_terms %}
 <div class="section page-break" data-section="condizioni-sintesi">
-  <h2>Condizioni generali — in sintesi</h2>
+  <h2>{{ snap.general_terms.section_title or 'Condizioni contrattuali — in sintesi' }}</h2>
   <div class="rule"></div>
-  <div class="lead">Sintesi informativa delle condizioni applicabili alla presente proposta (versione {{ snap.general_terms.version }}).</div>
+  <div class="lead"><b>{{ snap.general_terms.info_notice or snap.general_terms.closing_note }}</b></div>
+  <div class="lead">Sintesi informativa derivata dalle Condizioni Generali di Contratto versione {{ snap.general_terms.version }}{% if snap.general_terms.summary_version %} ({{ snap.general_terms.summary_version }}){% endif %}.</div>
   <div class="terms">
-    {% set all_terms = snap.general_terms.sections + snap.general_terms.legal_sections %}
+    {% set all_terms = snap.general_terms.sections + (snap.general_terms.legal_sections or []) %}
     {% for t in all_terms %}
       <div class="term">
-        <h4><span class="n">{{ loop.index }}.</span> {{ t.title }}</h4>
+        <h4><span class="n">{{ loop.index }}.</span> {{ t.title }}{% if t.source_articles %} <span class="n" style="font-weight:400">(rif. Art. {{ t.source_articles | join(', ') }})</span>{% endif %}</h4>
         <p>{{ t.text }}</p>
       </div>
     {% endfor %}
   </div>
   <div class="closing"><b>{{ all_terms | length + 1 }}. Condizioni complete.</b> {{ snap.general_terms.closing_note }}</div>
-</div>
-{% endif %}
-
-<!-- ================= CONDIZIONI CONTRATTUALI COMPLETE ================= -->
-{% if snap.clauses %}
-<div class="section page-break">
-  <h2>Condizioni generali di contratto</h2>
-  <div class="rule"></div>
-  {% for cl in snap.clauses | sort(attribute='code') %}
-    <div class="clause"><h4>{{ cl.title }}</h4><p>{{ cl.text }}</p></div>
-  {% endfor %}
 </div>
 {% endif %}
 

@@ -10,7 +10,7 @@ import pytest
 import requests
 
 from app.services.color_engine import (
-    CASSONETTO_COLOR_FAMILY, resolve_cassonetto_family, window_foil_surcharge_applicable,
+    resolve_cassonetto_family, resolve_color_classification, window_foil_surcharge_applicable,
 )
 from app.services.visual_spec import render_svg, build_visual
 from app.services.pdf_renderer import build_snapshot
@@ -22,16 +22,24 @@ CASS_PID = "dc5ac292-692f-4aa9-8065-83bd7664928c"
 
 
 # ---------------- unit: color engine ----------------
-@pytest.mark.parametrize("code,fam", [("003", "BIANCO_MASSA"), ("110", "STANDARD"), ("048", "STANDARD"), ("019", "NON_STANDARD"), ("663", "NON_STANDARD")])
+# COLOR INPUT V2 (msg 631): 003 WHITE_MASS · 100/110/154/096/048/964 STANDARD · altro SPECIAL
+@pytest.mark.parametrize("code,cls", [("003", "WHITE_MASS"), ("100", "STANDARD"), ("110", "STANDARD"), ("154", "STANDARD"), ("096", "STANDARD"),
+                                      ("048", "STANDARD"), ("964", "STANDARD"), ("019", "SPECIAL"), ("402", "SPECIAL"), ("7016", "SPECIAL"),
+                                      ("RAL7016", "SPECIAL"), ("xyz123", "SPECIAL"), (" 096 ", "STANDARD")])
+def test_color_classification(code, cls):
+    assert resolve_color_classification(code) == cls
+
+
+@pytest.mark.parametrize("code,fam", [("003", "BIANCO_MASSA"), ("110", "STANDARD"), ("048", "STANDARD"), ("964", "STANDARD"),
+                                      ("019", "NON_STANDARD"), ("777", "NON_STANDARD"), ("RAL7016", "NON_STANDARD")])
 def test_cassonetto_family_mapping(code, fam):
-    assert resolve_cassonetto_family(code) == fam
+    assert resolve_cassonetto_family(code) == fam  # SPECIAL -> griglia NON_STANDARD esistente
 
 
-@pytest.mark.parametrize("code", ["999", "WHITE_MASS", "", None, "STANDARD"])
-def test_cassonetto_unmapped_fail_closed(code):
+@pytest.mark.parametrize("code", ["", None, "  "])
+def test_cassonetto_missing_code_fail_closed(code):
     with pytest.raises(ValueError):
         resolve_cassonetto_family(code)
-    assert len(CASSONETTO_COLOR_FAMILY) == 13
 
 
 def test_window_foil_policy():
@@ -107,11 +115,21 @@ def test_window_110_154_bicolor(tok):
     assert (s["interior_color_code"], s["exterior_color_code"]) == ("110", "154")
 
 
-def test_window_special_and_unknown_fail_closed(tok):
-    d = _cfg_window(tok, "003", "019")
-    assert d["pricing_status"] != "ok" and any("NEEDS_PO_PRICING" in e for e in d["blocking_errors"])
-    d = _cfg_window(tok, "003", "999")
-    assert d["pricing_status"] != "ok" and any("UNKNOWN_COLOR_CODE" in e for e in d["blocking_errors"])
+def test_window_special_fail_closed_needs_po_pricing(tok):
+    for ext in ("019", "999", "7016"):  # SPECIAL (anche codici nuovi): NEEDS_PO_PRICING, mai UNKNOWN_COLOR_CODE
+        d = _cfg_window(tok, "003", ext)
+        assert d["pricing_status"] != "ok" and any("NEEDS_PO_PRICING" in e for e in d["blocking_errors"]), d["blocking_errors"]
+        assert not any("UNKNOWN_COLOR_CODE" in e for e in d["blocking_errors"])
+
+
+def test_window_free_name_and_leading_zero(tok):
+    body = {"technical_inputs": {"product_key": "PROEVOLUTION", "window_type": "WINDOW", "number_of_sashes": 2, "width_mm": 1200, "height_mm": 1400,
+                                 "color_internal": "003", "color_internal_name": "Bianco massa", "color_external": "096", "color_external_name": "Rovere personalizzato",
+                                 "color_mode": "WHITE_IN_FOIL_OUT", "glass_type": "DOUBLE_STANDARD", "quantity": 1}}
+    d = requests.post(f"{BASE_URL}/api/multi-cat/products/{WINDOW_PID}/configure", json=body, headers={"Authorization": f"Bearer {tok}"}).json()
+    assert d["pricing_status"] == "ok" and float(d["technical_snapshot"]["foil_surcharge"]) > 0  # STANDARD dal codice, non dal nome
+    s = d["visual"]["spec"]
+    assert s["exterior_color_code"] == "096" and s["exterior_color_name"] == "Rovere personalizzato" and s["exterior_color_classification"] == "STANDARD"
 
 
 def _cfg_cass(tok, code):
@@ -121,7 +139,7 @@ def _cfg_cass(tok, code):
     return r.json()
 
 
-@pytest.mark.parametrize("code,fam", [("003", "BIANCO_MASSA"), ("110", "STANDARD"), ("019", "NON_STANDARD")])
+@pytest.mark.parametrize("code,fam", [("003", "BIANCO_MASSA"), ("110", "STANDARD"), ("019", "NON_STANDARD"), ("777", "NON_STANDARD")])
 def test_cassonetto_live_price_family(tok, code, fam):
     d = _cfg_cass(tok, code)
     assert d["pricing_status"] == "ok" and d["simple_snapshot"]["finish_family"] == fam
@@ -131,9 +149,9 @@ def test_cassonetto_live_price_family(tok, code, fam):
     assert spec["roller_box_dimensions"]["depth_mm"] == 163
 
 
-def test_cassonetto_unmapped_blocked(tok):
-    d = _cfg_cass(tok, "999")
-    assert d["pricing_status"] != "ok" and "CASSONETTO_COLOR_FAMILY_UNMAPPED" in " ".join(d["blocking_errors"])
+def test_cassonetto_missing_code_blocked(tok):
+    d = _cfg_cass(tok, "")
+    assert d["pricing_status"] != "ok" and "MISSING_COLOR_CODE" in " ".join(d["blocking_errors"])
 
 
 # ---------------- save / reload / modify / pdf parity ----------------
@@ -179,10 +197,11 @@ def test_save_reload_modify_pdf_parity(tok, quote):
     assert cl["simple_snapshot"]["finish_family"] == "BIANCO_MASSA"
     assert cl["visual_spec"]["spec"]["roller_box_dimensions"] == {"width_mm": 1200, "height_mm": 250, "depth_mm": 326, "ceiling_liner": "NO"}
 
-    # cassonetto non mappato -> BLOCKED
-    bad = dict(ccfg, color_code="777")
-    r = requests.post(f"{BASE_URL}/api/quotes/{qid}/lines", json=_line_payload(bad, CASS_PID, "GRID", "CASSONETTI", "CASSONETTO_STD"), headers=h)
-    assert r.status_code == 400 and "CASSONETTO_COLOR_FAMILY_UNMAPPED" in r.text
+    # cassonetto codice nuovo (SPECIAL) -> prezzato sulla griglia NON_STANDARD, leading zero preservato su save/reload
+    sp = dict(ccfg, color_code="096", color_name="Rovere")
+    r = requests.post(f"{BASE_URL}/api/quotes/{qid}/lines", json=_line_payload(sp, CASS_PID, "GRID", "CASSONETTI", "CASSONETTO_STD"), headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["configuration_snapshot"]["color_code"] == "096" and r.json()["visual_spec"]["spec"]["roller_box_color"] == {"code": "096", "name": "Rovere", "hex": r.json()["visual_spec"]["spec"]["roller_box_color"]["hex"], "classification": "STANDARD"}
 
     # MODIFY: 110/154 -> 003/110, 1 anta
     cfg2 = dict(cfg, color_mode="WHITE_IN_FOIL_OUT", color_internal="003", color_external="110", number_of_sashes=1)
@@ -203,7 +222,7 @@ def test_save_reload_modify_pdf_parity(tok, quote):
             for k in ("width_mm", "height_mm", "sash_count", "glass_type", "interior_color_code", "exterior_color_code", "product_type"):
                 assert pdf_lines[l["id"]]["visual_spec"]["spec"][k] == l["visual_spec"]["spec"][k]
     schemes = snap["quote"]["visual_schemes"]
-    assert len(schemes) == 2  # una visual per configurazione, nessuna duplicazione
+    assert len(schemes) == 3  # una visual per configurazione, nessuna duplicazione
     assert {s["svg_exterior"] for s in schemes} == {l["visual_spec"]["svg_exterior"] for l in q["lines"] if l.get("visual_spec")}
     for s in schemes:
         assert "BIANCO_MASSA" not in s["details"] and "NON_STANDARD" not in s["details"]  # mai price family nel PDF cliente

@@ -93,8 +93,9 @@ async def build_visual_spec(db, tenant_id: str, product: Dict[str, Any], categor
             code = cfg.get(key)
             if code:
                 try:
-                    c = await resolve_window_color(db, tenant_id, str(code))
+                    c = await resolve_window_color(db, tenant_id, str(code), cfg.get(f"{key}_name"))
                     spec[f"{side}_color_code"], spec[f"{side}_color_name"], spec[f"{side}_color_hex"] = c["code"], c["name"], c["hex"]
+                    spec[f"{side}_color_classification"] = c["classification"]  # congelato con la riga (msg 631 §23-24)
                 except ValueError:
                     spec[f"{side}_color_code"] = str(code)
     elif ptype == "ROLLER_BOX":
@@ -105,9 +106,11 @@ async def build_visual_spec(db, tenant_id: str, product: Dict[str, Any], categor
         }
         code = cfg.get("color_code")
         if code:
-            doc = await db.product_colors.find_one({"tenant_id": tenant_id, "code": str(code), "deleted_at": None})
-            spec["roller_box_color"] = {"code": str(code), "name": (doc or {}).get("name") or str(code),
-                                        "hex": (doc or {}).get("visual_hex") or "#DDDDDD"}
+            from app.services.color_engine import normalize_color_code, resolve_color_classification
+            nc = normalize_color_code(code)
+            doc = await db.product_colors.find_one({"tenant_id": tenant_id, "code": nc, "deleted_at": None})
+            spec["roller_box_color"] = {"code": nc, "name": (cfg.get("color_name") or "").strip() or (doc or {}).get("name") or nc,
+                                        "hex": (doc or {}).get("visual_hex"), "classification": resolve_color_classification(nc)}
     else:
         flag = {"SHUTTER": "shutter", "ROLLER_SHUTTER": "roller_shutter", "MOSQUITO_NET": "mosquito_net"}[ptype]
         spec[flag] = True
@@ -201,7 +204,7 @@ def _opening_symbol(sx, sy, sw, sh, hinge_left: bool, tilt: bool) -> str:
 def _render_window(spec, view: str, uid: str) -> str:
     x, y, w, h = _fit(spec["width_mm"], spec["height_mm"])
     interior = view == "INTERIOR"
-    hex_ = (spec.get("interior_color_hex") if interior else spec.get("exterior_color_hex")) or "#F5F5F0"
+    hex_ = (spec.get("interior_color_hex") if interior else spec.get("exterior_color_hex")) or "#E5E7EB"  # neutro se HEX assente
     stroke = _shade(hex_, 0.55) if _is_light(hex_) else _shade(hex_, 1.6)
     n = spec.get("sash_count") or 1
     f = max(4.0, min(w, h) * 0.055)
@@ -238,7 +241,7 @@ def _render_roller_box(spec, uid: str) -> str:
     d = spec.get("roller_box_dimensions") or {}
     depth = d.get("depth_mm") or 0
     color = (spec.get("roller_box_color") or {})
-    hex_ = color.get("hex") or "#F5F5F0"
+    hex_ = color.get("hex") or "#E5E7EB"
     stroke = _shade(hex_, 0.55) if _is_light(hex_) else _shade(hex_, 1.6)
     w_mm, h_mm = spec["width_mm"] or 500, spec["height_mm"] or 250
     # riserva spazio per la faccia laterale (profondità) a destra

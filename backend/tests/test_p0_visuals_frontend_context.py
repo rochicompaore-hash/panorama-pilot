@@ -83,7 +83,7 @@ def test_window_003_999_unknown(H):
     r = requests.post(f"{BASE}/api/multi-cat/products/{WINDOW_PID}/configure", json=_win_payload("003", "999"), headers=H, timeout=30)
     d = r.json()
     joined = " ".join([str(b) for b in (d.get("blocking_errors") or [])])
-    assert "UNKNOWN_COLOR_CODE" in joined, d
+    assert "NEEDS_PO_PRICING" in joined, d  # COLOR INPUT V2: codice nuovo = SPECIAL -> fail closed sul pricing, non UNKNOWN
 
 
 def _cas_payload(cc):
@@ -102,9 +102,9 @@ def test_cassonetto_family(H, cc, fam):
 def test_cassonetto_unmapped_999(H):
     r = requests.post(f"{BASE}/api/multi-cat/products/{CASSONETTO_PID}/configure", json=_cas_payload("999"), headers=H, timeout=30)
     d = r.json()
-    assert d.get("pricing_status") == "invalid_inputs", d
+    assert d.get("pricing_status") == "ok", d  # COLOR INPUT V2: 999 = SPECIAL -> griglia NON_STANDARD
     joined = " ".join([str(b) for b in (d.get("blocking_errors") or [])])
-    assert "CASSONETTO_COLOR_FAMILY_UNMAPPED" in joined, d
+    assert d["simple_snapshot"]["finish_family"] == "NON_STANDARD", d
 
 
 def test_pdf_preview_contains_schemi(H):

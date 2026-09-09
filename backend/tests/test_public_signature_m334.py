@@ -275,6 +275,40 @@ class TestOtpVerify:
         assert rv.status_code == 200, rv.text
         assert rv.json().get("ok") is True
 
+    def test_otp_one_time_use_reuse_rejected(self, admin_session, a_lead):
+        """PO msg 629 §4: OTP ONE-TIME USE — dopo la verifica lo stesso codice non è riutilizzabile."""
+        qid = _create_quote_with_line(admin_session, a_lead)
+        _generate_pdf(admin_session, qid)
+        raw = _create_public_link(admin_session, qid)
+        anon = requests.Session()
+        email = f"ot_{uuid.uuid4().hex[:6]}@example.com"
+        rid = anon.post(f"{API}/public/quotes/{raw}/request-otp", json={"email": email}).json()["request_id"]
+        code = _get_debug_otp(admin_session, rid)
+        assert anon.post(f"{API}/public/quotes/{raw}/verify-otp", json={"request_id": rid, "code": code}).status_code == 200
+        r2 = anon.post(f"{API}/public/quotes/{raw}/verify-otp", json={"request_id": rid, "code": code})
+        assert r2.status_code in (400, 404) and "ok" not in r2.text.lower().replace('"ok":false', ''), r2.text  # riuso → rifiutato (not_found: la richiesta non è più pending)
+
+    def test_otp_expired_rejected(self, admin_session, a_lead):
+        """OTP scaduto (expires_at nel passato) → 400 expired, anche con codice corretto."""
+        import asyncio as _a, os as _o
+        from datetime import datetime, timedelta, timezone
+        qid = _create_quote_with_line(admin_session, a_lead)
+        _generate_pdf(admin_session, qid)
+        raw = _create_public_link(admin_session, qid)
+        anon = requests.Session()
+        email = f"ex_{uuid.uuid4().hex[:6]}@example.com"
+        rid = anon.post(f"{API}/public/quotes/{raw}/request-otp", json={"email": email}).json()["request_id"]
+        code = _get_debug_otp(admin_session, rid)
+
+        async def _expire():
+            from motor.motor_asyncio import AsyncIOMotorClient
+            db = AsyncIOMotorClient(_o.environ["MONGO_URL"])[_o.environ["DB_NAME"]]
+            past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+            await db.quote_otp_requests.update_one({"_id": rid}, {"$set": {"expires_at": past}})
+        _a.run(_expire())
+        r = anon.post(f"{API}/public/quotes/{raw}/verify-otp", json={"request_id": rid, "code": code})
+        assert r.status_code in (400, 410) and "expired" in r.text.lower(), r.text
+
     def test_five_failed_attempts_marks_failed(self, admin_session, a_lead):
         qid = _create_quote_with_line(admin_session, a_lead)
         _generate_pdf(admin_session, qid)
