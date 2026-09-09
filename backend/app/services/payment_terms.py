@@ -80,3 +80,55 @@ def apply_automatic_discount(totals: Dict[str, Any], discount_percent: float) ->
     })
     out["margin_pct"] = round(out["margin_abs"] / subtotal * 100, 2) if subtotal > 0 else 0
     return out
+
+
+# ---------------------------------------------------------------------------
+# Sconto globale preventivo / codice promo (PO msg 407 §7-§27)
+# Stacking (fail-safe, documentato): GLOBAL DISCOUNT prima, PAYMENT DISCOUNT (FULL_UPFRONT 5%) dopo,
+# in sequenza sulla base già scontata (nessun doppio sconto sulla stessa base piena).
+# ---------------------------------------------------------------------------
+DISCOUNT_POLICY_VERSION = "global_discount_v1_msg407"
+
+
+def apply_global_discount(totals: Dict[str, Any], discount_type: Optional[str], discount_value: float) -> Dict[str, Any]:
+    gross_subtotal = float(totals.get("subtotal") or 0)
+    out = dict(totals)
+    out.update({"commercial_subtotal": round(gross_subtotal, 2), "global_discount_amount": 0.0})
+    v = float(discount_value or 0)
+    if not discount_type or v <= 0 or gross_subtotal <= 0:
+        return out
+    amount = round(gross_subtotal * v / 100.0, 2) if discount_type == "PERCENT" else round(min(v, gross_subtotal), 2)
+    factor = (gross_subtotal - amount) / gross_subtotal
+    subtotal = round(gross_subtotal - amount, 2)
+    out.update({
+        "global_discount_amount": amount,
+        "total_discounts": round(float(totals.get("total_discounts") or 0) + amount, 2),
+        "subtotal": subtotal, "taxable_amount": subtotal,
+        "vat_amount": round(float(totals.get("vat_amount") or 0) * factor, 2),   # IVA dopo sconto
+    })
+    out["total"] = round(out["subtotal"] + out["vat_amount"], 2)
+    out["margin_abs"] = round(subtotal - float(totals.get("internal_cost") or 0), 2)
+    out["margin_pct"] = round(out["margin_abs"] / subtotal * 100, 2) if subtotal > 0 else 0
+    return out
+
+
+async def resolve_promo_code(db, tenant_id: str, code: str) -> Dict[str, Any]:
+    """Validazione backend-side, tenant-scoped. Solleva ValueError con codice esplicito."""
+    from datetime import datetime, timezone
+    c = (code or "").strip().upper()
+    doc = await db.promo_codes.find_one({"tenant_id": tenant_id, "code": c, "deleted_at": None})
+    if not doc:
+        raise ValueError("PROMO_CODE_UNKNOWN")
+    if not doc.get("active", False):
+        raise ValueError("PROMO_CODE_DISABLED")
+    now = datetime.now(timezone.utc).isoformat()
+    if doc.get("valid_from") and now < doc["valid_from"]:
+        raise ValueError("PROMO_CODE_NOT_YET_VALID")
+    if doc.get("valid_to") and now > doc["valid_to"]:
+        raise ValueError("PROMO_CODE_EXPIRED")
+    if doc.get("usage_limit") is not None and int(doc.get("usage_count") or 0) >= int(doc["usage_limit"]):
+        raise ValueError("PROMO_CODE_USAGE_LIMIT_REACHED")
+    if doc.get("discount_type") not in ("PERCENT", "FIXED_AMOUNT") or float(doc.get("discount_value") or 0) <= 0:
+        raise ValueError("PROMO_CODE_INVALID_CONFIG")
+    return {"promo_code": c, "global_discount_type": doc["discount_type"], "global_discount_value": float(doc["discount_value"]),
+            "global_discount_source": "PROMO_CODE", "promo_code_description": doc.get("description")}

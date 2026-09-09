@@ -112,7 +112,7 @@ class TestCassonettoGrid:
         j = r.json()
         assert j.get("pricing_status") in ("invalid_inputs", "invalid")
         errs = j.get("blocking_errors") or []
-        assert any("MISSING_CASSONETTO_COLOR_PRICE_FAMILY" in str(e) for e in errs), errs
+        assert any(("CASSONETTO_COLOR_FAMILY_UNMAPPED" in str(e)) or ("MISSING_CASSONETTO_COLOR_PRICE_FAMILY" in str(e)) for e in errs), errs
 
 
 # ---------------- PERSIANE AREA_PURCHASE_MULTIPLIER ----------------

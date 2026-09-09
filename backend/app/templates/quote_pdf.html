@@ -135,10 +135,53 @@
 
     /* Break helpers */
     .page-break { page-break-after: always; }
+    .thumb svg { width: 22mm; height: 22mm; display: block; }
+    .thumb-pair { display: flex; gap: 1mm; }
+    .schemes { display: flex; flex-wrap: wrap; gap: 4mm; }
+    .scheme { width: 86mm; border: 0.5pt solid var(--border); border-radius: 2mm; padding: 3mm; break-inside: avoid; page-break-inside: avoid; }
+    .scheme svg { width: 60mm; height: 60mm; display: block; }
+    .scheme .views { display: flex; gap: 2mm; justify-content: center; }
+    .scheme .views svg { width: 38mm; height: 38mm; }
+    .scheme h4 { margin: 0 0 1mm 0; font-size: 9pt; color: var(--brand); }
     tr, td, .opening, .clause { page-break-inside: avoid; }
   </style>
 </head>
 <body>
+{% macro line_cell(l) %}
+  <div style="display:flex; gap:2mm; align-items:flex-start;">
+    {% if l.visual_spec and l.visual_spec.svg_exterior %}
+      <div class="thumb" data-visual-thumb="{{ l.id }}">
+        {% if l.visual_spec.is_bicolor %}
+          <div class="thumb-pair"><div>{{ l.visual_spec.svg_interior | safe }}</div><div>{{ l.visual_spec.svg_exterior | safe }}</div></div>
+        {% else %}
+          {{ l.visual_spec.svg_exterior | safe }}
+        {% endif %}
+      </div>
+    {% endif %}
+    <div>
+      <b>{{ l.description or 'Prodotto' }}</b>
+      {% if l.width_mm and l.height_mm %}<div class="small muted">L × H: {{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}
+      {% set vs = l.visual_spec.spec if l.visual_spec else none %}
+      {% if vs %}
+        <div class="small muted">
+          {% if vs.product_type in ('WINDOW','DOOR_WINDOW') %}
+            {{ 'Portafinestra' if vs.product_type == 'DOOR_WINDOW' else 'Finestra' }} · {{ vs.sash_count }} ant{{ 'a' if vs.sash_count == 1 else 'e' }}
+            {% if vs.opening_configuration == 'ANTA_RIBALTA' %} · anta-ribalta{% elif vs.opening_configuration in ('FISSA','FIXED') %} · fissa{% else %} · battente{% endif %}
+            {% if vs.glass_type %} · vetro {{ 'triplo' if 'TRIPLE' in vs.glass_type else 'doppio' }}{{ ' satinato' if 'SATIN' in vs.glass_type else '' }}{% endif %}
+            <br/>Colore interno: <b>{{ vs.interior_color_code }}</b> {{ vs.interior_color_name }} · Colore esterno: <b>{{ vs.exterior_color_code }}</b> {{ vs.exterior_color_name }}
+          {% elif vs.product_type == 'ROLLER_BOX' %}
+            Cassonetto{% if vs.roller_box_dimensions.depth_mm %} · profondità {{ vs.roller_box_dimensions.depth_mm }} mm{% endif %} · {{ 'con cielino' if vs.roller_box_dimensions.ceiling_liner == 'SI' else 'senza cielino' }}
+            {% if vs.roller_box_color %}<br/>Colore: <b>{{ vs.roller_box_color.code }}</b> {{ vs.roller_box_color.name }}{% endif %}
+          {% else %}
+            {% if vs.exterior_color_code %}Colore: <b>{{ vs.exterior_color_code }}</b>{% if vs.exterior_color_name and vs.exterior_color_name != vs.exterior_color_code %} {{ vs.exterior_color_name }}{% endif %}{% endif %}
+            {% if vs.orientable %} · lamelle orientabili{% endif %}
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
 
 <!-- Running header -->
 <div class="running-header">
@@ -260,10 +303,7 @@
                       {% elif l.role == 'disposal' %}Smaltimento
                       {% else %}{{ l.role or '—' }}{% endif %}
                     </td>
-                    <td>
-                      <b>{{ l.description or 'Prodotto' }}</b>
-                      {% if l.width_mm and l.height_mm %}<div class="small muted">{{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}
-                    </td>
+                    <td>{{ line_cell(l) }}</td>
                     <td class="qty">{{ l.quantity | num(0) }}</td>
                     {% if snap.template.show_prices_mode == 'per_line' %}
                       <td class="price">{{ l.unit_price_final | cur }}</td>
@@ -301,7 +341,7 @@
               {% for l in snap.quote.lines if l.opening_id == op.id %}
                 {% set _ = ns.shown.append(l.id) %}
                 <tr>
-                  <td><b>{{ l.description or 'Prodotto' }}</b>{% if l.width_mm and l.height_mm %}<div class="small muted">{{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}</td>
+                  <td>{{ line_cell(l) }}</td>
                   <td class="qty">{{ l.quantity | num(0) }}</td>
                   {% if snap.template.show_prices_mode == 'per_line' %}<td class="price">{{ l.unit_price_final | cur }}</td><td class="sub">{{ l.subtotal_line | cur }}</td>{% endif %}
                 </tr>
@@ -322,7 +362,7 @@
         <tbody>
           {% for l in orphans %}
             <tr>
-              <td><b>{{ l.description or 'Prodotto' }}</b>{% if l.width_mm %}<div class="small muted">{{ l.width_mm }}×{{ l.height_mm }} mm</div>{% endif %}</td>
+              <td>{{ line_cell(l) }}</td>
               <td class="qty">{{ l.quantity | num(0) }}</td>
               {% if snap.template.show_prices_mode == 'per_line' %}<td class="price">{{ l.unit_price_final | cur }}</td><td class="sub">{{ l.subtotal_line | cur }}</td>{% endif %}
             </tr>
@@ -334,11 +374,38 @@
 </div>
 {% endif %}
 
+<!-- SCHEMI PRODOTTI (P0 msg 625 §1B/§21) — una visual grande per posizione/configurazione, nessuna duplicazione -->
+{% if snap.quote.visual_schemes %}
+<div class="section" data-section="schemi-prodotti">
+  <h2>Schemi prodotti</h2>
+  <p class="small muted">Rappresentazione schematica della configurazione venduta (proporzioni L/H, ante, aperture viste dall'interno, vetro, colori). Disegni non in scala.</p>
+  <div class="schemes">
+    {% for sc in snap.quote.visual_schemes %}
+      <div class="scheme" data-scheme="{{ loop.index }}">
+        <h4>{{ sc.positions | join(', ') }} — {{ sc.description }}</h4>
+        <div class="small muted">{{ sc.details }}</div>
+        {% if sc.is_bicolor %}
+          <div class="views"><div>{{ sc.svg_interior | safe }}</div><div>{{ sc.svg_exterior | safe }}</div></div>
+        {% elif sc.product_type in ('WINDOW','DOOR_WINDOW') %}
+          <div class="views"><div>{{ sc.svg_interior | safe }}</div></div>
+        {% else %}
+          <div class="views"><div>{{ sc.svg_exterior | safe }}</div></div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <!-- Economic summary -->
 <div class="section econ">
   <h2>Riepilogo economico</h2>
   <table>
     {% if snap.quote.delivery_surcharge_amount and snap.quote.delivery_surcharge_amount > 0 %}<tr><td class="k">Maggiorazione consegna accelerata (+{{ snap.quote.delivery_surcharge_percent | num(0) }}%)</td><td class="v">{{ snap.quote.delivery_surcharge_amount | cur }}</td></tr>{% endif %}
+    {% if snap.quote.global_discount_amount and snap.quote.global_discount_amount > 0 %}
+    <tr><td class="k">Subtotale</td><td class="v">{{ snap.quote.commercial_subtotal | cur }}</td></tr>
+    <tr><td class="k">{{ snap.quote.global_discount_label }}</td><td class="v">− {{ snap.quote.global_discount_amount | cur }}</td></tr>
+    {% endif %}
     {% if snap.quote.payment_discount_amount and snap.quote.payment_discount_amount > 0 %}
     <tr><td class="k">Imponibile prima dello sconto</td><td class="v">{{ snap.quote.subtotal_before_payment_discount | cur }}</td></tr>
     <tr><td class="k">Sconto pagamento anticipato ({{ snap.quote.automatic_discount_percent | num(0) }}%)</td><td class="v">− {{ snap.quote.payment_discount_amount | cur }}</td></tr>

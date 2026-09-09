@@ -1464,3 +1464,14 @@ Con TEMPORARY multiplier 2.5/3.0/3.5 e included_services 30/200/500 €: BASE 50
 
 ---
 ## 2026-09-08 — Vedi `memory/CHANGELOG.md`: msg 401 Pricing Integrity Audit = PASS; msg 402 Quote Editor Completion V1 = PASS (`QUOTE_EDITOR_FINAL_AUDIT.md`). Backlog P0: PRE-RELEASE CLEANUP residuo (full-suite 0F/0E, /api/sequences, tenant isolation, frontend build) → GENERAL PRE-PRODUCTION RELEASE GATE. Prossimo turno richiesto dal PO: CONNECTOR AUDIT (solo analisi). FREEZE: Vano V2, F2, F3, F4.
+
+---
+## 2026-09-09 — P0 QUOTE VISUALS + WINDOW/CASSONETTO COLOR ENGINE (msg 625) = PASS
+- **VisualSpec canonico** (`backend/app/services/visual_spec.py`): PRODUCT CONFIG → VISUAL_SPEC → SVG deterministico (Python, unica source of truth). `ConfigureResponse.visual = {spec, is_bicolor, svg_interior, svg_exterior}`; UI (`ProductVisualSVG.jsx`) e PDF consumano lo stesso payload. Tipi: WINDOW, DOOR_WINDOW, ROLLER_BOX, SHUTTER, ROLLER_SHUTTER, MOSQUITO_NET.
+- **Visual snapshot** congelato in `QuoteLine.visual_spec` al save/reconfigure (DRAFT rigenerabile, ACCEPTED immutabile — catalogo colori non altera PDF già accettati).
+- **PDF**: miniatura per riga (2 viste se bicolore) + sezione "Schemi prodotti" (dedup per configurazione). Mai price family nel PDF cliente.
+- **Window Color Engine** (`color_engine.py`, `resolvers._foil_applicable`): codici catalogo product_colors; 003 = BIANCO MASSA no surcharge; STANDARD +10% solo base PVC eleggibile (una volta anche 2 lati); SPECIAL → NEEDS_PO_PRICING; ignoto → UNKNOWN_COLOR_CODE. UI 4 modalità: WHITE_MASS / WHITE_IN_FOIL_OUT / FOIL_BOTH_SAME / BICOLOR + toggle vista interna/esterna. Placeholder WHITE_MASS/ANTHRACITE/OAK rimossi dalla UI.
+- **Cassonetto Color Engine**: mapping rigido codice→famiglia (003 BIANCO_MASSA; 100/096/694/110/154/048 STANDARD; 019/145/146/109/402/663 NON_STANDARD); altro → `CASSONETTO_COLOR_FAMILY_UNMAPPED` fail closed. Famiglia visibile solo con canSeeCosts.
+- Test: `tests/test_p0_visuals_color_engine.py` 22/22 + testing agent iteration_38 (FE 11/11, BE 100%).
+- Data gap noto (non P0): ricetta tecnica PROEVOLUTION WINDOW_3_SASH / WINDOW_4_SASH assente → 3/4 ante = INCOMPLETE (SVG ok).
+- Pre-esistenti non correlati: `test_pdf_m332` (XPASS strict missing_site, snapshot non in listing), `test_multi_category_v1_e2e` fixture TEST_ZANZARIERA_AREA_130 e categoria PORTEFINESTRE mancanti.

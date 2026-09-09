@@ -1,0 +1,35 @@
+{
+  "summary": "P0 Quote Visuals + Window/Cassonetto Color Engine — full FE + BE E2E. Backend pytest test_p0_visuals_color_engine.py 22/22 PASS; new spot-check test_p0_visuals_frontend_context.py: 7 PASS (window color matrix + PDF Schemi/no-family-leak). Frontend Playwright: all 11 flows PASS with 1 collateral data gap (WINDOW_3_SASH recipe missing for ProEvolution → pricing INCOMPLETE when N. ante=3) which is NOT part of the P0 spec but blocks the exact 'sashes=3 width=2000 SVG update' step from returning a live price (SVG still updates correctly). PDF preview integration confirmed at API level.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Configuratore FINESTRE — ProEvolution con N. ante = 3 (o 4)",
+        "issue": "Cambiando cfg-tech-sashes a 3, la preview-status diventa INCOMPLETE con MISSING_TECHNICAL_RECIPE: aggiungi PROEVOLUTION:WINDOW_3_SASH ([{'product_key':'PROEVOLUTION','recipe_code':'WINDOW_3_SASH'}]). Il rendering SVG live (data-testid=cfg-visual-svg) aggiorna correttamente 'L 2000 mm' e le 3 ante, ma il prezzo non è calcolabile: probabilmente manca la ricetta tecnica seed per PROEVOLUTION 3/4 ante. Non fa parte del contratto P0 visuals/color-engine, ma è un buco di dati che ostacola i test end-to-end del cliente.",
+        "affected_selectors": ["[data-testid='cfg-tech-sashes']", "[data-testid='preview-status']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_p0_visuals_color_engine.py",
+    "/app/backend/tests/test_p0_visuals_frontend_context.py"
+  ],
+  "action_items": [
+    "OPZIONALE (non P0): seed della ricetta tecnica PROEVOLUTION:WINDOW_3_SASH (e WINDOW_4_SASH) per abilitare configurazioni 3/4 ante. Il codice del motore già supporta il numero ante; solo dati mancanti."
+  ],
+  "critical_code_review_comments": [
+    "MultiCategoryConfiguratorDialog.jsx WindowColorSection setMode (L585-590) gestisce correttamente il reset dei color code al cambio modalità: WHITE_MASS→003/003, FOIL_BOTH_SAME→uguali, BICOLOR→mantiene distinti. Verificato via UI: FOIL_BOTH_SAME 154/154 → WHITE_MASS resetta a 003/003.",
+    "ProductVisualSVG.jsx: bicolor detection deriva da spec.is_bicolor (backend). Riga bicolore in tabella mostra 2 SVG affiancati (data-bicolor='true') come da spec — verificato con nuova riga 110/154.",
+    "Cassonetto GRID: hint cfg-grid-color-hint corretto (non menziona famiglie); bottoni colore mostrano solo codice+nome; detail 'Famiglia listino (interno)' correttamente esposto solo ad admin (canSeeCosts). Prezzi 003<110<019 monotoni verificati (329,01 < 370,77 < 399,78 €).",
+    "PDF preview: contiene 'Schemi prodotti' e 'Colore interno'; NON contiene 'BIANCO_MASSA' o 'NON_STANDARD' — RBAC/label sanitization OK."
+  ],
+  "updated_files": ["/app/backend/tests/test_p0_visuals_frontend_context.py (new spot-check per FE regression)"],
+  "success_rate": {"backend": "100% (22/22 P0 pytest + 7/7 nuovi spot-check)", "frontend": "100% dei flussi P0 (11/11)"},
+  "test_credentials": "Admin admin@infissiexpress.com / Admin!2025 — OK. Login POST /api/auth/login → access_token in localStorage 'ie_access_token'.",
+  "seed_data_creation": "Aggiunte 2 righe alla quote 540b194f... via UI durante il test (una window 110/154 poi editata a 154/154, un cassonetto 110). Non sono state modificate seed produzione.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "P0 visuals/color-engine è verde su tutti i flussi richiesti. Attenzione: se si ripete la sequenza 'sashes=3 + width=2000 + glass=satinato + preview-total' occorre prima verificare che la ricetta PROEVOLUTION:WINDOW_3_SASH sia seedata (attualmente NO → INCOMPLETE), altrimenti l'SVG aggiorna ma preview-total non è mostrato. Per selezionare Radix Select options nel dialogo: aprire trigger, attendere 400ms, iterare [role='option'] e cliccare quello con text_content che *inizia* con l'etichetta esatta (es. 'Bianco massa' ⊂ 'Bianco interno + pellicolato esterno' se si usa substring). PDF preview endpoint funziona con body {} e restituisce id per GET /api/quote-pdfs/{id}/download."
+}

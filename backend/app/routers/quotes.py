@@ -23,7 +23,7 @@ from app.services.margin_engine import (
     redact_financial_snapshot_for_role,
 )
 from app.services.multi_category_pricing import resolve_and_compute
-from app.services.payment_terms import resolve_payment_terms, apply_automatic_discount, PAYMENT_POLICIES
+from app.services.payment_terms import resolve_payment_terms, apply_automatic_discount, PAYMENT_POLICIES, apply_global_discount, resolve_promo_code, DISCOUNT_POLICY_VERSION
 from app.services.delivery_policy import resolve_delivery, apply_delivery_surcharge, DELIVERY_MODES
 from app.models_multi_category import ConfigureRequest, SimplePricingInputs
 from app.services.service_resolver import build_profiling_service
@@ -106,8 +106,13 @@ def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
     totals = compute_quote_totals(lines)
     # msg 402 Lotto 9 — maggiorazione consegna EXPRESS +20% (base commerciale, esclusi ENEA), poi sconto pagamento
     totals = apply_delivery_surcharge(totals, lines, existing_quote.get("delivery_surcharge_percent") or 0)
-    # msg 402 Lotto 5 — sconto automatico da payment terms (FULL_UPFRONT = 5%)
+    # msg 407 — sconto globale / promo (QUOTE LEVEL, su tutto il preventivo, IVA dopo sconto) — PRIMA del payment discount
+    totals = apply_global_discount(totals, existing_quote.get("global_discount_type"), existing_quote.get("global_discount_value") or 0)
+    # msg 402 Lotto 5 — sconto automatico da payment terms (FULL_UPFRONT = 5%) sulla base già scontata
     totals = apply_automatic_discount(totals, existing_quote.get("automatic_discount_percent") or 0)
+    totals["total_discount_amount"] = round(float(totals.get("global_discount_amount") or 0) + float(totals.get("payment_discount_amount") or 0), 2)
+    totals["discounted_net_revenue"] = totals["subtotal"]
+    totals["discount_policy_version"] = DISCOUNT_POLICY_VERSION
     if _is_frozen(existing_quote):
         return totals
     proposed = dict(existing_quote)
@@ -272,12 +277,30 @@ async def update_quote(
     user: dict = Depends(require_permission("quotes.edit")),
 ):
     payload = body.model_dump(exclude_unset=True)
+    db = get_db()
     # msg 402 Lotto 5 — payment terms strutturati (fail-closed su codice sconosciuto)
     if "payment_terms" in payload and payload["payment_terms"]:
         try:
             payload.update(resolve_payment_terms(payload["payment_terms"]))
         except ValueError as e:
             raise HTTPException(status_code=400, detail={"code": "PAYMENT_TERMS_INVALID", "message": str(e), "allowed": list(PAYMENT_POLICIES.keys())})
+    # msg 407 — sconto globale manuale (%) e codice promo: validazione backend, mai valori decisi dal frontend
+    if "promo_code" in payload:
+        code = (payload.pop("promo_code") or "").strip()
+        if code:
+            try:
+                payload.update(await resolve_promo_code(db, user["tenant_id"], code))
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail={"code": str(e), "message": "Codice sconto non applicabile"})
+        else:
+            payload.update({"promo_code": None, "global_discount_type": None, "global_discount_value": 0.0, "global_discount_source": None, "promo_code_description": None})
+    if "global_discount_percent" in payload:
+        pct = payload.pop("global_discount_percent")
+        pct = float(pct or 0)
+        if pct < 0 or pct > 100:
+            raise HTTPException(status_code=400, detail={"code": "GLOBAL_DISCOUNT_INVALID", "message": "Percentuale sconto 0-100"})
+        payload.update({"promo_code": None, "promo_code_description": None, "global_discount_source": "MANUAL" if pct > 0 else None,
+                        "global_discount_type": "PERCENT" if pct > 0 else None, "global_discount_value": pct})
     if "delivery_mode" in payload and payload["delivery_mode"]:
         try:
             payload.update(resolve_delivery(payload["delivery_mode"]))
@@ -332,7 +355,8 @@ async def update_quote(
     # ri-risolvi i servizi automatici + ricomputa il financial_snapshot.
     if any(k in payload for k in ("installation_mode", "dismantling_mode", "disposal_mode",
                                   "withholding_applicable", "withholding_rate", "enea_practice_code",
-                                  "payment_terms", "tax_deduction_requested", "delivery_mode")):
+                                  "payment_terms", "tax_deduction_requested", "delivery_mode",
+                                  "global_discount_type", "global_discount_value")):
         db = get_db()
         fresh = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
         if fresh and not _is_frozen(fresh):
@@ -579,6 +603,8 @@ async def _build_priced_line(db, user: dict, doc: dict, line_data: dict) -> "Quo
                 resp_dict = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
                 if getattr(resp, "pricing_status", None) == "ok":
                     line_data["pricing_snapshot"] = resp_dict
+                    # P0 msg 625 §3: visual snapshot congelato con la riga (spec + svg, hex inclusi)
+                    line_data["visual_spec"] = resp_dict.get("visual")
                     for k in ("technical_snapshot", "commercial_snapshot", "simple_snapshot"):
                         if resp_dict.get(k):
                             line_data[k] = resp_dict[k]

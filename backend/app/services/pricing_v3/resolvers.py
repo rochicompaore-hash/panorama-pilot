@@ -402,6 +402,21 @@ class TechnicalCostResolver:
             hint=f"Configurazione tecnica → Tempi produzione — aggiungi {recipe_code}",
         )
 
+    async def _foil_applicable(self, req: PricingRequest) -> bool:
+        from app.services.color_engine import resolve_window_color, window_foil_surcharge_applicable
+        cats = {}
+        for side, code in (("internal", req.color_internal), ("external", req.color_external)):
+            try:
+                cats[side] = (await resolve_window_color(self.db, req.tenant_id, code))["category"]
+            except ValueError:
+                raise PricingError("UNKNOWN_COLOR_CODE", configuration={"side": side, "color_code": code},
+                                   hint="Colore non presente nel catalogo product_colors — selezionare un codice valido (es. 003 BIANCO MASSA)")
+        try:
+            return window_foil_surcharge_applicable(cats["internal"], cats["external"])
+        except ValueError:
+            raise PricingError("NEEDS_PO_PRICING", configuration={"color_internal": req.color_internal, "color_external": req.color_external},
+                               hint="Colore SPECIAL: nessuna policy economica V1 definita dal PO per il pellicolato speciale")
+
     async def resolve(self, req: PricingRequest, ps: ProfileSystemResolution,
                        bom: BomResolution) -> TechnicalSnapshot:
         # Tempo produzione (config-based, fail-closed)
@@ -479,9 +494,11 @@ class TechnicalCostResolver:
         # Manodopera
         labor_cost = bom.production_time_hours * hourly
 
-        # Pellicolato +10% (solo Fase 1B: attivato solo se colore non è WHITE_MASS)
+        # Pellicolato +10% (P0 msg 625 §6-§10): codici catalogo product_colors.
+        # 003 = BIANCO MASSA -> nessun surcharge. STANDARD -> +10% solo su base PVC eleggibile,
+        # una sola volta anche se pellicolato due lati. SPECIAL -> NEEDS_PO_PRICING (fail closed).
         foil_surcharge = Decimal("0")
-        if is_foil_surcharge_applicable(req.color_internal, req.color_external):
+        if await self._foil_applicable(req):
             foil_surcharge = foil_pvc_base * (STANDARD_FOIL_SURCHARGE_PERCENT / Decimal("100"))
 
         total_internal = (material_cost + glass_cost + hardware_cost

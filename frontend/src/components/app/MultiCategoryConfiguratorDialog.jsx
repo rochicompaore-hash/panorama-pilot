@@ -10,6 +10,23 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ArrowRight, Activity, Info, Package, Ruler, Boxes, Hammer } from "lucide-react";
 import { toast } from "sonner";
+import { ProductVisualSVG } from "@/components/app/ProductVisualSVG";
+
+const WHITE_MASS_CODE = "003";
+const COLOR_MODES = [
+  ["WHITE_MASS", "Bianco massa (003)"],
+  ["WHITE_IN_FOIL_OUT", "Bianco interno + pellicolato esterno"],
+  ["FOIL_BOTH_SAME", "Pellicolato due lati stesso colore"],
+  ["BICOLOR", "Bicolore (interno ≠ esterno)"],
+];
+// Deriva la modalità colore da una configurazione salvata (reload/modify di righe esistenti).
+function deriveColorMode(cfg) {
+  if (cfg.color_mode) return cfg.color_mode;
+  const ci = cfg.color_internal, ce = cfg.color_external;
+  if (!ci || !ce) return "WHITE_MASS";
+  if (ci === ce) return ["WHITE_MASS", WHITE_MASS_CODE].includes(ci) ? "WHITE_MASS" : "FOIL_BOTH_SAME";
+  return ["WHITE_MASS", WHITE_MASS_CODE].includes(ci) ? "WHITE_IN_FOIL_OUT" : "BICOLOR";
+}
 
 const fmt = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n || 0);
 
@@ -53,7 +70,11 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
         setSelectedCat({ id: prod.category_id, code: prod.category_code || initialConfig.category_code });
         setSelectedProduct(prod);
         const cfg = initialConfig.configuration_snapshot || initialConfig.product_config || {};
-        setInputs({ ...cfg, quantity: initialConfig.quantity || cfg.quantity || 1, width_mm: cfg.width_mm ?? initialConfig.width_mm, height_mm: cfg.height_mm ?? initialConfig.height_mm });
+        const legacy = (c) => (c === "WHITE_MASS" ? WHITE_MASS_CODE : c);
+        const colorFix = prod.pricing_model === "FORMULA_TECHNICAL"
+          ? { color_mode: deriveColorMode(cfg), color_internal: legacy(cfg.color_internal) || WHITE_MASS_CODE, color_external: legacy(cfg.color_external) || WHITE_MASS_CODE }
+          : {};
+        setInputs({ ...cfg, ...colorFix, quantity: initialConfig.quantity || cfg.quantity || 1, width_mm: cfg.width_mm ?? initialConfig.width_mm, height_mm: cfg.height_mm ?? initialConfig.height_mm });
         setPreview(null);
         setStep(3);
       } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || e.message); }
@@ -86,6 +107,10 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
     if (p.pricing_model === "AREA" || p.pricing_model === "FORMULA_TECHNICAL") {
       defaults.width_mm = 1200; defaults.height_mm = 1400;
     }
+    if (p.pricing_model === "FORMULA_TECHNICAL") {
+      defaults.color_mode = "WHITE_MASS"; defaults.color_internal = WHITE_MASS_CODE; defaults.color_external = WHITE_MASS_CODE;
+      defaults.opening_configuration = "ANTA_RIBALTA"; defaults.hinge_side = "DX";
+    }
     if (p.pricing_model === "AREA_PURCHASE_MULTIPLIER") {
       defaults.width_mm = 1200; defaults.height_mm = 1500; defaults.orientable = false;
     }
@@ -110,6 +135,11 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
     try {
       let body;
       if (selectedProduct.pricing_model === "FORMULA_TECHNICAL") {
+        if (!inputs.color_internal || !inputs.color_external) {
+          setPreview({ pricing_status: "incomplete", blocking_errors: ["COLOR_REQUIRED: seleziona il colore pellicolato."], visual: null });
+          setLoading(false);
+          return;
+        }
         body = {
           technical_inputs: {
             product_key: selectedProduct.key,
@@ -117,8 +147,11 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
             number_of_sashes: Number(inputs.number_of_sashes || 1),
             width_mm: Number(inputs.width_mm || 0),
             height_mm: Number(inputs.height_mm || 0),
-            color_internal: inputs.color_internal || "WHITE_MASS",
-            color_external: inputs.color_external || "WHITE_MASS",
+            color_mode: inputs.color_mode || deriveColorMode(inputs),
+            color_internal: inputs.color_internal,
+            color_external: inputs.color_external,
+            opening_configuration: inputs.opening_configuration || "ANTA_RIBALTA",
+            hinge_side: inputs.hinge_side || "DX",
             glass_type: inputs.glass_type || "DOUBLE_STANDARD",
             quantity: Number(inputs.quantity || 1),
           },
@@ -311,9 +344,15 @@ export function MultiCategoryConfiguratorDialog({ open, onOpenChange, onConfirm,
                 category={selectedCat}
               />
             </div>
-            {/* RIGHT: live price */}
-            <div className="lg:col-span-2">
-              <Card className="rounded-sm border-border p-4 sticky top-2" data-testid="multi-cat-preview">
+            {/* RIGHT: live visual + price */}
+            <div className="lg:col-span-2 space-y-3">
+              {preview?.visual?.svg_exterior && (
+                <Card className="rounded-sm border-border p-3" data-testid="multi-cat-visual">
+                  <div className="overline mb-2">Schema prodotto (live)</div>
+                  <ProductVisualSVG visual={preview.visual} size={260} testid="cfg-visual" />
+                </Card>
+              )}
+              <Card className="rounded-sm border-border p-4" data-testid="multi-cat-preview">
                 <div className="flex items-center justify-between mb-2">
                   <div className="overline">Prezzo live</div>
                   {loading && <Badge className="rounded-sm bg-amber-500/20 text-amber-800 gap-1"><Activity size={10} className="animate-pulse" /> Calcolo…</Badge>}
@@ -406,11 +445,14 @@ function PricingModelRenderer({ model, inputs, setInputs, product, category }) {
           <NumField label="N. ante" value={inputs.number_of_sashes || 1} onChange={(v) => set("number_of_sashes", v)} testid="cfg-tech-sashes" min={1} max={4} />
           <NumField label="Larghezza (mm)" value={inputs.width_mm} onChange={(v) => set("width_mm", v)} testid="cfg-tech-width" />
           <NumField label="Altezza (mm)" value={inputs.height_mm} onChange={(v) => set("height_mm", v)} testid="cfg-tech-height" />
-          <SelectField label="Colore interno" value={inputs.color_internal || "WHITE_MASS"} onChange={(v) => set("color_internal", v)} options={[["WHITE_MASS","Bianco"],["ANTHRACITE","Antracite"],["OAK","Rovere"]]} testid="cfg-tech-cint" />
-          <SelectField label="Colore esterno" value={inputs.color_external || "WHITE_MASS"} onChange={(v) => set("color_external", v)} options={[["WHITE_MASS","Bianco"],["ANTHRACITE","Antracite"],["OAK","Rovere"]]} testid="cfg-tech-cext" />
+          <SelectField label="Apertura" value={inputs.opening_configuration || "ANTA_RIBALTA"} onChange={(v) => set("opening_configuration", v)} options={[["ANTA_RIBALTA","Anta-ribalta"],["BATTENTE","Battente"],["FISSA","Fissa"]]} testid="cfg-tech-opening" />
+          {Number(inputs.number_of_sashes || 1) === 1 && (inputs.opening_configuration || "ANTA_RIBALTA") !== "FISSA" && (
+            <SelectField label="Lato cerniere (vista interna)" value={inputs.hinge_side || "DX"} onChange={(v) => set("hinge_side", v)} options={[["DX","Destra"],["SX","Sinistra"]]} testid="cfg-tech-hinge" />
+          )}
           <SelectField label="Vetro" value={inputs.glass_type || "DOUBLE_STANDARD"} onChange={(v) => set("glass_type", v)} options={[["DOUBLE_STANDARD","Doppio vetro (76 €/m²)"],["DOUBLE_SATIN","Doppio vetro satinato (96 €/m²)"],["TRIPLE_STANDARD","Triplo vetro (125 €/m²)"],["TRIPLE_SATIN","Triplo vetro satinato (156,25 €/m²)"]]} testid="cfg-tech-glass" />
           <NumField label="Quantità" value={inputs.quantity || 1} onChange={(v) => set("quantity", v)} testid="cfg-qty" min={1} />
         </div>
+        <WindowColorSection inputs={inputs} setInputs={setInputs} />
       </Card>
     );
   }
@@ -446,7 +488,7 @@ function PricingModelRenderer({ model, inputs, setInputs, product, category }) {
           <NumField label="Quantità" value={inputs.quantity || 1} onChange={(v) => set("quantity", v)} testid="cfg-qty" min={1} />
         </div>
         <ColorPicker productCategory="CASSONETTI" value={inputs.color_code} onChange={(v) => set("color_code", v)} testid="cfg-grid-color" />
-        {!inputs.color_code && <div className="text-[11px] text-amber-700" data-testid="cfg-grid-color-hint">Seleziona il colore PVC: determina la famiglia di listino (BIANCO_MASSA / STANDARD / NON_STANDARD).</div>}
+        {!inputs.color_code && <div className="text-[11px] text-amber-700" data-testid="cfg-grid-color-hint">Seleziona il colore del cassonetto (obbligatorio per il prezzo di listino).</div>}
       </Card>
     );
   }
@@ -532,6 +574,51 @@ function PricingModelRenderer({ model, inputs, setInputs, product, category }) {
   return <div className="rounded-sm border border-border p-4 text-xs text-muted-foreground">Pricing model non supportato: {String(model)}</div>;
 }
 
+/**
+ * WindowColorSection — Color Engine finestre PVC (P0 msg 625 §5-§9).
+ * Modalità: BIANCO MASSA | BIANCO INT + PELLICOLATO EST | PELLICOLATO 2 LATI STESSO COLORE | BICOLORE.
+ * Salva sempre color_internal / color_external come codici catalogo product_colors.
+ */
+function WindowColorSection({ inputs, setInputs }) {
+  const mode = inputs.color_mode || deriveColorMode(inputs);
+  const patch = (p) => setInputs((s) => ({ ...s, ...p }));
+  const setMode = (m) => {
+    if (m === "WHITE_MASS") patch({ color_mode: m, color_internal: WHITE_MASS_CODE, color_external: WHITE_MASS_CODE });
+    else if (m === "WHITE_IN_FOIL_OUT") patch({ color_mode: m, color_internal: WHITE_MASS_CODE, color_external: inputs.color_external !== WHITE_MASS_CODE ? inputs.color_external : undefined });
+    else if (m === "FOIL_BOTH_SAME") { const c = inputs.color_external !== WHITE_MASS_CODE ? inputs.color_external : undefined; patch({ color_mode: m, color_internal: c, color_external: c }); }
+    else patch({ color_mode: m, color_internal: inputs.color_internal !== WHITE_MASS_CODE ? inputs.color_internal : undefined, color_external: inputs.color_external !== WHITE_MASS_CODE ? inputs.color_external : undefined });
+  };
+  return (
+    <div className="space-y-3 pt-2 border-t border-border" data-testid="cfg-window-color" data-color-mode={mode}>
+      <SelectField label="Colore serramento" value={mode} onChange={setMode} options={COLOR_MODES} testid="cfg-color-mode" />
+      {mode === "WHITE_MASS" && (
+        <div className="text-[11px] text-muted-foreground" data-testid="cfg-color-white-mass-info">Interno ed esterno <b>003 — BIANCO MASSA</b>. Nessuna maggiorazione pellicolato.</div>
+      )}
+      {mode === "WHITE_IN_FOIL_OUT" && (
+        <>
+          <div className="text-[11px] text-muted-foreground" data-testid="cfg-color-int-auto">Interno: <b>003 — BIANCO MASSA</b> (automatico)</div>
+          <ColorPicker productCategory="FINESTRE" label="Colore esterno (pellicolato)" excludeCodes={[WHITE_MASS_CODE]} value={inputs.color_external} onChange={(v) => patch({ color_external: v })} testid="cfg-color-ext" />
+        </>
+      )}
+      {mode === "FOIL_BOTH_SAME" && (
+        <ColorPicker productCategory="FINESTRE" label="Colore pellicolato (interno = esterno)" excludeCodes={[WHITE_MASS_CODE]} value={inputs.color_external} onChange={(v) => patch({ color_internal: v, color_external: v })} testid="cfg-color-both" />
+      )}
+      {mode === "BICOLOR" && (
+        <>
+          <ColorPicker productCategory="FINESTRE" label="Colore interno" value={inputs.color_internal} onChange={(v) => patch({ color_internal: v })} testid="cfg-color-int" />
+          <ColorPicker productCategory="FINESTRE" label="Colore esterno" value={inputs.color_external} onChange={(v) => patch({ color_external: v })} testid="cfg-color-ext" />
+          {inputs.color_internal && inputs.color_internal === inputs.color_external && (
+            <div className="text-[11px] text-amber-700" data-testid="cfg-color-bicolor-warn">Bicolore richiede interno ≠ esterno: usa "Pellicolato due lati stesso colore".</div>
+          )}
+        </>
+      )}
+      <div className="text-[11px] font-mono-plex text-muted-foreground" data-testid="cfg-color-summary">
+        Interno: <b data-testid="cfg-color-summary-int">{inputs.color_internal || "—"}</b> · Esterno: <b data-testid="cfg-color-summary-ext">{inputs.color_external || "—"}</b>
+      </div>
+    </div>
+  );
+}
+
 function NumField({ label, value, onChange, testid, min, max, step }) {
   return (
     <div>
@@ -567,7 +654,7 @@ function SelectField({ label, value, onChange, options, testid }) {
  * - ZANZARIERE -> /api/zanzariere-colors (separate taxonomy §7)
  * - TAPPARELLE -> INTERNAL_MAP embedded in product.pricing_config.color_map
  */
-function ColorPicker({ productCategory, value, onChange, testid, tapparellaMap }) {
+function ColorPicker({ productCategory, value, onChange, testid, label = "Colore", excludeCodes = [], showCategory = false }) {
   const isZanzariera = productCategory === "ZANZARIERE";
   const isTapparella = productCategory === "TAPPARELLE";
   const { data } = useQuery({
@@ -584,10 +671,10 @@ function ColorPicker({ productCategory, value, onChange, testid, tapparellaMap }
     staleTime: 5 * 60 * 1000,
     enabled: !!productCategory,
   });
-  const colors = data?.items || [];
+  const colors = (data?.items || []).filter((c) => !excludeCodes.includes(c.code));
   return (
     <div className="space-y-1" data-testid={testid}>
-      <Label className="text-xs">Colore</Label>
+      <Label className="text-xs">{label}</Label>
       <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
         {colors.map((c) => {
           const active = value === c.code;
@@ -607,7 +694,7 @@ function ColorPicker({ productCategory, value, onChange, testid, tapparellaMap }
                 <div className="text-[11px] font-bold truncate">{c.code}</div>
               </div>
               <div className="text-[10px] text-muted-foreground truncate">{c.name}</div>
-              {cat && <div className="text-[9px] text-muted-foreground mt-0.5">{cat}</div>}
+              {showCategory && cat && <div className="text-[9px] text-muted-foreground mt-0.5">{cat}</div>}
             </button>
           );
         })}
@@ -711,7 +798,7 @@ function PricingPreviewCard({ preview, product, canSeeCosts }) {
           <Row k="Dimensioni" v={`${s.width_mm}×${s.height_mm} mm`} />
           <Row k="Profondità" v={`${s.depth_mm} mm`} />
           <Row k="Cielino" v={s.ceiling_liner === "SI" ? "Con cielino" : "Senza cielino"} />
-          <Row k="Famiglia" v={s.finish_family} />
+          {canSeeCosts && <Row k="Famiglia listino (interno)" v={s.finish_family} />}
           {s.color_code && <Row k="Colore" v={s.color_code} />}
           <Row k="Prezzo vendita" v={fmt(s.customer_sale_price_per_item)} />
           {s.internal_production_cost_per_item != null && canSeeCosts && (

@@ -219,6 +219,9 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         ],
         "subtotal": quote.get("subtotal"),
         # msg 402 — payment terms / delivery policy / sconto pagamento (solo dati cliente, nessun dato interno)
+        "commercial_subtotal": quote.get("commercial_subtotal") or 0,
+        "global_discount_amount": quote.get("global_discount_amount") or 0,
+        "global_discount_label": ("Sconto promozionale" if quote.get("promo_code") else f"Sconto {quote.get('global_discount_value')}%") if (quote.get("global_discount_amount") or 0) > 0 else None,
         "payment_terms_code": quote.get("payment_terms_code"),
         "payment_terms_label": quote.get("payment_terms_label"),
         "payment_schedule": quote.get("payment_schedule") or [],
@@ -237,6 +240,7 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "vat_breakdown": _compute_vat_breakdown(quote.get("lines") or []),
         "notes": quote.get("notes"),
         "version": quote.get("version"),
+        "visual_schemes": _build_visual_schemes(quote),
     }
     return {
         "kind": kind,
@@ -266,6 +270,58 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "payment_terms": payment_terms,
         "quote": quote_snap,
     }
+
+
+def _visual_details(spec: dict) -> str:
+    pt = spec.get("product_type")
+    parts = [f"L × H {spec.get('width_mm')}×{spec.get('height_mm')} mm", f"q.tà {spec.get('quantity') or 1}"]
+    if pt in ("WINDOW", "DOOR_WINDOW"):
+        n = spec.get("sash_count") or 1
+        parts.append(f"{n} ant{'a' if n == 1 else 'e'}")
+        oc = spec.get("opening_configuration")
+        parts.append({"ANTA_RIBALTA": "anta-ribalta", "FISSA": "fissa", "FIXED": "fissa"}.get(oc, "battente"))
+        gt = spec.get("glass_type") or ""
+        parts.append(("vetro triplo" if "TRIPLE" in gt else "vetro doppio") + (" satinato" if "SATIN" in gt else ""))
+        parts.append(f"interno {spec.get('interior_color_code')} {spec.get('interior_color_name') or ''}".strip())
+        parts.append(f"esterno {spec.get('exterior_color_code')} {spec.get('exterior_color_name') or ''}".strip())
+    elif pt == "ROLLER_BOX":
+        d = spec.get("roller_box_dimensions") or {}
+        if d.get("depth_mm"):
+            parts.append(f"profondità {d['depth_mm']} mm")
+        parts.append("con cielino" if d.get("ceiling_liner") == "SI" else "senza cielino")
+        c = spec.get("roller_box_color") or {}
+        if c.get("code"):
+            parts.append(f"colore {c['code']} {c.get('name') or ''}".strip())
+    else:
+        if spec.get("exterior_color_code"):
+            parts.append(f"colore {spec['exterior_color_code']}")
+        if spec.get("orientable"):
+            parts.append("lamelle orientabili")
+    return " · ".join(parts)
+
+
+def _build_visual_schemes(quote: dict) -> List[dict]:
+    """Una visual grande per configurazione (dedup su spec identico), con elenco posizioni/vani."""
+    openings = {o.get("id"): o for o in (quote.get("openings") or [])}
+    schemes: Dict[str, dict] = {}
+    for l in quote.get("lines") or []:
+        vs = l.get("visual_spec") or {}
+        spec = vs.get("spec")
+        if not spec or not vs.get("svg_exterior"):
+            continue
+        key = json.dumps({k: v for k, v in spec.items() if k != "quantity"}, sort_keys=True)
+        op = openings.get(l.get("opening_id")) or {}
+        pos = op.get("code") or op.get("display_name") or "Riga aggiuntiva"
+        if key not in schemes:
+            schemes[key] = {
+                "positions": [], "description": l.get("description") or spec.get("product_name") or spec.get("product_type"),
+                "product_type": spec.get("product_type"), "details": _visual_details(spec),
+                "is_bicolor": bool(vs.get("is_bicolor")),
+                "svg_exterior": vs.get("svg_exterior"), "svg_interior": vs.get("svg_interior"),
+            }
+        if pos not in schemes[key]["positions"]:
+            schemes[key]["positions"].append(pos)
+    return list(schemes.values())
 
 
 def _compute_vat_breakdown(lines: List[dict]) -> List[dict]:

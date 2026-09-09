@@ -41,6 +41,8 @@ class QuoteLine(BaseModel):
     commercial_snapshot: Optional[Dict[str, Any]] = None
     simple_snapshot: Optional[Dict[str, Any]] = None
     financial_snapshot: Optional[Dict[str, Any]] = None
+    # P0 msg 625 — visual snapshot congelato al salvataggio (spec + svg): DRAFT rigenerabile, ACCEPTED immutabile
+    visual_spec: Optional[Dict[str, Any]] = None
     previous_snapshots: List[Dict[str, Any]] = Field(default_factory=list)
     # --- Installation Mode V1 (msg 393) ---
     automatic_services: List[Dict[str, Any]] = Field(default_factory=list)
@@ -113,6 +115,17 @@ class Quote(BaseDoc):
     payment_policy_version: Optional[str] = None
     payment_discount_amount: float = 0.0
     subtotal_before_payment_discount: float = 0.0
+    # msg 407 — sconto globale / promo code snapshot
+    commercial_subtotal: float = 0.0
+    global_discount_type: Optional[str] = None
+    global_discount_value: float = 0.0
+    global_discount_amount: float = 0.0
+    global_discount_source: Optional[str] = None
+    promo_code: Optional[str] = None
+    promo_code_description: Optional[str] = None
+    total_discount_amount: float = 0.0
+    discounted_net_revenue: float = 0.0
+    discount_policy_version: Optional[str] = None
     # msg 402 Lotto 9 — delivery policy snapshot
     delivery_mode: str = "STANDARD"
     delivery_label: Optional[str] = None
@@ -200,6 +213,8 @@ class QuoteCreate(BaseModel):
 class QuoteUpdate(BaseModel):
     title: Optional[str] = None
     delivery_mode: Optional[str] = None
+    global_discount_percent: Optional[float] = None
+    promo_code: Optional[str] = None
     intervention_type: Optional[str] = None
     tax_practice: Optional[str] = None
     payment_terms: Optional[str] = None

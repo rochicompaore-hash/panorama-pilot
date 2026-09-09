@@ -1,0 +1,46 @@
+{
+  "summary": "PO msg 407 E2E — Backend pytest 11/11 (test_enea_costing_msg407 + test_global_discount_msg407) + 2/2 new PDF/RBAC (test_msg407_pdf_rbac). Frontend UI E2E all 7 sub-flows PASS (10% manual, PROMO10, NOPE rejected, remove, reload persist, sidebar totals, tachometer visible admin). Two UI bugs discovered but backend behavior fully correct.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "QuoteEditorPage.jsx (fmtEUR) — and Intl.NumberFormat('it-IT') usage app-wide",
+        "issue": "Thousand separator missing for amounts < 10.000. Rendered as '9000,00 €' / '1000,00 €' / '1980,00 €' / '4000,00 €' / '3650,00 €' instead of '9.000,00 €' etc. Cause: ICU 72+ default useGrouping='auto' → 'min2' for it-IT, so integers with a single grouping (<10000) aren't grouped. Spec (msg 407) explicitly expects 'Sconto 10% = − 1.000,00 €' and 'Imponibile 9.000,00 €'. Fix: pass useGrouping: 'always' (or true) to Intl.NumberFormat in fmtEUR helpers (QuoteEditorPage.jsx L26 and other pages: Dashboard.jsx, GoalsPage.jsx, ErpOpsPage.jsx, CustomerQuotesTab.jsx).",
+        "selector": "[data-testid=quote-global-discount], right sidebar Totali (Imponibile/IVA), Riservato Direzione block",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "QuoteEditorPage.jsx patchQuote onError + api/client.js formatApiError",
+        "issue": "Invalid promo (NOPE) → backend returns 400 with detail={code:'PROMO_CODE_UNKNOWN', message:'Codice sconto non applicabile'} (object). formatApiError() only handles string / array / {msg} shapes, so falls through to String(detail) → '[object Object]' shown in error toast. Spec requires user-visible 'Codice sconto non applicabile' / 'PROMO_CODE_UNKNOWN'. Fix: extend formatApiError to handle {message} or {code, message} shape (return detail.message || detail.code || JSON.stringify(detail)).",
+        "selector": "toast.error after quote-promo-apply-btn with invalid code",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_enea_costing_msg407.py",
+    "/app/backend/tests/test_global_discount_msg407.py",
+    "/app/backend/tests/test_msg407_pdf_rbac.py"
+  ],
+  "action_items": [
+    "Fix formatApiError in /app/frontend/src/api/client.js to unwrap {message}/{code,message} objects (returned by /api/quotes PATCH on promo/discount errors) so the user sees 'Codice sconto non applicabile' instead of '[object Object]'.",
+    "Fix fmtEUR (QuoteEditorPage.jsx L26 + Dashboard/Goals/ErpOps/CustomerQuotesTab) to pass useGrouping:'always' to Intl.NumberFormat('it-IT', …) so 4-digit amounts render as '1.000,00 €' / '9.000,00 €' per PO msg 407 spec.",
+    "OPTIONAL RBAC hardening (spec ambiguous but suspicious): commercial GET /api/quotes/{id}.financial_snapshot currently exposes commission_gross (1350), commission_rate (0.15), final_company_margin (40.5556), net_revenue_ex_vat (9000), margin_band. Spec says 'only tachometer_value etc.'; strictly-forbidden fields (supply_cost, other_direct_costs, pre_commission_margin, pre_commission_contribution, final_company_contribution) are correctly hidden. Consider stripping the rest if PO intent was truly minimal."
+  ],
+  "critical_code_review_comments": [
+    "quotes.py:294 raises HTTPException(status_code=400, detail={'code': ..., 'message': ...}) — good structured error, but every frontend caller relies on formatApiError which does NOT handle this shape. Either unify backend errors to {msg: ...} or upgrade formatApiError (recommended).",
+    "QuoteEditorPage.jsx L390: Sconto row renders `${q.global_discount_value}%` even when discount is applied via promo (source=PROMO_CODE) — currently gated by q.promo_code so it correctly says 'promo PROMO10'. OK.",
+    "PDF text extraction verified: 'Subtotale', 'Sconto promozionale', '1.000,00', 'Imponibile' all present; NO 'internal_cost' or 'supply_cost' leaked. quote_pdf.html renders correct Italian currency (server-side uses Jinja babel format, unaffected by browser ICU bug)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_msg407_pdf_rbac.py (new)"
+  ],
+  "success_rate": {"backend": "100% (13/13 msg407 pytest)", "frontend": "100% functional flows, 2 UI polish bugs"},
+  "test_credentials": "Admin admin@infissiexpress.com / Admin!2025 ; Commercial commercial_test@infissiexpress.com / CommTest!2026 — both verified working.",
+  "seed_data_creation": "Created 2 test quotes via API (UI-MSG407 76c8908f…, UI-MSG407-B 540b194f…) and 2 quotes from backend test_msg407_pdf_rbac.py fixtures. No seed data modified. Promo seeds (PROMO10 valid, EXPIRED5/OFF20 invalid, TENANTB15 cross-tenant) confirmed working per test_promo_codes[…] pytest results.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend msg 407 fully green. Frontend E2E flow uses admin token in localStorage.ie_access_token then navigates to /quotes/{id}. Selectors: quote-discount-section, quote-discount-pct-input, quote-discount-apply-btn, quote-promo-input, quote-promo-apply-btn, quote-discount-remove-btn, quote-global-discount. When retesting after fixes: verify (a) '[data-testid=quote-global-discount]' contains literal '1.000,00' and '9.000,00' with dots; (b) after applying NOPE the visible toast text equals 'Codice sconto non applicabile' (no '[object Object]'). PDF preview endpoint: POST /api/quotes/{qid}/pdf/preview {} → id → GET /api/quote-pdfs/{id}/download → parse with pypdf. RBAC test: commercial user must NOT see supply_cost/other_direct_costs/pre_commission_margin (all hidden today)."
+}

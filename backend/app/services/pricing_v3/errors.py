@@ -21,6 +21,8 @@ ERROR_CODES = {
     "INVALID_GEOMETRY": "Larghezza o altezza non valide",
     "SNAPSHOT_INTEGRITY_ERROR": "Hash snapshot non coincide con i dati salvati",
     "COMPUTED_ZERO": "Motore ha prodotto prezzo zero — configurazione anomala",
+    "UNKNOWN_COLOR_CODE": "Codice colore non presente nel catalogo product_colors",
+    "NEEDS_PO_PRICING": "Policy economica non definita per questa configurazione colore (SPECIAL)",
 }
 
 

@@ -15,6 +15,7 @@ import { ArrowLeft, Plus, Trash, PaperPlaneTilt, ArrowsClockwise, FileText, Chec
 import { toast } from "sonner";
 import { ConflictModal } from "@/components/app/ConflictModal";
 import { MultiCategoryConfiguratorDialog } from "@/components/app/MultiCategoryConfiguratorDialog";
+import { ProductVisualThumb } from "@/components/app/ProductVisualSVG";
 import { MarginTachometer } from "@/components/app/MarginTachometer";
 import { AutosaveIndicator } from "@/components/app/AutosaveIndicator";
 import { useConflict, getVersion, withVersion, withForce } from "@/hooks/useConflict";
@@ -118,6 +119,9 @@ export default function QuoteEditorPage() {
     onSuccess: () => { toast.success("Riga aggiornata e ricalcolata"); reload(); },
     onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
   });
+  const [discountPct, setDiscountPct] = React.useState(0);
+  const [promoInput, setPromoInput] = React.useState("");
+  React.useEffect(() => { if (q) { setDiscountPct(q.global_discount_source === "MANUAL" ? q.global_discount_value || 0 : 0); setPromoInput(q.promo_code || ""); } }, [q?.global_discount_value, q?.promo_code, q?.global_discount_source]); // eslint-disable-line react-hooks/exhaustive-deps
   const patchQuote = useMutation({
     mutationFn: async (fields) => (await api.patch(`/quotes/${id}`, fields)).data,
     onSuccess: () => { toast.success("Preventivo aggiornato e ricalcolato"); reload(); },
@@ -365,6 +369,29 @@ export default function QuoteEditorPage() {
                   {q.delivery_customer_text && <div className="mt-1 text-[10px] text-muted-foreground" data-testid="quote-delivery-text">{q.delivery_customer_text}</div>}
                   {Number(q.delivery_surcharge_amount) > 0 && <div className="mt-1 text-xs font-bold text-amber-700" data-testid="quote-delivery-surcharge">Maggiorazione consegna accelerata +{q.delivery_surcharge_percent}% = {fmtEUR(q.delivery_surcharge_amount)}</div>}
                 </div>
+                <div className="mt-3 border border-border rounded-sm p-3 space-y-2" data-testid="quote-discount-section">
+                  <Label className="text-[10px] uppercase font-bold">Sconto / Codice promo (intero preventivo)</Label>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Label className="text-[10px] uppercase">Sconto %</Label>
+                      <Input type="number" min={0} max={100} step={0.5} disabled={!editable} value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} className="rounded-sm h-9" data-testid="quote-discount-pct-input" />
+                    </div>
+                    <Button type="button" size="sm" variant="outline" className="rounded-sm h-9" disabled={!editable} onClick={() => patchQuote.mutate({ global_discount_percent: Number(discountPct || 0) })} data-testid="quote-discount-apply-btn">Applica</Button>
+                  </div>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Label className="text-[10px] uppercase">Codice sconto</Label>
+                      <Input disabled={!editable} value={promoInput} onChange={(e) => setPromoInput(e.target.value.toUpperCase())} placeholder="es. PROMO10" className="rounded-sm h-9 font-mono-plex" data-testid="quote-promo-input" />
+                    </div>
+                    <Button type="button" size="sm" className="rounded-sm h-9" disabled={!editable || !promoInput} onClick={() => patchQuote.mutate({ promo_code: promoInput })} data-testid="quote-promo-apply-btn">Applica</Button>
+                    {(q.promo_code || Number(q.global_discount_value) > 0) && <Button type="button" size="sm" variant="ghost" className="rounded-sm h-9 text-destructive" disabled={!editable} onClick={() => { setPromoInput(""); setDiscountPct(0); patchQuote.mutate({ promo_code: "" }); }} data-testid="quote-discount-remove-btn">Rimuovi</Button>}
+                  </div>
+                  {Number(q.global_discount_amount) > 0 && (
+                    <div className="text-xs font-bold text-emerald-700" data-testid="quote-global-discount">
+                      Subtotale {fmtEUR(q.commercial_subtotal)} · Sconto {q.promo_code ? `promo ${q.promo_code}` : `${q.global_discount_value}%`} = − {fmtEUR(q.global_discount_amount)} → Imponibile {fmtEUR(q.subtotal)}
+                    </div>
+                  )}
+                </div>
                 {Number(q.automatic_discount_percent) > 0 && (
                   <div className="mt-1 text-xs font-bold text-emerald-700" data-testid="quote-payment-discount">
                     Sconto automatico pagamento {q.automatic_discount_percent}% = − {fmtEUR(q.payment_discount_amount)}
@@ -445,9 +472,20 @@ export default function QuoteEditorPage() {
                   <React.Fragment key={l.id}>
                   <TableRow data-testid={`line-row-${l.id}`}>
                     <TableCell>
-                      <Badge variant="outline" className="rounded-sm text-[10px] mr-2">{CATEGORY_LABELS[l.category] || l.category}</Badge>
-                      <span className="text-sm">{l.description || "—"}</span>
-                      {(l.width_mm || l.height_mm) ? <div className="text-[10px] font-mono-plex text-muted-foreground">{l.width_mm}×{l.height_mm} mm</div> : null}
+                      <div className="flex items-start gap-2">
+                        {l.visual_spec?.svg_exterior && <ProductVisualThumb visual={l.visual_spec} size={52} testid={`line-visual-${l.id}`} />}
+                        <div>
+                          <Badge variant="outline" className="rounded-sm text-[10px] mr-2">{CATEGORY_LABELS[l.category] || l.category}</Badge>
+                          <span className="text-sm">{l.description || "—"}</span>
+                          {(l.width_mm || l.height_mm) ? <div className="text-[10px] font-mono-plex text-muted-foreground">{l.width_mm}×{l.height_mm} mm</div> : null}
+                          {l.visual_spec?.spec?.interior_color_code && (
+                            <div className="text-[10px] font-mono-plex text-muted-foreground" data-testid={`line-colors-${l.id}`}>
+                              Int. {l.visual_spec.spec.interior_color_code} · Est. {l.visual_spec.spec.exterior_color_code}
+                              {l.visual_spec.spec.sash_count ? ` · ${l.visual_spec.spec.sash_count} ante` : ""}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell className="font-mono-plex text-xs">{l.quantity}</TableCell>
                     <TableCell className="font-mono-plex text-xs">{fmtEUR(l.unit_price_final || l.base_price)}</TableCell>

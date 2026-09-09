@@ -135,6 +135,8 @@ class ConfigureResponse(BaseModel):
     calculation_hash: Optional[str] = None
     blocking_errors: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+    # P0 msg 625 — VisualSpec canonico + SVG (UI e PDF consumano lo stesso payload)
+    visual: Optional[Dict[str, Any]] = None
 
 
 # ---------------------------------------------------------------------------

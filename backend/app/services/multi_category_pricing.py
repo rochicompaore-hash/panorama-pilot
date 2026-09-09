@@ -513,6 +513,30 @@ async def resolve_and_compute(
     req: ConfigureRequest,
     tenant_id: str,
 ) -> ConfigureResponse:
+    """Resolver principale — fail-closed. Allega sempre il VisualSpec (P0 msg 625)."""
+    resp = await _resolve_and_compute_core(product, category, req, tenant_id)
+    from app.db import get_db
+    from app.services.visual_spec import build_visual_spec, build_visual
+    cfg: Dict[str, Any] = {}
+    if req.technical_inputs:
+        cfg = dict(req.technical_inputs)
+    elif req.simple_inputs:
+        si = req.simple_inputs
+        cfg = {"width_mm": si.width_mm, "height_mm": si.height_mm, "quantity": si.quantity, **(si.options or {})}
+    try:
+        resp.visual = build_visual(await build_visual_spec(get_db(), tenant_id, product, category, cfg))
+    except Exception as _ve:  # visual non deve mai bloccare il pricing
+        import logging
+        logging.getLogger(__name__).error(f"visual_spec build failed: {_ve}")
+    return resp
+
+
+async def _resolve_and_compute_core(
+    product: Dict[str, Any],
+    category: Optional[Dict[str, Any]],
+    req: ConfigureRequest,
+    tenant_id: str,
+) -> ConfigureResponse:
     """Resolver principale — fail-closed.
 
     Args:
@@ -645,16 +669,10 @@ async def resolve_and_compute(
         color_code = (req.simple_inputs.options or {}).get("color_code")
 
         if model == "GRID":
-            # Cassonetti: risolvi finish_family dal color_code via product_colors
-            from app.db import get_db
-            db = get_db()
-            finish_family = None
-            if color_code:
-                cdoc = await db.product_colors.find_one({"tenant_id": tenant_id, "code": color_code, "deleted_at": None, "active": True})
-                if cdoc:
-                    finish_family = cdoc.get("cassonetti_price_family")
-            if not finish_family or finish_family == "NEEDS_PO_MAPPING":
-                raise ValueError("MISSING_CASSONETTO_COLOR_PRICE_FAMILY" if color_code else "MISSING_COLOR_CODE")
+            # Cassonetti (P0 msg 625 §14): COLOR CODE -> PRICE FAMILY via mapping autoritativo rigido.
+            # Nessun surcharge finestra, nessun fallback: codice non mappato -> CASSONETTO_COLOR_FAMILY_UNMAPPED.
+            from app.services.color_engine import resolve_cassonetto_family
+            finish_family = resolve_cassonetto_family(color_code)
             snap = SimplePricingEngine.compute_grid(product, req.simple_inputs, finish_family=finish_family)
         elif model == PricingModel.AREA_PURCHASE_MULTIPLIER.value:
             snap = SimplePricingEngine.compute_area_purchase_multiplier(product, req.simple_inputs)
