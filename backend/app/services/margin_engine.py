@@ -19,10 +19,15 @@ CRITICO does NOT set commission_rate=0. It flags
 """
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 MARGIN_POLICY_VERSION = "margin_policy_v2_2026_02"
-COMMISSION_POLICY_VERSION = "commission_policy_v1_2026_02"
+COMMISSION_POLICY_VERSION = "commission_policy_v2_modular_by_discount_2026_09"
+MARGIN_FLOOR_PERCENT = 20.0
+DIRECTOR_APPROVAL_DISCOUNT_PERCENT = 30.0
+# (sconto massimo della fascia incluso, cap commissione) — msg 796
+DISCOUNT_COMMISSION_BANDS = [(5.0, 0.15), (10.0, 0.12), (15.0, 0.10), (20.0, 0.08), (25.0, 0.05), (30.0, 0.03)]
 WITHHOLDING_POLICY_VERSION = "withholding_policy_v1_2026_02"
 COMMISSION_BASE_POLICY = "NET_REVENUE_EX_VAT"
 WITHHOLDING_BASE_POLICY = "NET_REVENUE_EX_VAT"
@@ -77,6 +82,35 @@ def resolve_band(margin_pct: Optional[float]) -> Tuple[str, Optional[float], str
     if m >= 8.0:
         return ("SCARSO", 0.05, "OK")
     return ("CRITICO", None, "AUTHORIZATION_REQUIRED")
+
+
+def commission_cap_for_discount(effective_discount_pct: float) -> Tuple[float, bool]:
+    """(cap commissione, director_approval_required). >30% → cap 0 AND approvazione direzione."""
+    d = round(float(effective_discount_pct or 0), 2)
+    for upper, cap in DISCOUNT_COMMISSION_BANDS:
+        if d <= upper:
+            return cap, False
+    return 0.0, True
+
+
+def effective_discount_percent(quote: Dict[str, Any]) -> float:
+    """Sconto effettivo complessivo subito dal ricavo (global + promo + payment + altri) vs valore commerciale pre-sconti."""
+    base = float(quote.get("commercial_subtotal") or 0)
+    net = float(quote.get("subtotal") or 0)
+    if base <= 0:
+        return 0.0
+    return round(max(0.0, (base - net) / base * 100.0), 2)
+
+
+def max_discount_for_margin_floor(commercial_subtotal: float, direct_costs: float, wh_rate: float) -> Optional[float]:
+    """Sconto massimo (%) tale che il margine pre-commissione resti ≥ floor (la commissione si adatta fino a 0)."""
+    if commercial_subtotal <= 0:
+        return None
+    k = (1.0 - MARGIN_FLOOR_PERCENT / 100.0) - wh_rate
+    if k <= 0:
+        return 0.0
+    d = 1.0 - direct_costs / (k * commercial_subtotal)
+    return round(max(0.0, min(100.0, d * 100.0)), 2)
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +266,27 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
     pre_commission_contribution = net_revenue - supply - install - other - float(wh_cost or 0)
     pre_commission_margin = (pre_commission_contribution / net_revenue * 100.0) if net_revenue > 0 else None
 
-    band, rate, status = resolve_band(pre_commission_margin)
+    band, _legacy_rate, status = resolve_band(pre_commission_margin)
+
+    # --- MODULAR COMMISSION BY DISCOUNT (msg 796) ---
+    eff_discount = effective_discount_percent({**quote, "subtotal": net_revenue})
+    cap, director_approval = commission_cap_for_discount(eff_discount)
+    max_compat = None
+    if net_revenue > 0:
+        # floor (non round) a 4 dp: la commissione non deve MAI far scendere il POST sotto il 20% per arrotondamento
+        max_compat = max(0.0, math.floor((pre_commission_contribution - net_revenue * MARGIN_FLOOR_PERCENT / 100.0) / net_revenue * 10_000) / 10_000)
+    rate = None if pre_commission_margin is None else round(min(cap, max_compat if max_compat is not None else cap), 4)
+    if pre_commission_margin is not None and pre_commission_margin < MARGIN_FLOOR_PERCENT:
+        discount_status, status = "BLOCKED", "BLOCKED_MARGIN_FLOOR"
+    elif pre_commission_margin is None:
+        discount_status = "NO_DATA"
+    else:
+        # margine finale (post-commissione) è ≥ floor per costruzione; 20–20.99 = critico
+        discount_status = "CRITICAL" if (pre_commission_margin - (rate or 0) * 100.0) < MARGIN_FLOOR_PERCENT + 1.0 else "ALLOWED"
+        status = "DIRECTOR_APPROVAL_REQUIRED" if director_approval else "OK"
+    commercial_subtotal = float(quote.get("commercial_subtotal") or net_revenue)
+    max_disc_floor = max_discount_for_margin_floor(commercial_subtotal, supply + install + other, wh_rate)
+    max_disc_no_approval = None if max_disc_floor is None else round(min(max_disc_floor, DIRECTOR_APPROVAL_DISCOUNT_PERCENT), 2)
 
     # Se ENEA cost mancante ⇒ commissione non definitiva (§5 msg 395).
     fs_status = "COMPLETE"
@@ -264,7 +318,25 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
     # Il tachimetro DEVE mostrare esclusivamente FINAL_COMPANY_MARGIN.
     tachometer_value = final_company_margin
 
+    # --- ADMIN MASTER DUAL MARGIN (msg 800) ---
+    # PRE = ricavo netto post-sconti − costi diretti (NO ritenuta, NO commissione)
+    # POST = PRE − ritenuta − commissione effettiva (ACTUAL_COMMISSION_RATE) = FINAL_COMPANY_MARGIN
+    pre_margin_amount = net_revenue - supply - install - other
+    pre_margin_percent = _r4(pre_margin_amount / net_revenue * 100.0) if net_revenue > 0 else None
+    post_margin_amount = None
+    post_margin_percent = None
+    if rate is not None:
+        post_margin_amount = _r2(pre_margin_amount - float(wh_cost or 0) - float(commission_gross or 0))
+        post_margin_percent = _r4(post_margin_amount / net_revenue * 100.0) if net_revenue > 0 else None
+
     return {
+        # Admin Master only (msg 800 §2-§3)
+        "pre_margin_amount": _r2(pre_margin_amount),
+        "pre_margin_percent": pre_margin_percent,
+        "post_margin_amount": post_margin_amount,
+        "post_margin_percent": post_margin_percent,
+        "actual_commission_rate": rate,
+        "commercial_commission": commission_gross,
         "gross_contract_value": _r2(total),
         "net_revenue_ex_vat": _r2(net_revenue),
         "supply_cost": _r2(supply),
@@ -285,6 +357,15 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
         "commission_rate": rate,
         "commission_gross": commission_gross,
         "commission_status": status,
+        # Modular commission by discount (msg 796)
+        "effective_discount_percent": eff_discount,
+        "discount_band_commission_cap": cap,
+        "max_commission_compatible_with_floor": _r4(max_compat) if max_compat is not None else None,
+        "margin_floor_percent": MARGIN_FLOOR_PERCENT,
+        "discount_status": discount_status,
+        "director_approval_required": bool(director_approval),
+        "max_discount_available_percent": max_disc_floor,
+        "max_discount_without_approval_percent": max_disc_no_approval,
         "final_company_contribution": final_company_contribution,
         "final_company_margin": final_company_margin,
         # Tachometer authoritative value (msg 396 §4/§13)
@@ -311,6 +392,14 @@ COMMERCIAL_SAFE_KEYS = {
     "commission_rate",
     "commission_gross",
     "commission_status",
+    # msg 796 — commerciale vede sconto effettivo, commissione, margine finale, sconto massimo (nessun costo)
+    "effective_discount_percent",
+    "discount_band_commission_cap",
+    "discount_status",
+    "director_approval_required",
+    "max_discount_available_percent",
+    "max_discount_without_approval_percent",
+    "margin_floor_percent",
     # policy version + snapshot health hint
     "commission_policy_version",
     "financial_snapshot_status",
@@ -318,11 +407,27 @@ COMMERCIAL_SAFE_KEYS = {
 }
 
 
+ADMIN_MASTER_ROLE_NAMES = {"super admin", "superadmin", "master_admin", "admin_master"}
+ADMIN_MASTER_ROLE_CODES = {"super_admin", "superadmin", "tenant_owner", "master_admin", "admin_master"}
+
+
+def is_admin_master(user: Dict[str, Any], roles: Iterable[Dict[str, Any]] = ()) -> bool:
+    """ADMIN MASTER (msg 800 §1) = ruolo canonico esistente: flag ``is_superadmin`` o ruolo Super Admin / tenant_owner."""
+    if user.get("is_superadmin"):
+        return True
+    for r in roles or []:
+        if str(r.get("name") or "").strip().lower() in ADMIN_MASTER_ROLE_NAMES:
+            return True
+        if str(r.get("code") or "").strip().lower() in ADMIN_MASTER_ROLE_CODES:
+            return True
+    return False
+
+
 def redact_financial_snapshot_for_role(snapshot: Optional[Dict[str, Any]], is_admin: bool) -> Optional[Dict[str, Any]]:
     """Return a copy of the snapshot filtered per role.
 
-    Admin (``quotes.view_costs`` or ``quotes.view_margins`` or ``*``): full snapshot.
-    Otherwise: only the commercial-safe subset.
+    ``is_admin`` = ADMIN MASTER (msg 800 §11-§13): full snapshot incl. PRE/POST margin + breakdown.
+    Otherwise (Commerciale, Admin Azienda, altri admin): only the commercial-safe subset — server-side.
     """
     if snapshot is None:
         return None

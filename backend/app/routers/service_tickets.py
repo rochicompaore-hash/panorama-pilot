@@ -85,8 +85,16 @@ async def change_status(tid: str, body: TicketStatus, request: Request,
     updates = {"ticket_status": body.ticket_status}
     if body.ticket_status in ("resolved", "closed"):
         updates["resolved_at"] = datetime.now(timezone.utc).isoformat()
-    return await update_doc(collection="service_tickets", doc_id=tid, updates=updates, user=user,
-                             entity_type="service_ticket", ip=get_client_ip(request))
+    res = await update_doc(collection="service_tickets", doc_id=tid, updates=updates, user=user,
+                           entity_type="service_ticket", ip=get_client_ip(request))
+    # SUPPORT_UPDATED: solo cambi di stato customer-facing (mai per PATCH/note interne)
+    from app.services.customer_email_events import notify_customer_event
+    await notify_customer_event(db, tenant_id=user["tenant_id"], customer_id=existing.get("customer_id"), event_type="SUPPORT_UPDATED",
+                                entity_type="service_ticket", entity_id=tid, title="Aggiornamento sulla tua richiesta di assistenza",
+                                body=f"La tua richiesta \"{existing.get('title') or existing.get('subject') or tid}\" è passata allo stato: {body.ticket_status}."
+                                     + (f" Esito: {body.resolution}" if body.resolution and body.ticket_status in ("resolved", "closed") else ""),
+                                cta_label="Visualizza richiesta", dedupe_suffix=body.ticket_status)
+    return res
 
 
 @router.get("/dashboard/kpi")

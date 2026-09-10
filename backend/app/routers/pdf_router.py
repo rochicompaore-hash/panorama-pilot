@@ -465,6 +465,10 @@ async def _generate_pdf(qid: str, body: GeneratePdfRequest, request: Request, us
                       "updated_by": user["id"]},
              "$inc": {"version": 1}},
         )
+        from app.services.customer_email_events import notify_customer_event
+        await notify_customer_event(db, tenant_id=user["tenant_id"], customer_id=quote.get("customer_id"), event_type="DOCUMENT_AVAILABLE",
+                                    entity_type="quote_pdf", entity_id=pdf_doc["_id"], title="Nuovo documento disponibile",
+                                    body=f"È disponibile un nuovo documento relativo alla tua commessa: Preventivo {quote.get('number')}. Puoi consultarlo in sicurezza dalla tua area cliente.")
         await record_activity(
             tenant_id=user["tenant_id"], type="pdf_generated",
             subject=f"PDF definitivo emesso: {quote.get('number')}",

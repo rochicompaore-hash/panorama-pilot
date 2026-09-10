@@ -29,6 +29,7 @@ from app.db import get_db
 from app.mongo_utils import to_mongo, from_mongo
 from app.models import new_id
 from app.models_email import (
+    EMAIL_STATUS_BOUNCED,
     EmailLogV2, EmailTemplateDoc,
     EMAIL_STATUS_QUEUED, EMAIL_STATUS_SENDING, EMAIL_STATUS_SENT,
     EMAIL_STATUS_FAILED, EMAIL_STATUS_RETRYING, EMAIL_STATUS_CONFIG_REQUIRED,
@@ -193,7 +194,8 @@ async def enqueue_email(
     if idempotency_key:
         existing = await db.email_logs.find_one({
             "tenant_id": tenant_id, "idempotency_key": idempotency_key,
-            "status": {"$in": [EMAIL_STATUS_SENT, EMAIL_STATUS_TEST_INTERCEPTED]},
+            # una sola email per evento: qualsiasi log non definitivamente fallito è un hit (il retry lo gestisce il worker)
+            "status": {"$nin": [EMAIL_STATUS_FAILED, EMAIL_STATUS_BOUNCED]},
         })
         if existing:
             logger.info("email idempotent hit key=%s status=%s", idempotency_key, existing.get("status"))

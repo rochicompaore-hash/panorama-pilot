@@ -534,7 +534,7 @@ export default function QuoteEditorPage() {
           </Card>
 
           {/* --- Marginalità (Margin Tachometer V1 — msg 392) --- */}
-          <MarginPanel financial={financial} isAdmin={canSeeCosts} />
+          <MarginPanel financial={financial} isAdmin={!!financial?.is_admin_master_view} />
 
           <Card className="rounded-sm border-border p-6" data-testid="revisions-card">
             <div className="overline mb-3">Revisioni</div>
@@ -754,7 +754,44 @@ function MarginPanel({ financial, isAdmin }) {
             {commGross != null ? fmtEUR(commGross) : "—"}
           </span>
         </div>
+        {fs.effective_discount_percent != null && (
+          <div className="flex justify-between" data-testid="margin-panel-effective-discount">
+            <span className="text-muted-foreground">Sconto effettivo applicato</span>
+            <span className="font-mono-plex">{fmtPct(fs.effective_discount_percent)}</span>
+          </div>
+        )}
+        {fs.max_discount_without_approval_percent != null && (
+          <div className="flex justify-between" data-testid="margin-panel-max-discount">
+            <span className="text-muted-foreground">Sconto massimo concedibile</span>
+            <span className="font-mono-plex">{fmtPct(fs.max_discount_without_approval_percent)}</span>
+          </div>
+        )}
+        {fs.discount_status === "BLOCKED" && (
+          <div className="rounded-sm border border-destructive bg-destructive/10 p-2 text-[11px] font-bold text-destructive" data-testid="margin-discount-blocked">
+            SCONTO BLOCCATO — margine aziendale sotto il {fs.margin_floor_percent ?? 20}%
+          </div>
+        )}
+        {fs.director_approval_required && (
+          <div className="rounded-sm border border-amber-500 bg-amber-500/10 p-2 text-[11px] font-bold text-amber-800" data-testid="margin-director-approval">
+            SCONTO &gt; 30% — APPROVAZIONE DIREZIONE RICHIESTA (commissione 0%)
+          </div>
+        )}
       </div>
+
+      {/* ADMIN MASTER ONLY — dual margin (msg 800 §9) */}
+      {isAdmin && fs.pre_margin_amount != null && (
+        <div className="mt-4 pt-3 border-t space-y-2 text-xs" data-testid="margin-panel-profitability">
+          <div className="text-[10px] font-mono-plex text-muted-foreground uppercase">Redditività commessa · Admin Master</div>
+          <div className="flex justify-between items-baseline" data-testid="margin-pre">
+            <span className="text-muted-foreground">Margine pre ritenuta/commissione</span>
+            <span className="font-mono-plex font-bold">{fmtEUR(fs.pre_margin_amount)} <span className="text-muted-foreground">| {fmtPct(fs.pre_margin_percent)}</span></span>
+          </div>
+          <div className="flex justify-between items-baseline" data-testid="margin-post">
+            <span className="font-bold">Margine finale impresa</span>
+            <span className="font-mono-plex font-black text-[hsl(200_82%_45%)]">{fs.post_margin_amount != null ? fmtEUR(fs.post_margin_amount) : "—"} <span className="text-muted-foreground font-normal">| {fs.post_margin_percent != null ? fmtPct(fs.post_margin_percent) : "n/d"}</span></span>
+          </div>
+        </div>
+      )}
 
       {/* Admin-only breakdown (§8 msg 395 + §7 msg 396) */}
       {isAdmin && fs.supply_cost != null && (

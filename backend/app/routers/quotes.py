@@ -21,6 +21,7 @@ from app.services.pricing import compute_line, compute_quote_totals
 from app.services.margin_engine import (
     compute_financial_snapshot,
     redact_financial_snapshot_for_role,
+    is_admin_master,
 )
 from app.services.multi_category_pricing import resolve_and_compute
 from app.services.payment_terms import resolve_payment_terms, apply_automatic_discount, PAYMENT_POLICIES, apply_global_discount, resolve_promo_code, DISCOUNT_POLICY_VERSION
@@ -122,6 +123,9 @@ def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
     return {**totals, "financial_snapshot": fs}
 
 
+ADMIN_MASTER_MARKER = "__ADMIN_MASTER__"
+
+
 def _strip_costs_if_needed(doc: dict, perms: set) -> dict:
     d = dict(doc)
     is_admin = "*" in perms or "quotes.view_costs" in perms or "quotes.view_margins" in perms
@@ -129,8 +133,8 @@ def _strip_costs_if_needed(doc: dict, perms: set) -> dict:
         for k in ("internal_cost", "margin_abs", "margin_pct"):
             d[k] = None
         d["lines"] = [{**l, "internal_cost": None, "margin": None} for l in (d.get("lines") or [])]
-    # Financial snapshot RBAC (§20 msg 392): commerciale riceve solo il subset safe.
-    d["financial_snapshot"] = redact_financial_snapshot_for_role(d.get("financial_snapshot"), is_admin)
+    # Financial snapshot RBAC (msg 800 §11): breakdown + PRE/POST margin SOLO Admin Master, redazione server-side.
+    d["financial_snapshot"] = redact_financial_snapshot_for_role(d.get("financial_snapshot"), ADMIN_MASTER_MARKER in perms)
     return d
 
 
@@ -138,6 +142,9 @@ async def _get_perms(user: dict) -> set:
     perms = set(await get_permission_keys_for_user(user))
     if user.get("is_superadmin"):
         perms.add("*")
+    roles = await get_db().roles.find({"_id": {"$in": user.get("role_ids") or []}, "deleted_at": None}, {"name": 1, "code": 1}).to_list(20)
+    if is_admin_master(user, roles):
+        perms.add(ADMIN_MASTER_MARKER)
     return perms
 
 
@@ -424,6 +431,17 @@ async def update_quote(
                     detail={"code": "MISSING_DISPOSAL_PRICING", "message": "Smaltimento incluso ma prezzo non configurato.", "errors": all_errors},
                 )
             patch = _financial_totals_patch(new_lines, fresh)
+            # msg 796 — MARGIN FLOOR 20%: se anche con commissione 0% il margine è < 20%, lo sconto è BLOCCATO (fail-closed).
+            fs_new = patch.get("financial_snapshot") or {}
+            if (any(k in payload for k in ("global_discount_type", "global_discount_value", "payment_terms", "promo_code"))
+                    and fs_new.get("discount_status") == "BLOCKED" and fs_new.get("financial_snapshot_status") == "COMPLETE"):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"code": "DISCOUNT_BLOCKED_MARGIN_FLOOR",
+                            "message": f"Sconto non concedibile: margine aziendale finale sotto il {int(fs_new.get('margin_floor_percent') or 20)}% anche con commissione 0%.",
+                            "effective_discount_percent": fs_new.get("effective_discount_percent"),
+                            "max_discount_available_percent": fs_new.get("max_discount_available_percent")},
+                )
             await db.quotes.update_one(
                 {"_id": qid},
                 {"$set": {"lines": new_lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}},
@@ -903,6 +921,11 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
         update["expired_at"] = now
 
     await db.quotes.update_one({"_id": qid}, {"$set": update})
+    from app.services.customer_email_events import ORDER_STATUS_EVENTS, notify_customer_event
+    if new in ORDER_STATUS_EVENTS:
+        ev, title, text = ORDER_STATUS_EVENTS[new]
+        await notify_customer_event(db, tenant_id=doc["tenant_id"], customer_id=doc.get("customer_id"), event_type=ev, entity_type="quote",
+                                    entity_id=qid, title=title, body=f"{text} Riferimento: {doc.get('number')}.", dedupe_suffix=new)
     await record_audit(action=f"quotes.status_change", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=qid, before={"status": current}, after={"status": new, "reason": body.reason})
     await record_activity(tenant_id=user["tenant_id"], type=f"quote_{new}",
                           subject=f"Preventivo {doc.get('number')}: {new}",
@@ -941,13 +964,14 @@ async def get_financial_snapshot(qid: str, user: dict = Depends(require_permissi
     else:
         snap = compute_financial_snapshot(doc)
     perms = await _get_perms(user)
-    is_admin = "*" in perms or "quotes.view_costs" in perms or "quotes.view_margins" in perms
+    is_master = ADMIN_MASTER_MARKER in perms
     return {
         "quote_id": qid,
         "quote_status": doc.get("quote_status"),
         "frozen": _is_frozen(doc),
-        "is_admin_view": is_admin,
-        "financial_snapshot": redact_financial_snapshot_for_role(snap, is_admin),
+        "is_admin_view": is_master,
+        "is_admin_master_view": is_master,
+        "financial_snapshot": redact_financial_snapshot_for_role(snap, is_master),
     }
 
 

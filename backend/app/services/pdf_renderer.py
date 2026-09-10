@@ -225,7 +225,19 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
     _FORBIDDEN_LINE_KEYS = (
         "internal_cost", "margin", "margin_abs", "margin_pct", "cost_price",
         "technical_snapshot", "financial_snapshot", "pricing_snapshot",
+        # Installation Mode V1 / servizi: costi interni di posizione e servizi (msg 800 §15)
+        "position_internal_cost_total", "standard_services_internal_cost_total",
+        "internal_cost_total", "unit_internal_reference_price", "internal_cost_status",
+        "commercial_snapshot", "simple_snapshot",
     )
+
+    def _strip_line(obj):
+        if isinstance(obj, dict):
+            return {k: _strip_line(v) for k, v in obj.items()
+                    if k not in _FORBIDDEN_LINE_KEYS and "internal_cost" not in k and "purchase_cost" not in k}
+        if isinstance(obj, list):
+            return [_strip_line(x) for x in obj]
+        return obj
     quote_snap = {
         "id": quote.get("id") or quote.get("_id"),
         "number": quote.get("number"),
@@ -241,10 +253,7 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "sales_rep": quote.get("sales_rep_snapshot") or {"name": quote.get("sales_rep_name")},
         "openings": quote.get("openings") or [],
         "environments": quote.get("environments") or [],
-        "lines": [
-            {k: v for k, v in l.items() if k not in _FORBIDDEN_LINE_KEYS}
-            for l in (quote.get("lines") or [])
-        ],
+        "lines": [_strip_line(l) for l in (quote.get("lines") or [])],
         "subtotal": quote.get("subtotal"),
         # msg 402 — payment terms / delivery policy / sconto pagamento (solo dati cliente, nessun dato interno)
         "commercial_subtotal": quote.get("commercial_subtotal") or 0,

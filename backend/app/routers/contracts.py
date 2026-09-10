@@ -253,8 +253,13 @@ async def send_for_signature(cid: str, body: SendForSignatureRequest, request: R
                         user_id=user["id"], user_email=user["email"], ip=get_client_ip(request),
                         entity_type="contract", entity_id=cid,
                         after={"to": body.to_email, "expires_at": expires_at.isoformat()})
-    # NB: invio email è mocked (dipende da servizio email) — in test l'endpoint public/firma è raggiungibile via token
-    return {"ok": True, "signing_token": token, "expires_at": expires_at.isoformat(),
+    # CONTRACT_AVAILABLE (msg 794): email al cliente della commessa via servizio centrale; destinatario risolto server-side.
+    from app.services.customer_email_events import notify_customer_event
+    email_log_id = await notify_customer_event(
+        db, tenant_id=user["tenant_id"], customer_id=doc.get("customer_id"), event_type="CONTRACT_AVAILABLE", entity_type="contract", entity_id=cid,
+        title="Il tuo contratto è pronto per la firma", body=f"Il contratto {doc.get('number')} è disponibile per la revisione e la firma elettronica. "
+        f"Il link è personale e scade il {expires_at.strftime('%d/%m/%Y')}.", cta_label="Visualizza documento", cta_path=f"/contract-sign/{token}", dedupe_suffix=token[:12])
+    return {"ok": True, "signing_token": token, "expires_at": expires_at.isoformat(), "email_log_id": email_log_id,
              "signing_url": f"/contract-sign/{token}"}
 
 
