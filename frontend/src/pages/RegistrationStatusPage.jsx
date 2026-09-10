@@ -50,6 +50,11 @@ export default function RegistrationStatusPage() {
       .catch((e) => setState({ loading: false, error: formatApiError(e.response?.data?.detail) || e.message }));
   }, [reqId]);
   const info = state.data ? STATUS_LABEL[state.data.status] : null;
+  const [resendMsg, setResendMsg] = useState("");
+  const resend = async () => {
+    try { const { data } = await axios.post(`${API_BASE}/auth/resend-verification`, { request_id: reqId }); setResendMsg(data.verification_email_status === "EMAIL_SEND_FAILED" ? "Invio non riuscito: servizio email non disponibile." : data.message); }
+    catch (e) { setResendMsg(formatApiError(e.response?.data?.detail) || e.message); }
+  };
   return (
     <AuthLayout title="Stato della richiesta" subtitle="Puoi vedere solo lo stato della tua richiesta di registrazione." testId="registration-status-page">
       <Seo title="Stato richiesta" path="/registration-status" />
@@ -61,6 +66,10 @@ export default function RegistrationStatusPage() {
             <div className="overline">Stato</div>
             <div className="font-display text-xl font-black" data-testid="registration-status-value">{info?.label || state.data.status}</div>
             <p className="text-sm text-muted-foreground mt-2">{info?.text}</p>
+            {state.data.status === "PENDING_EMAIL_VERIFICATION" && (
+              <div className="text-sm mt-3">Non hai ricevuto l'email? <button type="button" onClick={resend} className="underline font-medium" data-testid="status-resend-button">Invia di nuovo</button>
+                {resendMsg && <div className="text-xs text-muted-foreground mt-1" data-testid="status-resend-result">{resendMsg}</div>}</div>
+            )}
             <div className="text-xs text-muted-foreground mt-3">Ruolo richiesto: <b>{state.data.requested_role}</b> · Email verificata: {state.data.email_verified ? "sì" : "no"}</div>
           </div>
           <Button asChild variant="outline" className="rounded-sm" data-testid="status-go-login"><Link to="/login">Vai al login</Link></Button>

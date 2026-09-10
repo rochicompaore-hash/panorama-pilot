@@ -66,6 +66,52 @@ async def _set_status(db, req_id: str, new_status: str, by: Optional[str], extra
     return doc
 
 
+def _btn(href: str, label: str) -> str:
+    return (f'<p style="margin:24px 0"><a href="{href}" style="background:#12a16b;color:#fff;padding:12px 22px;border-radius:4px;'
+            f'text-decoration:none;font-weight:600;font-family:Roboto,Arial,sans-serif">{label}</a></p>')
+
+
+def _wrap(title: str, body_html: str) -> str:
+    return (f'<div style="font-family:Roboto,Arial,sans-serif;color:#1f2937;max-width:560px"><h2 style="margin:0 0 12px">{title}</h2>'
+            f'{body_html}<p style="color:#6b7280;font-size:12px;margin-top:28px">Panorama Pilot · messaggio automatico</p></div>')
+
+
+async def _send_verification_email(db, r: dict, token: str) -> str:
+    """Invia (o reinvia) l'email di verifica; ritorna lo status del log (mai 'sent' finto)."""
+    link = f"{settings.APP_BASE_URL.rstrip('/')}/verify-email?token={token}"
+    html = _wrap("Verifica il tuo indirizzo email",
+                 f"<p>Ciao {r['first_name']},</p><p>hai richiesto l'accesso a Panorama Pilot. Conferma il tuo indirizzo email per proseguire: "
+                 f"dopo la verifica la richiesta sarà esaminata dall'amministratore.</p>{_btn(link, 'Verifica email')}"
+                 f"<p style=\"font-size:12px;color:#6b7280\">Il link scade tra {VERIFY_TTL_HOURS} ore. Se non hai richiesto tu l'accesso, ignora questo messaggio.</p>")
+    from app.services.email_service import enqueue_email
+    try:
+        res = await enqueue_email(to=r["email"], subject="Verifica il tuo indirizzo email | Panorama Pilot", template="registration_verify",
+                                  html=html, text=f"Verifica il tuo indirizzo email (valido {VERIFY_TTL_HOURS} ore): {link}",
+                                  idempotency_key=f"reg-verify:{r['_id']}:{_h(token)[:12]}", event_type="REGISTRATION_VERIFY_EMAIL")
+        status = res.get("status") or "failed"
+    except Exception:
+        status = "failed"
+    ok = status in ("sent", "test_intercepted")
+    await db.registration_requests.update_one({"_id": r["_id"]}, {"$set": {
+        "verification_email_status": "SENT" if ok else "EMAIL_SEND_FAILED", "verification_email_last_at": _now()},
+        "$inc": {"verification_email_count": 1}})
+    return status
+
+
+async def _notify_superadmins_new_request(db, r: dict) -> None:
+    """PENDING_APPROVAL -> notifica ai Superadmin attivi (dati admin-safe, nessun dato interno)."""
+    link = f"{settings.APP_BASE_URL.rstrip('/')}/registration-requests"
+    html = _wrap("Nuova richiesta di registrazione",
+                 f"<p>Un nuovo utente ha verificato la propria email ed è in attesa di approvazione.</p>"
+                 f"<ul><li><b>Nome:</b> {r['first_name']} {r['last_name']}</li><li><b>Ruolo richiesto:</b> {r['requested_role']}</li>"
+                 f"<li><b>Azienda richiesta:</b> {r.get('company_name') or '—'}</li><li><b>Data richiesta:</b> {r['registered_at'][:16].replace('T', ' ')}</li></ul>"
+                 f"{_btn(link, 'Gestisci richiesta')}")
+    async for sa in db.users.find({"$or": [{"is_superadmin": True}, {"is_platform_owner": True}], "is_active": True, "deleted_at": None}, {"email": 1}):
+        await send_email(to=sa["email"], subject="Nuova richiesta di registrazione | Panorama Pilot", template="registration_new_request_admin",
+                         html=html, text=f"Nuova richiesta di registrazione: {r['first_name']} {r['last_name']} ({r['requested_role']}). Gestisci: {link}",
+                         idempotency_key=f"reg-admin-notify:{r['_id']}:{sa['_id']}", event_type="SUPERADMIN_NEW_REGISTRATION")
+
+
 def require_superadmin(user: dict = Depends(get_current_user)) -> dict:
     if not (user.get("is_superadmin") or user.get("is_platform_owner")):
         raise HTTPException(403, "Operazione riservata al Superadmin")
@@ -120,17 +166,13 @@ async def register(body: RegisterBody, request: Request):
         "status_history": [{"to": "PENDING_EMAIL_VERIFICATION", "by": None, "at": _now()}],
     }
     await db.registration_requests.insert_one(doc)
-    link = f"{settings.APP_BASE_URL.rstrip('/')}/verify-email?token={token}"
-    await send_email(
-        to=email, subject="Panorama Pilot — conferma il tuo indirizzo email", template="registration_verify",
-        html=f"<p>Ciao {doc['first_name']},</p><p>conferma il tuo indirizzo email per completare la richiesta di registrazione a Panorama Pilot:</p>"
-             f"<p><a href=\"{link}\">{link}</a></p><p>Il link è valido {VERIFY_TTL_HOURS} ore. Dopo la conferma, la richiesta sarà esaminata dall'amministratore.</p>",
-        text=f"Conferma il tuo indirizzo email: {link}", idempotency_key=f"reg-verify:{req_id}",
-    )
+    email_status = await _send_verification_email(db, doc, token)
     await record_audit(action="auth.register.requested", tenant_id=None, user_id=None, user_email=email, ip=doc["registered_ip"],
                        user_agent=request.headers.get("user-agent"), meta={"request_id": req_id, "requested_role": body.requested_role})
-    out = {"request_id": req_id, "status": "PENDING_EMAIL_VERIFICATION",
-           "message": "Registrazione ricevuta. Conferma la tua email: riceverai una comunicazione quando il tuo account sarà stato verificato e approvato."}
+    email_ok = email_status in ("sent", "test_intercepted")
+    out = {"request_id": req_id, "status": "PENDING_EMAIL_VERIFICATION", "verification_email_status": "SENT" if email_ok else "EMAIL_SEND_FAILED",
+           "message": "Registrazione ricevuta. Conferma la tua email: riceverai una comunicazione quando il tuo account sarà stato verificato e approvato."
+           if email_ok else "Registrazione ricevuta, ma l'invio dell'email di verifica non è riuscito. Puoi richiedere un nuovo invio."}
     if settings.OTP_DEBUG_ENABLED:
         out["debug_verification_token"] = token
     return out
@@ -151,8 +193,43 @@ async def verify_email(body: VerifyBody):
     await _set_status(db, r["_id"], "PENDING_APPROVAL", None,
                       {"email_verified_at": _now(), "verification_token_hash": None}, expect=["PENDING_EMAIL_VERIFICATION"])
     await record_audit(action="auth.register.email_verified", tenant_id=None, user_id=None, user_email=r["email"], meta={"request_id": r["_id"]})
+    await _notify_superadmins_new_request(db, r)
     return {"request_id": r["_id"], "status": "PENDING_APPROVAL",
             "message": "Email verificata. Il tuo account è in attesa di approvazione da parte dell'amministratore."}
+
+
+class ResendBody(BaseModel):
+    request_id: str
+
+
+RESEND_MIN_INTERVAL_S = 60
+RESEND_MAX_PER_DAY = 5
+
+
+@router.post("/auth/resend-verification")
+async def resend_verification(body: ResendBody, request: Request):
+    """Reinvio email di verifica: per request_id (nessuna enumerazione email), rate-limited, token precedente invalidato."""
+    db = get_db()
+    r = await db.registration_requests.find_one({"_id": body.request_id})
+    if not r or r["status"] != "PENDING_EMAIL_VERIFICATION":
+        # risposta neutra: non rivela stato/esistenza
+        return {"request_id": body.request_id, "status": "ACCEPTED", "message": "Se la richiesta è in attesa di verifica, riceverai una nuova email."}
+    last = r.get("verification_email_last_at")
+    if last and (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds() < RESEND_MIN_INTERVAL_S:
+        raise HTTPException(429, {"code": "RESEND_TOO_SOON", "message": f"Attendi almeno {RESEND_MIN_INTERVAL_S} secondi prima di un nuovo invio."})
+    if int(r.get("verification_email_count") or 0) >= RESEND_MAX_PER_DAY + 1:
+        raise HTTPException(429, {"code": "RESEND_LIMIT_REACHED", "message": "Limite di reinvii raggiunto. Contatta l'amministratore."})
+    token = secrets.token_urlsafe(32)
+    await db.registration_requests.update_one({"_id": r["_id"]}, {"$set": {
+        "verification_token_hash": _h(token), "verification_expires_at": (datetime.now(timezone.utc) + timedelta(hours=VERIFY_TTL_HOURS)).isoformat()}})
+    status = await _send_verification_email(db, r, token)
+    await record_audit(action="auth.register.verification_resent", tenant_id=None, user_id=None, user_email=r["email"], ip=get_client_ip(request),
+                       meta={"request_id": r["_id"], "email_status": status})
+    out = {"request_id": r["_id"], "status": "ACCEPTED", "verification_email_status": "SENT" if status in ("sent", "test_intercepted") else "EMAIL_SEND_FAILED",
+           "message": "Se la richiesta è in attesa di verifica, riceverai una nuova email."}
+    if settings.OTP_DEBUG_ENABLED:
+        out["debug_verification_token"] = token
+    return out
 
 
 @router.get("/auth/registration/{request_id}")
@@ -316,11 +393,11 @@ async def approve(req_id: str, body: ApproveBody, request: Request, user: dict =
     await record_audit(action="auth.register.approved", tenant_id=body.tenant_id, user_id=user["id"], user_email=user.get("email"),
                        ip=get_client_ip(request), meta={"request_id": req_id, "requested_role": r["requested_role"], "approved_role": body.effective_role,
                                                         "created_user_id": new_user["_id"], "kind": kind, "customer_id": body.customer_id})
+    login_url = f"{settings.APP_BASE_URL.rstrip('/')}/{'customer-portal' if kind == 'customer_portal' else 'login'}"
     await send_email(to=r["email"], subject="Il tuo account Panorama Pilot è stato approvato", template="registration_approved",
-                     html=f"<p>Ciao {r['first_name']},</p><p>il tuo account Panorama Pilot è stato approvato. Puoi accedere da: "
-                          f"<a href=\"{settings.APP_BASE_URL}\">{settings.APP_BASE_URL}</a></p>",
-                     text=f"Il tuo account Panorama Pilot è stato approvato. Accedi: {settings.APP_BASE_URL}", tenant_id=body.tenant_id,
-                     idempotency_key=f"reg-approved:{req_id}")
+                     html=_wrap("Il tuo account Panorama Pilot è stato approvato", f"<p>Ciao {r['first_name']},</p><p>l'amministratore ha approvato la tua richiesta di accesso.</p>{_btn(login_url, 'Accedi a Panorama Pilot')}"),
+                     text=f"Il tuo account Panorama Pilot è stato approvato. Accedi: {login_url}", tenant_id=body.tenant_id,
+                     idempotency_key=f"reg-approved:{req_id}", event_type="ACCOUNT_APPROVED")
     return _public(approved)
 
 
@@ -336,8 +413,8 @@ async def reject(req_id: str, body: RejectBody, request: Request, user: dict = D
     await record_audit(action="auth.register.rejected", tenant_id=None, user_id=user["id"], user_email=user.get("email"), ip=get_client_ip(request),
                        meta={"request_id": req_id, "has_internal_reason": bool(body.rejection_reason_internal)})
     await send_email(to=r["email"], subject="Panorama Pilot — esito richiesta di registrazione", template="registration_rejected",
-                     html="<p>La tua richiesta di registrazione a Panorama Pilot non è stata approvata. Per informazioni contatta l'amministratore.</p>",
-                     text="La tua richiesta di registrazione a Panorama Pilot non è stata approvata.", idempotency_key=f"reg-rejected:{req_id}")
+                     html=_wrap("Esito richiesta di accesso", "<p>La tua richiesta di accesso non è stata approvata. Per informazioni contatta l'amministratore.</p>"),
+                     text="La tua richiesta di accesso a Panorama Pilot non è stata approvata.", idempotency_key=f"reg-rejected:{req_id}", event_type="ACCOUNT_REJECTED")
     return _public(r)
 
 
@@ -350,6 +427,10 @@ async def suspend(req_id: str, request: Request, user: dict = Depends(require_su
     else:
         await db.users.update_one({"_id": r["created_user_id"]}, {"$set": {"is_active": False}})
         await db.sessions.update_many({"user_id": r["created_user_id"], "revoked_at": None}, {"$set": {"revoked_at": _now()}})
+    await send_email(to=r["email"], subject="Il tuo account Panorama Pilot è stato sospeso", template="registration_suspended",
+                     html=_wrap("Account sospeso", "<p>Il tuo account Panorama Pilot è stato sospeso. Per informazioni contatta l'amministratore.</p>"),
+                     text="Il tuo account Panorama Pilot è stato sospeso. Contatta l'amministratore.", idempotency_key=f"reg-suspended:{req_id}:{r.get('suspended_at')}",
+                     event_type="ACCOUNT_SUSPENDED")
     await record_audit(action="auth.register.suspended", tenant_id=r.get("approved_tenant_id"), user_id=user["id"], user_email=user.get("email"),
                        ip=get_client_ip(request), meta={"request_id": req_id, "created_user_id": r.get("created_user_id")})
     return _public(r)

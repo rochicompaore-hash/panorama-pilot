@@ -18,6 +18,7 @@ import ssl
 import time
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
+from email.utils import make_msgid
 from typing import Optional, Dict, Any, Tuple, List
 from pathlib import Path
 
@@ -122,6 +123,7 @@ async def _smtp_deliver(cfg, to: str, subject: str, html: str, text: str,
     msg["From"] = f"{cfg.mail_from_name} <{cfg.mail_from}>" if cfg.mail_from_name else cfg.mail_from
     msg["To"] = to
     msg["Subject"] = subject
+    msg["Message-ID"] = make_msgid(domain=(cfg.mail_from or "panoramapilot.com").split("@")[-1])
     if reply_to:
         msg["Reply-To"] = reply_to
     elif cfg.reply_to:
@@ -150,7 +152,7 @@ async def _smtp_deliver(cfg, to: str, subject: str, html: str, text: str,
     errors, srv_msg = resp
     if errors:
         raise RuntimeError(f"SMTP recipient errors: {errors}")
-    return (srv_msg or "").strip()[:400]
+    return (srv_msg or "").strip()[:400], msg["Message-ID"]
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +170,7 @@ async def enqueue_email(
     idempotency_key: Optional[str] = None,
     reply_to: Optional[str] = None,
     attempt_send_now: bool = True,
+    event_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Enqueue an email + attempt immediate send.
 
@@ -247,6 +250,7 @@ async def enqueue_email(
         updated_at=now,
     )
     doc = to_mongo(log.model_dump(by_alias=True))
+    doc["event_type"] = event_type or template
     await db.email_logs.insert_one(doc)
 
     if not attempt_send_now:
@@ -291,7 +295,7 @@ async def _attempt_send(log_id: str) -> Dict[str, Any]:
         }},
     )
     try:
-        srv_resp = await _smtp_deliver(
+        srv_resp, provider_message_id = await _smtp_deliver(
             cfg,
             to=log_doc["to"],
             subject=log_doc["subject"],
@@ -306,6 +310,8 @@ async def _attempt_send(log_id: str) -> Dict[str, Any]:
             {"_id": log_id},
             {"$set": {
                 "status": final_status,
+                "delivery_status": "provider_accepted",  # SMTP 250 = accettato dal provider, NON delivered
+                "provider_message_id": provider_message_id,
                 "smtp_response": srv_resp,
                 "sent_at": datetime.now(timezone.utc).isoformat(),
                 "next_retry_at": None,
@@ -330,6 +336,8 @@ async def _attempt_send(log_id: str) -> Dict[str, Any]:
             {"_id": log_id},
             {"$set": {
                 "status": EMAIL_STATUS_RETRYING if will_retry else EMAIL_STATUS_FAILED,
+                "delivery_status": "failed",
+                "error_code": type(e).__name__,
                 "error": err_msg,
                 "next_retry_at": next_retry,
                 "updated_at": datetime.now(timezone.utc).isoformat(),

@@ -27,6 +27,7 @@ async def send_email(
     body: Optional[str] = None,       # legacy landing.py signature
     tenant_id: Optional[str] = None,
     idempotency_key: Optional[str] = None,
+    event_type: Optional[str] = None,
     **_ignored: Any,
 ) -> str:
     """Backward-compatible wrapper. Returns log_id (or empty string on hard failure)."""
@@ -37,7 +38,7 @@ async def send_email(
         result = await enqueue_email(
             to=to, subject=subject or "(no subject)", template=template,
             html=html, text=text,
-            tenant_id=tenant_id, idempotency_key=idempotency_key,
+            tenant_id=tenant_id, idempotency_key=idempotency_key, event_type=event_type or template,
         )
         return result.get("id") or result.get("_id") or ""
     except Exception:  # noqa: BLE001 — send_email must never crash the caller

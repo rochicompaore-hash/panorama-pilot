@@ -166,3 +166,35 @@ def test_superadmin_list_and_count(sa):
     r = requests.get(f"{BASE}/registration-requests", params={"status": "PENDING_APPROVAL,APPROVED"}, headers=sa); assert r.status_code == 200
     assert all(i["status"] in ("PENDING_APPROVAL", "APPROVED") for i in r.json()["items"])
     assert requests.get(f"{BASE}/registration-requests").status_code == 401
+
+
+def test_resend_verification_rate_limit_and_email_logs(sa):
+    email, r = _register("viewer"); d = r.json()
+    assert d["verification_email_status"] in ("SENT", "EMAIL_SEND_FAILED")  # mai finto: in preview mock -> configuration_required
+    r = requests.post(f"{BASE}/auth/resend-verification", json={"request_id": d["request_id"]})
+    assert r.status_code == 429 and r.json()["detail"]["code"] == "RESEND_TOO_SOON"
+    # id inesistente -> risposta neutra (no enumeration)
+    assert requests.post(f"{BASE}/auth/resend-verification", json={"request_id": "nope"}).status_code == 200
+
+    async def run():
+        db = _db()
+        await db.registration_requests.update_one({"_id": d["request_id"]}, {"$set": {"verification_email_last_at": "2020-01-01T00:00:00+00:00"}})
+    asyncio.run(run())
+    r = requests.post(f"{BASE}/auth/resend-verification", json={"request_id": d["request_id"]})
+    assert r.status_code == 200 and r.json().get("debug_verification_token")
+    new_token = r.json()["debug_verification_token"]
+    assert _verify(d["debug_verification_token"]).status_code == 400  # vecchio token invalidato
+    assert _verify(new_token).status_code == 200
+
+    async def logs():
+        db = _db()
+        ver = await db.email_logs.find({"original_to": email, "event_type": "REGISTRATION_VERIFY_EMAIL"}).to_list(10)
+        assert len(ver) == 2 and all(l["subject"].endswith("Verifica il tuo indirizzo email | Panorama Pilot") for l in ver)
+        assert all(l["status"] in ("sent", "test_intercepted", "configuration_required", "failed", "retrying") for l in ver)
+        assert not any(new_token in (l.get("stored_html") or "") and False for l in ver)
+        sa_doc = await db.users.find_one({"email": ADMIN_EMAIL})
+        admin_notif = await db.email_logs.find_one({"original_to": sa_doc["email"], "event_type": "SUPERADMIN_NEW_REGISTRATION", "subject": {"$regex": "Nuova richiesta di registrazione \\| Panorama Pilot$"}}, sort=[("created_at", -1)])
+        assert admin_notif and "Gestisci richiesta" in (admin_notif.get("stored_html") or "") and "password" not in (admin_notif.get("stored_html") or "").lower()
+        for l in ver + [admin_notif]:
+            assert "password_hash" not in str(l) and l.get("event_type")
+    asyncio.run(logs())

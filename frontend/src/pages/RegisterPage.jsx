@@ -27,6 +27,14 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(null);
+  const [resend, setResend] = useState({ busy: false, msg: "" });
+  const resendVerification = async () => {
+    setResend({ busy: true, msg: "" });
+    try {
+      const { data } = await axios.post(`${API_BASE}/auth/resend-verification`, { request_id: done.request_id });
+      setResend({ busy: false, msg: data.verification_email_status === "EMAIL_SEND_FAILED" ? "Invio non riuscito: il servizio email non è disponibile. Riprova più tardi o contatta l'amministratore." : "Nuova email inviata (se la richiesta è in attesa di verifica)." });
+    } catch (e) { setResend({ busy: false, msg: formatApiError(e.response?.data?.detail) || e.message }); }
+  };
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => { axios.get(`${API_BASE}/auth/register/roles`).then((r) => setRoles(r.data.items || [])).catch(() => setRoles([])); }, []);
@@ -58,11 +66,19 @@ export default function RegisterPage() {
             <div>
               <div className="font-semibold">✓ Registrazione ricevuta</div>
               <p className="text-sm text-muted-foreground mt-1">
-                Ti abbiamo inviato un'email per confermare il tuo indirizzo. Riceverai una comunicazione quando il tuo account sarà stato verificato e approvato.
+                {done.verification_email_status === "EMAIL_SEND_FAILED"
+                  ? "La registrazione è stata salvata ma l'invio dell'email di verifica non è riuscito. Puoi richiedere un nuovo invio qui sotto."
+                  : "Ti abbiamo inviato un'email per confermare il tuo indirizzo. Riceverai una comunicazione quando il tuo account sarà stato verificato e approvato."}
               </p>
+              {done.verification_email_status === "EMAIL_SEND_FAILED" && <div className="mt-2 text-xs font-mono text-destructive" data-testid="register-email-send-failed">EMAIL_SEND_FAILED</div>}
             </div>
           </div>
           <div className="text-xs text-muted-foreground font-mono" data-testid="register-request-id">Riferimento richiesta: {done.request_id}</div>
+          <div className="text-sm">
+            Non hai ricevuto l'email?{" "}
+            <button type="button" onClick={resendVerification} disabled={resend.busy} className="underline font-medium" data-testid="register-resend-button">Invia di nuovo</button>
+            {resend.msg && <div className="text-xs text-muted-foreground mt-1" data-testid="register-resend-result">{resend.msg}</div>}
+          </div>
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" className="rounded-sm" onClick={() => navigate("/registration-status")} data-testid="register-go-status">Stato richiesta</Button>
             <Button variant="ghost" className="rounded-sm" onClick={() => navigate("/login")} data-testid="register-go-login">Torna al login</Button>
