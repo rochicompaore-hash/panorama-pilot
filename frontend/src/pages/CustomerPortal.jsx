@@ -1,4 +1,5 @@
 import React from "react";
+import { Seo } from "@/seo/Seo";
 import axios from "axios";
 import { Routes, Route, Navigate, useNavigate, useParams, Link, useLocation } from "react-router-dom";
 import { Home, FileText, LifeBuoy, User, ChevronRight, LogOut, Download } from "lucide-react";
@@ -22,6 +23,7 @@ const errMsg = (e) => { const d = e?.response?.data?.detail; if (!d) return e.me
 export default function CustomerPortal() {
   return (
     <div className="min-h-screen bg-[#F5F7F6] text-[#1F2937]" style={{ fontFamily: "Roboto, system-ui, sans-serif" }} data-testid="customer-portal">
+      <Seo title="Area Clienti" path="/customer-portal" />
       <Routes>
         <Route path="login" element={<CPLogin />} />
         <Route path="*" element={<CPGuard><Routes>

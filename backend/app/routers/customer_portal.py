@@ -118,6 +118,8 @@ async def cp_login(body: LoginBody, request: Request, response: Response):
         count = (att or {}).get("count", 0) + 1
         await db.login_attempts.update_one({"identifier": ident}, {"$set": {"count": count, "locked_until": (_now() + timedelta(minutes=LOCK_MINUTES)).isoformat() if count >= MAX_ATTEMPTS else None}}, upsert=True)
         raise HTTPException(status_code=401, detail="Credenziali non valide")
+    if u.get("status") == "SUSPENDED":
+        raise HTTPException(status_code=403, detail={"code": "ACCOUNT_SUSPENDED", "message": "Account sospeso. Contatta l'azienda."})
     if u.get("status") != "AUTHORIZED" or not u.get("customer_id"):
         raise HTTPException(status_code=403, detail={"code": u.get("status"), "message": "Account in attesa di autorizzazione da parte dell'azienda."})
     await db.login_attempts.delete_one({"identifier": ident})

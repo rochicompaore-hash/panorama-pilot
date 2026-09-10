@@ -3,6 +3,9 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-
 import "@/App.css";
 import { useAuth } from "@/contexts/AuthContext";
 import Login from "@/pages/Login";
+import RegisterPage from "@/pages/RegisterPage";
+import RegistrationStatusPage, { VerifyEmailPage } from "@/pages/RegistrationStatusPage";
+import RegistrationRequestsPage from "@/pages/RegistrationRequestsPage";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import AcceptInvitation from "@/pages/AcceptInvitation";
@@ -111,6 +114,9 @@ function App() {
       <Routes>
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/registration-status" element={<RegistrationStatusPage />} />
         <Route path="/customer-portal/*" element={<CustomerPortal />} />
         <Route path="/p/:token" element={<PublicQuotePage />} />
         <Route path="/p/schedule/:token" element={<PublicSchedulePage />} />
@@ -172,6 +178,7 @@ function App() {
           <Route path="legal-entities" element={<LegalEntitiesPage />} />
           <Route path="cfo" element={<TreasuryCFOPage />} />
           <Route path="saas-platform" element={<SaaSPlatformPage />} />
+          <Route path="registration-requests" element={<RegistrationRequestsPage />} />
           <Route path="product-catalog" element={<ProductCatalogPage />} />
           <Route path="tech-config" element={<TechConfigPage />} />
           <Route path="site-conditions" element={<SiteConditionsForm />} />

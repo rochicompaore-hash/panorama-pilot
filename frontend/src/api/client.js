@@ -73,5 +73,6 @@ export function formatApiError(detail) {
       .filter(Boolean)
       .join(" ");
   if (detail && typeof detail.msg === "string") return detail.msg;
+  if (detail && typeof detail.message === "string") return detail.message;
   return String(detail);
 }

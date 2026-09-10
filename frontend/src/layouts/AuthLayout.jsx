@@ -21,7 +21,7 @@ export default function AuthLayout({ children, title, subtitle, testId }) {
         <div className="grain-overlay absolute inset-0" />
         <div className="relative z-10 h-full flex flex-col justify-between p-12 text-zinc-100">
           <div>
-            <div className="overline text-zinc-400">Infissi Express</div>
+            <div className="overline text-zinc-400">Panorama Pilot</div>
             <div className="mt-2 text-3xl font-display font-black tracking-tight text-white">
               CLOUD ERP
             </div>
@@ -52,7 +52,7 @@ export default function AuthLayout({ children, title, subtitle, testId }) {
       <div className="flex items-start lg:items-center justify-center px-6 py-12 lg:px-16" data-testid={testId}>
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8">
-            <div className="overline">Infissi Express</div>
+            <div className="overline">Panorama Pilot</div>
             <div className="font-display text-2xl font-black tracking-tight">CLOUD ERP</div>
           </div>
           <div className="mb-8">

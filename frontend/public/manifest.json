@@ -1,0 +1,11 @@
+{
+  "name": "Panorama Pilot",
+  "short_name": "Panorama Pilot",
+  "description": "Gestionale per aziende di serramenti, preventivi, clienti, cantieri e commesse.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#12a16b",
+  "lang": "it",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

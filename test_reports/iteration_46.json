@@ -1,0 +1,45 @@
+{
+  "summary": "PO FASE 1 (brand cleanup + SEO/META v1) + FASE 2 (user self-registration + role approval v1) end-to-end verification. BACKEND: reused/executed /app/backend/tests/test_self_registration_v1.py — 7/7 passed. Added new /app/backend/tests/test_iter46_brand_seo_regression.py — 7 passed / 1 skipped (landing/public endpoint returned 404 on all probed paths; not asserted). Direct API smoke also confirmed: SUSPEND→login 403 ACCOUNT_SUSPENDED, REACTIVATE→login 200, REJECT→login 403 ACCOUNT_NOT_APPROVED with NO 'motivo interno' leak in either login response or GET /api/auth/registration/{id}; CUSTOMER role approval links to existing customer_id (customer-matches decision NO_MATCH when email/phone differ — still allowed with explicit customer_id), portal login 200, backoffice login 401; privilege-escalation payload (role='super_admin', tenant_id='other', permissions=['*'], is_superadmin=true) is IGNORED — stored requested_role='commerciale', approved_tenant_id=null, is_superadmin absent; requested_role='super_admin' → 400 ROLE_NOT_ALLOWED; duplicate email → 409 ACCOUNT_ALREADY_EXISTS; approve on unverified request → 409 INVALID_STATE_TRANSITION. FRONTEND (Playwright, REACT_APP_BACKEND_URL): SEO gates ALL green — /landing document.title='Software Gestionale per Serramentisti | Panorama Pilot', meta robots='index, follow', canonical/og:title/og:image/twitter:card/JSON-LD present, html lang='it', brand 'Panorama Pilot' in DOM, no 'Emergent' text; /login title 'Accedi | Panorama Pilot' robots 'noindex, nofollow' with auth-tab-login + auth-tab-register visible; /register title 'Registrati | Panorama Pilot' robots noindex; /dashboard robots 'noindex, nofollow'; /customer-portal title 'Area Clienti | Panorama Pilot' robots noindex. Assets: GET /sitemap.xml → 200 with only /landing (no /login, /register, /dashboard, /customer-portal, /registration-status, /registration-requests); GET /manifest.json → name='Panorama Pilot'; GET /og-image.png → 200. Full self-registration UI flow verified end-to-end: /register submit → register-success + register-request-id; register-requested-role-select native <select> options = [cliente, commerciale, tecnico_rilievo, produzione, magazzino, posatore, amministrazione, viewer] — NO super_admin/admin_azienda; /verify-email?token=<debug_verification_token> → verify-success; /registration-status shows 'attesa di approvazione'; login with pending account → login-error 'Il tuo account è in attesa di approvazione' + login-pending-status-link. Superadmin flow: admin login → nav lands on /registration-requests (registration-requests-page rendered), approve-btn-{id} opens approve-dialog with approve-tenant-select (Infissi Express Test + PanoramaPilot) and approve-role-select excluding super_admin/admin_azienda; approving commerciale on tenant Infissi Express Test → toast 'Richiesta approvata', request status APPROVED; the admin sidebar shows tenant brand 'INFISSI EXPRESS / CLOUD ERP' (tenant branding preserved). RBAC of the newly approved commerciale: /auth/login 200 (user.tenant_id=5e35…, is_superadmin=false); GET /api/registration-requests → 403; GET /api/quotes → 200; /auth/me permissions include financials.view (as PO noted, acceptable per RBAC), NO '*' and NO users.manage. Responsive /register: 1280×720, 1366×768 and 390×844 all pass — REGISTRATI button in viewport after scroll_into_view, no horizontal overflow. Regression: admin login still works, PDF quote preview response filename carries 'infissi_express_...' brand token and NO 'Emergent' leak. All 7 self-reg test records + orphan users/customer_portal_users deleted post-run (reg cleanup: 5/1/1).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/landing/public", "issue": "404 — no landing config endpoint reachable at /landing/public, /landing/config, /public/landing or /branding/public. If a public landing config with product_name is a PO deliverable, expose one; else this row can be ignored. Currently the brand 'Panorama Pilot' is only surfaced via SPA SEO helmet + /manifest.json + /og-image.png (all confirmed)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_self_registration_v1.py",
+    "/app/backend/tests/test_iter46_brand_seo_regression.py",
+    "/app/test_reports/pytest/iter46_selfreg.xml",
+    "/app/test_reports/pytest/iter46_brand_seo.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: expose GET /api/landing/public (or equivalent) that returns product_name='Panorama Pilot' for parity with the PO regression check. Non-blocking — brand is already exposed via /manifest.json and Helmet on /landing.",
+    "OBSERVATIONAL: on the initial DOM render at /dashboard the nav-registration-requests testid is briefly absent (locator.count()==0) but Playwright's auto-wait resolves in <1s and the click succeeds — timing only, not a bug."
+  ],
+  "critical_code_review_comments": [
+    "GOOD: /api/auth/register hardens against privilege-escalation payloads (role/tenant_id/permissions/is_superadmin ignored, stored requested_role wins) — confirmed by direct fuzzing.",
+    "GOOD: dual-auth surface correctly enforced — customer_portal_users only used when approve.effective_role='cliente' with a linked customer_id; backoffice login 401 for portal-only accounts and vice-versa.",
+    "GOOD: reject internal reason never leaks in login 403 body nor in GET /api/auth/registration/{id} public status.",
+    "GOOD: SEO helmet strategy centralised in src/seo — every route sets the right robots directive (index only on /landing; noindex on /login, /register, /dashboard, /customer-portal). Absolute-URL canonical uses REACT_APP_BACKEND_URL correctly.",
+    "GOOD: RegisterPage uses a NATIVE <select> for register-requested-role-select (not shadcn) — deliberate for accessibility on mobile; option list matches whitelist (admin roles excluded server-side too via /api/auth/register/roles).",
+    "NIT: RegistrationRequestsPage should ideally show a small explanatory tooltip on approve-role-select stating 'super_admin/admin_azienda must be assigned via user management, not via registration approval' — currently the whitelist is silently applied."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter46_brand_seo_regression.py"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 executed; 1 optional skip for /landing/public 404)",
+    "frontend": "100% (SEO gates, register E2E, superadmin approval, RBAC negative, reject, customer, responsive — all pass)"
+  },
+  "test_credentials": "admin@infissiexpress.com / <REDACTED_ADMIN_PWD> from /app/memory/test_credentials.md — one login per session honoured (brute-force lock). Test users prefixed reg-*@example.com, password Registrazione!2026x — all removed post-run.",
+  "seed_data_creation": "Created + verified + approved/rejected 4 registration_requests (1 commerciale approved/suspended/reactivated, 1 posatore rejected, 1 cliente approved+portal login, 1 privilege-escalation attempt). All records + spawned users/customer_portal_users cleaned (5 registration_requests / 1 user / 1 customer_portal_user deleted).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "PO FASE 1 + FASE 2 GREEN. Brand 'Panorama Pilot' exposed via Helmet + manifest.json + og-image.png + sitemap.xml (only /landing indexed). Tenant brand 'Infissi Express' preserved on backoffice sidebar and PDF quote filename. Self-registration + 3-state workflow (pending_email_verification / pending_approval / approved|rejected|suspended) fully functional with correct 403 codes and no internal-reason leaks. RBAC works for newly created commerciale: quotes accessible, registration-requests denied. Customer role correctly routes user to customer_portal_users (separate auth surface). Known non-blocking observation: /api/landing/public is 404 — either intentional (brand carried by manifest+helmet) or missing endpoint. Frontend register uses native <select> (mobile-friendly).",
+  "rca of the issue": "N/A — no blocking issues detected in this iteration."
+}

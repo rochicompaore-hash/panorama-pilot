@@ -271,7 +271,7 @@ async def _attempt_send(log_id: str) -> Dict[str, Any]:
             {"_id": log_id},
             {"$set": {
                 "status": EMAIL_STATUS_CONFIG_REQUIRED,
-                "error": "SMTP_NOT_CONFIGURED: MAIL_PASSWORD non impostata negli Emergent Secrets",
+                "error": "SMTP_NOT_CONFIGURED: MAIL_PASSWORD non impostata nei Production Secrets",
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }},
         )

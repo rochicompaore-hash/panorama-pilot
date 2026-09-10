@@ -33,7 +33,7 @@ class PackageConfig(BaseModel):
 
 class PublicSiteConfig(BaseDoc):
     """Configurazione del sito pubblico (landing + login area)."""
-    product_name: str = "Infissi Express Cloud"
+    product_name: str = "Panorama Pilot"
     logo_url: Optional[str] = None
     favicon_url: Optional[str] = None
     hero_title: str = "Gestisci tutta la tua azienda di serramenti in un unico sistema"

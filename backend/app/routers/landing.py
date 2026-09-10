@@ -89,9 +89,9 @@ async def _get_or_create_config() -> dict:
             "service", "administration", "treasury",
             "management_control", "ai_cfo", "multi_company", "omnichannel",
         ],
-        seo_title="Infissi Express Cloud — ERP per aziende di serramenti",
-        seo_description=("Piattaforma SaaS modulare per aziende di infissi, serramenti, "
-                          "PVC, alluminio, legno. CRM, preventivi, produzione, tesoreria e AI CFO."),
+        seo_title="Software Gestionale per Serramentisti | Panorama Pilot",
+        seo_description=("Panorama Pilot è il software gestionale per aziende di serramenti: CRM, preventivi, "
+                          "contratti, cantieri, clienti, documenti e gestione della commessa in un'unica piattaforma."),
         email_status="configuration_required",
         email_status_note="Configurare i destinatari email prima di attivare le notifiche di lead.",
         is_published=True, published_at=utcnow(),

@@ -58,7 +58,7 @@ export default function EmailSettingsPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
           Configurazione SMTP SiteGround, template personalizzabili, verifica DNS
-          (SPF/DKIM/DMARC) e invio di test. La password è caricata solo dagli Emergent Secrets
+          (SPF/DKIM/DMARC) e invio di test. La password è caricata solo dai Production Secrets
           e non è mai esposta.
         </p>
       </div>
@@ -120,7 +120,7 @@ function ConfigCard({ cfg, isLoading }) {
           <p className="text-sm text-muted-foreground mt-1" data-testid="smtp-status-desc">
             {ok
               ? "Il servizio SMTP è pronto per inviare email."
-              : "Manca MAIL_PASSWORD negli Emergent Secrets. Le email vengono registrate ma non inviate."}
+              : "Manca MAIL_PASSWORD nei Production Secrets. Le email vengono registrate ma non inviate."}
           </p>
         </div>
       </div>
@@ -130,7 +130,7 @@ function ConfigCard({ cfg, isLoading }) {
           <AlertDescription className="text-sm text-amber-900">
             <b>Come completare la configurazione:</b>
             <ol className="list-decimal pl-6 mt-2 space-y-1">
-              <li>Apri il pannello Emergent e vai su <b>Secrets</b>.</li>
+              <li>Apri il pannello di deploy e vai su <b>Secrets</b>.</li>
               <li>Aggiungi la variabile <code className="bg-white/70 px-1 rounded">MAIL_PASSWORD</code> con la password SMTP di SiteGround per <code className="bg-white/70 px-1 rounded">{cfg.smtp_user}</code>.</li>
               <li>Riavvia il backend (o attendi il redeploy automatico).</li>
               <li>Torna qui e usa "Invio di test" per verificare.</li>

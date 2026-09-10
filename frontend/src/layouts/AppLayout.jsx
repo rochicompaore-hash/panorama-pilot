@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Seo } from "@/seo/Seo";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
@@ -100,6 +101,7 @@ const NAV = [
     group: "platform",
     label: "Platform Owner",
     items: [
+      { to: "/registration-requests", label: "Richieste registrazione", icon: Users, perm: null, superadmin: true, counter: "registrations" },
       { to: "/saas-platform", label: "SaaS Modularization", icon: ShieldCheck, perm: null },
       { to: "/platform-site-config", label: "Configurazione landing", icon: Buildings, perm: null },
     ],
@@ -138,6 +140,7 @@ const NAV = [
 export default function AppLayout() {
   const { t } = useTranslation();
   const { user, logout, has } = useAuth();
+  const [pendingRegs, setPendingRegs] = useState(0);
   const [openMobile, setOpenMobile] = useState(false);
   const [notif, setNotif] = useState({ unread: 0, items: [] });
   const [searchOpen, setSearchOpen] = useState(false);
@@ -147,6 +150,10 @@ export default function AppLayout() {
   const location = useLocation();
 
   useEffect(() => setOpenMobile(false), [location.pathname]);
+  useEffect(() => {
+    if (!(user?.is_superadmin || user?.is_platform_owner)) return;
+    api.get("/registration-requests/count").then((r) => setPendingRegs(r.data.pending || 0)).catch(() => {});
+  }, [user?.id, location.pathname]); // eslint-disable-line
 
   useEffect(() => {
     const load = async () => {
@@ -186,6 +193,7 @@ export default function AppLayout() {
       <div className="flex flex-col">
         {group.items.map((it) => {
           if (it.perm && !has(it.perm)) return null;
+          if (it.superadmin && !(user?.is_superadmin || user?.is_platform_owner)) return null;
           const Icon = it.icon;
           return (
             <NavLink
@@ -202,7 +210,7 @@ export default function AppLayout() {
               }
             >
               <Icon size={18} weight="duotone" aria-hidden />
-              <span>{it.label || t(it.i18n)}</span>
+              <span>{it.label || t(it.i18n)}{it.counter === "registrations" && pendingRegs > 0 && <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 min-w-[18px]" data-testid="nav-registrations-counter">({pendingRegs})</span>}</span>
             </NavLink>
           );
         })}
@@ -232,6 +240,7 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen flex bg-background">
+      <Seo title="Area riservata" />
       {/* Desktop sidebar */}
       <div className="hidden lg:block">{Sidebar}</div>
 

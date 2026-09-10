@@ -1,8 +1,10 @@
 import React, { useState } from "react";
+import { Seo } from "@/seo/Seo";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthLayout from "@/layouts/AuthLayout";
+import { AuthTabs } from "@/components/app/AuthTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +21,7 @@ export default function Login() {
   const location = useLocation();
   const [error, setError] = useState(location.state?.googleError || "");
   const [loading, setLoading] = useState(false);
+  const [pendingRequestId, setPendingRequestId] = useState(null);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -32,7 +35,12 @@ export default function Login() {
         navigate("/dashboard");
       }
     } catch (err) {
-      setError(formatApiError(err.response?.data?.detail) || err.message);
+      const detail = err.response?.data?.detail;
+      if (detail?.request_id) {
+        localStorage.setItem("registration_request_id", detail.request_id);
+        setPendingRequestId(detail.request_id);
+      }
+      setError(formatApiError(detail) || err.message);
     } finally {
       setLoading(false);
     }
@@ -40,10 +48,17 @@ export default function Login() {
 
   return (
     <AuthLayout title={t("auth.sign_in")} subtitle={t("auth.sign_in_subtitle")} testId="login-page">
+      <Seo title="Accedi" description="Accedi a Panorama Pilot per gestire clienti, cantieri, preventivi, contratti e attività della tua azienda." path="/login" />
+      <AuthTabs active="login" />
       <form onSubmit={submit} className="space-y-6" data-testid="login-form">
         {error && (
           <Alert variant="destructive" className="rounded-sm" data-testid="login-error">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              {error}
+              {pendingRequestId && (
+                <div className="mt-2"><Link to="/registration-status" className="underline" data-testid="login-pending-status-link">Vedi lo stato della tua richiesta</Link></div>
+              )}
+            </AlertDescription>
           </Alert>
         )}
         <div className="space-y-2">

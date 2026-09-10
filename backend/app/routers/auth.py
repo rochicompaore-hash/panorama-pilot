@@ -81,6 +81,12 @@ async def login(body: LoginRequest, request: Request, response: Response):
         user_doc and user_doc.get("is_active", True) and user_doc.get("password_hash")
     )
     if not is_valid_user:
+        # Self-registration (msg 790 §20): credenziali corrette ma account non attivo -> codice stato, mai "password errata".
+        from app.routers.registration import pending_login_block
+        blocked = await pending_login_block(db, email, body.password)
+        if blocked:
+            await _audit_login_failure(db, email, ip, ua, user_doc, blocked["code"].lower())
+            raise HTTPException(status_code=403, detail=blocked)
         await record_failed_login(db, identifier, settings)
         await _audit_login_failure(db, email, ip, ua, user_doc, "user_not_found_or_inactive")
         raise HTTPException(status_code=401, detail="Credenziali non valide")

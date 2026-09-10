@@ -31,6 +31,7 @@ from app.seed import run_seed
 # ------------------------------------------------------------------------------
 # Foundations: auth / users / roles / core meta
 from app.routers.auth import router as auth_router
+from app.routers.registration import router as registration_router
 from app.routers.users import router as users_router
 from app.routers.roles import roles_router, permissions_router
 from app.routers.company import router as company_router
@@ -216,7 +217,7 @@ async def production_status():
 # Mount routers — ordered by domain for readability
 # ------------------------------------------------------------------------------
 FOUNDATION_ROUTERS = [
-    auth_router, users_router, roles_router, permissions_router, company_router,
+    auth_router, registration_router, users_router, roles_router, permissions_router, company_router,
     audit_router, notifications_router, attachments_router, sequences_router,
     search_router, sessions_router, dashboard_router, email_logs_router,
     email_settings_router,
