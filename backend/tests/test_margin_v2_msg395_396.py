@@ -46,9 +46,10 @@ class TestWithholdingBandFlip:
         assert fs["withholding_cost"] == 1_100.0
         assert fs["pre_commission_margin"] == 29.0
         assert fs["margin_band"] == "BUONO"
-        assert fs["commission_rate"] == 0.10
+        # policy v3: cap 15% (sconto 0) → compat (29-15.01)=13.99%
+        assert fs["commission_rate"] == 0.1399
         # COMMISSION_BASE resta net_revenue (§6)
-        assert fs["commission_gross"] == 1_000.0
+        assert fs["commission_gross"] == 1_399.0
 
 
 # =====================================================================
@@ -140,8 +141,9 @@ class TestRBACTachometerVisibility:
             ],
         })
         red = redact_financial_snapshot_for_role(fs, is_admin=False)
-        assert "tachometer_value" in red
-        assert red["tachometer_value"] == fs["final_company_margin"]
+        # msg 801 — commerciale NON vede tachometer/margine
+        assert "tachometer_value" not in red and "final_company_margin" not in red
+        assert red["actual_commission_rate"] == fs["commission_rate"]
         assert "pre_commission_margin" not in red  # commerciale non vede il valore tecnico
         assert "supply_cost" not in red
         assert "installation_cost" not in red

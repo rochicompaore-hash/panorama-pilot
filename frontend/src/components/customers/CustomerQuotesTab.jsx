@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, FileText } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { NewQuoteDialog } from "@/components/quotes/NewQuoteDialog";
 import { customerDisplayName } from "@/components/customers/CustomerTypeBadge";
 
 function fmtEUR(n) {
@@ -56,15 +57,10 @@ export default function CustomerQuotesTab({ customerId, customer, sites = [] }) 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="rounded-sm gap-2 h-10" data-testid="new-quote-button-in-customer">
-              <Plus size={14} weight="bold" /> Nuovo preventivo
+              <Plus size={14} weight="bold" /> Crea preventivo
             </Button>
           </DialogTrigger>
-          <NewQuoteForCustomerDialog
-            customer={customer}
-            sites={sites}
-            onSubmit={(p) => createMut.mutate(p)}
-            loading={createMut.isPending}
-          />
+          <NewQuoteDialog initialCustomer={customer} onSubmit={(p) => createMut.mutate(p)} loading={createMut.isPending} />
         </Dialog>
       </div>
 

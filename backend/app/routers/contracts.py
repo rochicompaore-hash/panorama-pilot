@@ -26,6 +26,7 @@ from app.services.contracts_helpers import (
     load_quote_or_400, assert_no_active_contract, next_contract_number,
     build_contract_snapshot, compute_snapshot_hash, build_signature_hash,
     load_valid_signing_token, verify_public_otp,
+    presign_errors, build_signed_snapshot, CUSTOMER_EDITABLE_KEYS, SITE_EDITABLE_KEYS,
 )
 from app.config import settings
 import secrets
@@ -84,6 +85,137 @@ class SendForSignatureRequest(BaseModel):
 
 
 # =====================================================================
+# msg 803 — ACCEPTED QUOTE → CONTRACT V1
+# =====================================================================
+ACTIVE_CONTRACT_FILTER = {"contract_status": {"$nin": ["cancelled", "superseded", "rejected"]}}
+
+
+class PartiesPatch(BaseModel):
+    customer: Dict[str, Any] = Field(default_factory=dict)
+    site: Dict[str, Any] = Field(default_factory=dict)
+    sync_customer: bool = False
+
+
+class ContractPatch(BaseModel):
+    notes: Optional[str] = None
+
+
+def _assert_not_signed(doc: dict) -> None:
+    if doc.get("contract_status") in ("signed", "superseded") or doc.get("lifecycle_status") == "ACTIVE":
+        raise HTTPException(409, {"code": "CONTRACT_SIGNED_IMMUTABLE", "message": "Contratto firmato: usa Addendum o Revisione."})
+
+
+def _raise_if_presign_blocked(doc: dict) -> None:
+    errs = presign_errors(doc)
+    if errs:
+        raise HTTPException(400, {"code": "PRESIGN_CHECK_FAILED", "errors": errs,
+                                  "message": "Dati obbligatori mancanti: " + ", ".join(errs)})
+
+
+@router.get("/by-quote/{qid}")
+async def contract_by_quote(qid: str, user: dict = Depends(require_permission("contracts.view"))):
+    db = get_db()
+    doc = await db.contracts.find_one({"tenant_id": user["tenant_id"], "quote_id": qid, "deleted_at": None, **ACTIVE_CONTRACT_FILTER},
+                                      sort=[("created_at", -1)])
+    if not doc:
+        raise HTTPException(404, "Nessun contratto attivo per questo preventivo")
+    return from_mongo(doc)
+
+
+@router.get("/{cid}/presign-check")
+async def contract_presign_check(cid: str, user: dict = Depends(require_permission("contracts.view"))):
+    db = get_db()
+    doc = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(404, "Contratto non trovato")
+    errs = presign_errors(doc)
+    return {"contract_id": cid, "ok": not errs, "errors": errs, "general_terms_version": doc.get("general_terms_version")}
+
+
+@router.patch("/{cid}")
+async def patch_contract(cid: str, body: Dict[str, Any], request: Request,
+                         user: dict = Depends(require_permission("contracts.create"))):
+    """REVISION GUARD (msg 803 §7): qualsiasi campo economico/commerciale → CONTRACT_REVISION_REQUIRED. Solo `notes` ammesso."""
+    db = get_db()
+    doc = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(404, "Contratto non trovato")
+    _assert_not_signed(doc)
+    forbidden = [k for k in body.keys() if k != "notes"]
+    if forbidden:
+        raise HTTPException(409, {"code": "CONTRACT_REVISION_REQUIRED", "fields": forbidden,
+                                  "message": "Prodotti, quantità, prezzi, sconti, IVA e condizioni economiche non sono modificabili: crea una REVISIONE del preventivo."})
+    now = datetime.now(timezone.utc)
+    await db.contracts.update_one({"_id": cid}, {"$set": {"notes": body.get("notes"), "updated_at": now, "updated_by": user["id"]}})
+    return {"ok": True}
+
+
+@router.patch("/{cid}/parties")
+async def patch_contract_parties(cid: str, body: PartiesPatch, request: Request,
+                                 user: dict = Depends(require_permission("contracts.create"))):
+    """Correzione dati formali cliente/cantiere PRIMA della firma (msg 803 §5-§6) con audit old/new e sync anagrafica opzionale."""
+    db = get_db()
+    doc = await db.contracts.find_one({"_id": cid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(404, "Contratto non trovato")
+    _assert_not_signed(doc)
+    bad = [k for k in body.customer if k not in CUSTOMER_EDITABLE_KEYS] + [k for k in body.site if k not in SITE_EDITABLE_KEYS]
+    if bad:
+        raise HTTPException(409, {"code": "CONTRACT_REVISION_REQUIRED", "fields": bad,
+                                  "message": "Campo non modificabile nel contratto: richiede revisione."})
+    snap = dict(doc.get("quote_snapshot") or {})
+    cust = dict(snap.get("customer") or {})
+    site = dict(snap.get("site") or {})
+    now = datetime.now(timezone.utc)
+    changes = []
+    for k, v in body.customer.items():
+        if cust.get(k) != v:
+            changes.append({"scope": "customer", "field": k, "old_value": cust.get(k), "new_value": v,
+                            "changed_by": user["id"], "changed_by_email": user["email"], "changed_at": now.isoformat(),
+                            "synced_to_customer": body.sync_customer})
+            cust[k] = v
+    for k, v in body.site.items():
+        if site.get(k) != v:
+            changes.append({"scope": "site", "field": k, "old_value": site.get(k), "new_value": v,
+                            "changed_by": user["id"], "changed_by_email": user["email"], "changed_at": now.isoformat(),
+                            "synced_to_customer": False})
+            site[k] = v
+    if not changes:
+        return {"ok": True, "changes": []}
+    snap["customer"] = cust
+    snap["site"] = site
+    await db.contracts.update_one({"_id": cid}, {"$set": {"quote_snapshot": snap, "updated_at": now, "updated_by": user["id"]},
+                                                 "$push": {"party_changes": {"$each": changes}}})
+    synced = False
+    if body.sync_customer and doc.get("customer_id") and body.customer:
+        cust_patch = {k: v for k, v in body.customer.items() if k in CUSTOMER_EDITABLE_KEYS}
+        before = await db.customers.find_one({"_id": doc["customer_id"], "tenant_id": user["tenant_id"]}, {k: 1 for k in cust_patch})
+        r = await db.customers.update_one({"_id": doc["customer_id"], "tenant_id": user["tenant_id"], "deleted_at": None},
+                                          {"$set": {**cust_patch, "updated_at": now.isoformat(), "updated_by": user["id"]}})
+        synced = r.matched_count == 1
+        if synced:
+            await record_audit(action="customers.update.from_contract", tenant_id=user["tenant_id"], user_id=user["id"],
+                               user_email=user["email"], ip=get_client_ip(request), entity_type="customer", entity_id=doc["customer_id"],
+                               before={k: (before or {}).get(k) for k in cust_patch}, after=cust_patch)
+    await record_audit(action="contracts.parties.update", tenant_id=user["tenant_id"], user_id=user["id"],
+                       user_email=user["email"], ip=get_client_ip(request), entity_type="contract", entity_id=cid,
+                       before={c["field"]: c["old_value"] for c in changes}, after={c["field"]: c["new_value"] for c in changes})
+    return {"ok": True, "changes": changes, "customer_synced": synced, "presign_errors": presign_errors({**doc, "quote_snapshot": snap})}
+
+
+async def _activate_signed_contract(db, doc: dict, when: datetime) -> None:
+    """Post-firma (msg 803 §12-§13-§15): freeze snapshot, CONTRACT ACTIVE, evento CONTRACT_AVAILABLE per il Customer Portal."""
+    frozen = build_signed_snapshot(doc, when)
+    await db.contracts.update_one({"_id": doc["_id"]}, {"$set": {"signed_snapshot": frozen, "lifecycle_status": "ACTIVE", "active_at": when}})
+    from app.services.customer_email_events import notify_customer_event
+    await notify_customer_event(
+        db, tenant_id=doc["tenant_id"], customer_id=doc.get("customer_id"), event_type="CONTRACT_AVAILABLE",
+        entity_type="contract", entity_id=doc["_id"], title="Il tuo contratto firmato è disponibile",
+        body=f"Il contratto {doc.get('number')} è stato firmato ed è disponibile nella tua area cliente.",
+        cta_label="Apri area cliente", cta_path="/customer-portal", dedupe_suffix="signed")
+
+
+# =====================================================================
 # LIST + GET
 # =====================================================================
 @router.get("")
@@ -121,7 +253,9 @@ async def generate_from_quote(body: GenerateFromQuoteRequest, request: Request,
     db = get_db()
     tenant_id = user["tenant_id"]
     quote = await load_quote_or_400(db, tenant_id, body.quote_id)
-    await assert_no_active_contract(db, tenant_id, body.quote_id)
+    existing = await db.contracts.find_one({"tenant_id": tenant_id, "quote_id": body.quote_id, "deleted_at": None, **ACTIVE_CONTRACT_FILTER})
+    if existing:
+        return from_mongo(existing)   # msg 803 §1 — nessun duplicato: APRI CONTRATTO
 
     number, seq_n, _ = await next_contract_number(db, tenant_id)
     snapshot = await build_contract_snapshot(db, tenant_id, quote, body.payment_terms)
@@ -158,6 +292,7 @@ async def generate_from_quote(body: GenerateFromQuoteRequest, request: Request,
         "deleted_at": None,
     }
     await db.contracts.insert_one(doc)
+    await db.quotes.update_one({"_id": body.quote_id}, {"$set": {"contract_id": contract_id, "updated_at": now.isoformat()}})
     await record_audit(
         action="contracts.generate", tenant_id=tenant_id,
         user_id=user["id"], user_email=user["email"], ip=get_client_ip(request),
@@ -196,6 +331,8 @@ async def transition(cid: str, body: TransitionRequest, request: Request,
         raise HTTPException(404, "Contratto non trovato")
     current = doc.get("contract_status", "draft")
     _validate_transition(current, body.to_state)
+    if body.to_state == "ready_for_signature":
+        _raise_if_presign_blocked(doc)
     # Signed è immutabile — blocca modifiche
     if current == "signed" and body.to_state != "superseded":
         raise HTTPException(400, "Contratto firmato: solo variante può superarlo")
@@ -229,6 +366,7 @@ async def send_for_signature(cid: str, body: SendForSignatureRequest, request: R
     current = doc.get("contract_status")
     if current not in ("ready_for_signature", "sent", "viewed", "rejected"):
         raise HTTPException(400, f"Impossibile inviare da stato {current}")
+    _raise_if_presign_blocked(doc)
 
     # Genera token di firma sicuro
     now = datetime.now(timezone.utc)
@@ -377,6 +515,7 @@ async def public_sign(token: str, body: PublicSignRequest, request: Request):
         raise HTTPException(404, "Contratto non trovato")
     if doc.get("contract_status") == "signed":
         raise HTTPException(400, "Contratto già firmato")
+    _raise_if_presign_blocked(doc)
 
     now = datetime.now(timezone.utc)
     ip = get_client_ip(request)
@@ -402,6 +541,7 @@ async def public_sign(token: str, body: PublicSignRequest, request: Request):
     await db.contract_signing_tokens.update_one({"_id": token}, {"$set": {
         "consumed": True, "consumed_at": now,
     }})
+    await _activate_signed_contract(db, doc, now)
     await record_audit(action="contracts.sign.public", tenant_id=tk["tenant_id"],
                         user_id=None, user_email=tk.get("to_email"), ip=ip,
                         entity_type="contract", entity_id=doc["_id"],
@@ -436,6 +576,7 @@ async def sign_contract_internal(cid: str, body: SignRequest, request: Request,
         raise HTTPException(400, "Contratto già firmato")
     if not body.accept_terms:
         raise HTTPException(400, "Accettazione condizioni obbligatoria")
+    _raise_if_presign_blocked(doc)
     now = datetime.now(timezone.utc)
     ip = get_client_ip(request)
     ua = request.headers.get("user-agent", "")
@@ -455,6 +596,7 @@ async def sign_contract_internal(cid: str, body: SignRequest, request: Request,
         "by": user["id"], "by_email": user["email"],
         "signature_hash": signature_hash,
     }}})
+    await _activate_signed_contract(db, doc, now)
     await record_audit(action="contracts.sign", tenant_id=user["tenant_id"],
                         user_id=user["id"], user_email=user["email"], ip=ip,
                         entity_type="contract", entity_id=cid,

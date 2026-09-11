@@ -36,8 +36,9 @@ def test_golden_10pct_manual(admin):
     assert q["vat_amount"] == round(q["vat_amount"], 2) and abs(q["total"] - (9000 + q["vat_amount"])) < 0.01  # IVA dopo sconto
     assert fs["net_revenue_ex_vat"] == 9000 and fs["supply_cost"] == 4000 and fs["installation_cost"] == 1000 and fs["other_direct_costs"] == 500
     assert fs["pre_commission_contribution"] == 3500 and abs(fs["pre_commission_margin"] - 38.8889) < 0.01
-    assert fs["commission_rate"] == 0.15 and fs["commission_gross"] == 1350
-    assert fs["final_company_contribution"] == 2150 and abs(fs["final_company_margin"] - 23.89) < 0.01
+    # sconto 10% → cap 12% (commissione modulare msg 796)
+    assert fs["commission_rate"] == 0.12 and fs["commission_gross"] == 1080
+    assert fs["final_company_contribution"] == 2420 and abs(fs["final_company_margin"] - 26.89) < 0.01
     assert fs["tachometer_value"] == fs["final_company_margin"]
     # persist / reload
     q2 = admin.get(f"{BASE_URL}/api/quotes/{qid}", timeout=20).json()

@@ -108,6 +108,8 @@ async def production_release_check(*, tenant_id: str, contract_id: str, checked_
 
     # Acconto (se richiesto in payment_terms). Non blocca se non definito.
     payment_terms = contract.get("quote_snapshot", {}).get("payment_terms") or ""
+    if isinstance(payment_terms, dict):   # snapshot contrattuale V1 (msg 803): {code,label,schedule}
+        payment_terms = " ".join(str(payment_terms.get(k) or "") for k in ("code", "label"))
     if "50%" in payment_terms.lower() or "acconto" in payment_terms.lower():
         # Verifica pagamento acconto in `payments`
         acconto_paid = await db.payments.count_documents({

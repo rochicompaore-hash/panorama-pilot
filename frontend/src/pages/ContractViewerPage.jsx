@@ -26,6 +26,8 @@ function formatAddress(a) {
  * Contract viewer + firma integrata.
  * Mostra il contratto integralmente prima della firma (no solo pulsante download).
  */
+import { PresignCheckBanner, PartiesEditor, QuoteSummaryCard } from "@/components/app/ContractDraftSections";
+
 export default function ContractViewerPage() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -236,6 +238,12 @@ export default function ContractViewerPage() {
         </Card>
       )}
 
+      {/* msg 803 — Contract Draft: pre-firma check, cliente/cantiere modificabili, oggetto del contratto */}
+      {!signed && <PresignCheckBanner contractId={id} refreshKey={contract.updated_at} />}
+      {contract.lifecycle_status === "ACTIVE" && <div className="rounded-sm border border-emerald-600/40 bg-emerald-500/10 p-3 text-sm font-bold text-emerald-800" data-testid="contract-active">CONTRATTO ATTIVO — snapshot firmato congelato il {contract.signed_snapshot?.frozen_at ? new Date(contract.signed_snapshot.frozen_at).toLocaleString("it-IT") : ""}. Correzioni solo tramite Addendum / Revisione.</div>}
+      <PartiesEditor contract={contract} onSaved={load} />
+      <QuoteSummaryCard contract={contract} />
+
       {/* Intestazione azienda + cliente */}
       <Card>
         <CardHeader><CardTitle>Intestazione</CardTitle></CardHeader>
@@ -250,7 +258,7 @@ export default function ContractViewerPage() {
             </div>
             <div>
               <div className="text-xs text-muted-foreground uppercase mb-1">Cliente</div>
-              <div className="font-semibold" data-testid="customer-name">{snap.customer?.name || snap.customer?.full_name || snap.customer?.display_name || "-"}</div>
+              <div className="font-semibold" data-testid="customer-name">{snap.customer?.company_name || [snap.customer?.first_name, snap.customer?.last_name].filter(Boolean).join(" ") || snap.customer?.name || "-"}</div>
               <div className="text-sm">{snap.customer?.email}</div>
               <div className="text-sm">{snap.customer?.phone}</div>
               <div className="text-sm">{formatAddress(snap.customer?.address)}</div>

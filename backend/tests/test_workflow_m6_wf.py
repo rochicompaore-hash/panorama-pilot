@@ -67,9 +67,10 @@ def _make_customer(sess) -> str:
 def _make_signed_contract(sess, add_opening=True) -> str:
     """Crea customer → quote → sent → accepted → convert → sign. Ritorna contract_id."""
     cust_id = _make_customer(sess)
-    r = sess.post(f"{API}/quotes", json={"customer_id": cust_id, "title": "TEST_WF quote"}, timeout=15)
+    r = sess.post(f"{API}/quotes", json={"customer_id": cust_id, "title": "TEST_WF quote", "site_address": {"street": "Via Test 1", "city": "Milano", "zip_code": "20100", "province": "MI"}}, timeout=15)
     assert r.status_code in (200, 201), f"quote: {r.status_code} {r.text[:200]}"
     qid = r.json()["id"]
+    sess.post(f"{API}/quotes/{qid}/lines", json={"description": "TEST_WF finestra", "category": "window", "quantity": 1, "base_price": 1000.0, "internal_cost": 400.0}, timeout=15)  # msg 803 §18 presign: prodotti/totale obbligatori
     if add_opening:
         r = sess.post(f"{API}/quotes/{qid}/openings",
                        json={"code": "V1", "room": "Camera", "width_mm": 1200, "height_mm": 1400}, timeout=15)
@@ -324,8 +325,9 @@ class TestE2EFullWorkflow:
 class TestReleaseCheckIneligible:
     def test_release_check_no_contract_signed(self, admin_session):
         cust_id = _make_customer(admin_session)
-        r = admin_session.post(f"{API}/quotes", json={"customer_id": cust_id, "title": "TEST_WF ineligible"}, timeout=10)
+        r = admin_session.post(f"{API}/quotes", json={"customer_id": cust_id, "title": "TEST_WF ineligible", "site_address": {"street": "Via Test 1", "city": "Milano", "zip_code": "20100", "province": "MI"}}, timeout=10)
         qid = r.json()["id"]
+        admin_session.post(f"{API}/quotes/{qid}/lines", json={"description": "TEST_WF finestra", "category": "window", "quantity": 1, "base_price": 1000.0, "internal_cost": 400.0}, timeout=15)  # msg 803 §18 presign: prodotti/totale obbligatori
         for t in ["sent", "accepted"]:
             admin_session.post(f"{API}/quotes/{qid}/status", json={"new_status": t}, timeout=10)
         r = admin_session.post(f"{API}/quotes/{qid}/convert-to-contract", json={}, timeout=10)

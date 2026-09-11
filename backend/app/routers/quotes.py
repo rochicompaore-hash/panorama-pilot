@@ -126,6 +126,18 @@ def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
 ADMIN_MASTER_MARKER = "__ADMIN_MASTER__"
 
 
+def _raise_if_price_blocked(fs: dict) -> None:
+    """Hard floor (msg 802): POST_MARGIN_PERCENT <= 15.00% → BLOCKED. Il messaggio NON rivela alcun margine."""
+    if fs.get("discount_status") == "BLOCKED" and fs.get("financial_snapshot_status") == "COMPLETE":
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "DISCOUNT_BLOCKED_MARGIN_FLOOR",
+                    "message": "Prezzo non consentito: riduci lo sconto o rivedi il prezzo.",
+                    "effective_discount_percent": fs.get("effective_discount_percent"),
+                    "max_discount_available_percent": fs.get("max_discount_available_percent")},
+        )
+
+
 def _strip_costs_if_needed(doc: dict, perms: set) -> dict:
     d = dict(doc)
     is_admin = "*" in perms or "quotes.view_costs" in perms or "quotes.view_margins" in perms
@@ -175,11 +187,13 @@ async def list_quotes(
     if customer_id: query["customer_id"] = customer_id
     if assigned_to: query["assigned_to"] = assigned_to
     if q:
-        query["$or"] = [
-            {"number": {"$regex": q, "$options": "i"}},
-            {"title": {"$regex": q, "$options": "i"}},
-            {"notes": {"$regex": q, "$options": "i"}},
-        ]
+        rx = {"$regex": q, "$options": "i"}
+        # msg 804 §10 — ricerca anche per cliente (nome, cognome, ragione sociale, numero cliente, telefono, email) tenant-scoped
+        cust_ids = [c["_id"] async for c in db.customers.find(
+            {"tenant_id": user["tenant_id"], "deleted_at": None,
+             "$or": [{k: rx} for k in ("first_name", "last_name", "company_name", "customer_number", "phone", "email", "vat_number", "tax_code")]},
+            {"_id": 1}).limit(200)]
+        query["$or"] = [{"number": rx}, {"title": rx}, {"notes": rx}, {"customer_name": rx}, {"customer_id": {"$in": cust_ids}}]
     total = await db.quotes.count_documents(query)
     docs = await db.quotes.find(query).sort([("number_int", -1), ("created_at", -1)]).skip(skip).limit(limit).to_list(limit)
     perms = await _get_perms(user)
@@ -351,6 +365,11 @@ async def update_quote(
         if not user_has_permission(user, perms, "records.force_override"):
             raise HTTPException(status_code=403, detail="Permesso 'records.force_override' mancante")
 
+    # msg 802 — pre-check fail-closed PRIMA di persistere: sconto/pagamento che porta POST_MARGIN <= 15% → 400, nulla salvato
+    if any(k in payload for k in ("global_discount_type", "global_discount_value", "payment_terms", "promo_code", "automatic_discount_percent")):
+        cur = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
+        if cur:
+            _raise_if_price_blocked(_financial_totals_patch(cur.get("lines") or [], {**cur, **payload}).get("financial_snapshot") or {})
     updated = await update_with_version(
         collection="quotes", entity_id=qid, tenant_id=user["tenant_id"],
         entity_type="quote", expected_version=expected_version,
@@ -432,16 +451,8 @@ async def update_quote(
                 )
             patch = _financial_totals_patch(new_lines, fresh)
             # msg 796 — MARGIN FLOOR 20%: se anche con commissione 0% il margine è < 20%, lo sconto è BLOCCATO (fail-closed).
-            fs_new = patch.get("financial_snapshot") or {}
-            if (any(k in payload for k in ("global_discount_type", "global_discount_value", "payment_terms", "promo_code"))
-                    and fs_new.get("discount_status") == "BLOCKED" and fs_new.get("financial_snapshot_status") == "COMPLETE"):
-                raise HTTPException(
-                    status_code=400,
-                    detail={"code": "DISCOUNT_BLOCKED_MARGIN_FLOOR",
-                            "message": f"Sconto non concedibile: margine aziendale finale sotto il {int(fs_new.get('margin_floor_percent') or 20)}% anche con commissione 0%.",
-                            "effective_discount_percent": fs_new.get("effective_discount_percent"),
-                            "max_discount_available_percent": fs_new.get("max_discount_available_percent")},
-                )
+            if any(k in payload for k in ("global_discount_type", "global_discount_value", "payment_terms", "promo_code")):
+                _raise_if_price_blocked(patch.get("financial_snapshot") or {})
             await db.quotes.update_one(
                 {"_id": qid},
                 {"$set": {"lines": new_lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}, "$inc": {"version": 1}},
@@ -791,6 +802,9 @@ async def update_line(
         lines[idx][k] = v
     lines[idx] = compute_line(lines[idx])
     patch = _financial_totals_patch(lines, doc)
+    # msg 802 — QUOTE EDIT PRICE gate: POST_MARGIN <= 15.00% → PREZZO NON CONSENTITO (nessun margine rivelato)
+    if any(k in payload for k in ("discount_pct", "discount_amount", "base_price", "surcharges")):
+        _raise_if_price_blocked(patch.get("financial_snapshot") or {})
     update = {"lines": lines, **patch, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["id"]}
     if needs_approval and doc.get("quote_status") in ("draft", "to_complete"):
         update["quote_status"] = "to_approve"
@@ -1117,15 +1131,26 @@ async def convert_to_contract(qid: str, request: Request, user: dict = Depends(r
     year_part = f"{datetime.now(timezone.utc).year}-" if updated.get("year_reset") else ""
     number = f"{updated.get('prefix','CON-')}{year_part}{padded}"
 
+    # msg 803 — snapshot contrattuale completo (cliente, cantiere, prodotti/servizi, economics, general terms canonici)
+    from app.services.contracts_helpers import build_contract_snapshot, compute_snapshot_hash
+    rich = await build_contract_snapshot(db, user["tenant_id"], doc, {})
+    rich["signature_ref"] = signature_ref
+    rich["snapshot_hash"] = compute_snapshot_hash(qid, number, doc.get("total"), rich.pop("_products_count", 0))
     c = Contract(
         id=new_id(), tenant_id=user["tenant_id"],
         number=number, number_int=n,
         quote_id=qid, quote_revision=doc.get("revision", 0),
         customer_id=doc.get("customer_id"),
-        quote_snapshot={"lines": doc.get("lines", []), "openings": doc.get("openings", []), "totals": {k: doc.get(k) for k in ("subtotal", "vat_amount", "total")}, "site_address": doc.get("site_address"), "customer_id": doc.get("customer_id"), "quote_number": doc.get("number"), "payment_terms": doc.get("payment_terms"), "signature_ref": signature_ref},
+        quote_snapshot=rich,
         created_by=user["id"], updated_by=user["id"],
     )
-    await db.contracts.insert_one(to_mongo(c.model_dump(by_alias=True)))
+    c_doc = to_mongo(c.model_dump(by_alias=True))
+    c_doc.update({"snapshot_hash": rich["snapshot_hash"], "general_terms_version": rich["general_terms_version"],
+                  "general_terms_hash": rich["general_terms_hash"], "quote_revision_id": rich["quote_revision_id"],
+                  "accepted_at": rich.get("accepted_at"), "contract_status": c_doc.get("contract_status") or "draft",
+                  "state_history": [{"state": "draft", "at": datetime.now(timezone.utc).isoformat(), "by": user["id"], "by_email": user["email"]}]})
+    await db.contracts.insert_one(c_doc)
+
     now = datetime.now(timezone.utc).isoformat()
     await db.quotes.update_one({"_id": qid}, {"$set": {"contract_id": c.id, "quote_status": "converted", "converted_at": now, "updated_at": now, "updated_by": user["id"]}})
     await record_audit(action="quotes.convert_contract", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=qid, after={"contract_id": c.id, "contract_number": number})

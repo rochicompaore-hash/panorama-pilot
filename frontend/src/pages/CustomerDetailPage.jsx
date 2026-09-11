@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog } from "@/components/ui/dialog";
 import { ArrowLeft, EnvelopeSimple, Phone, WhatsappLogo, MapPin, PencilSimple, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { CustomerTypeBadge, customerDisplayName } from "@/components/customers/CustomerTypeBadge";
@@ -14,9 +13,17 @@ import NewCustomerDialog from "@/components/customers/NewCustomerDialog";
 import SitesTab from "@/components/customers/SitesTab";
 import CustomerTimelineTab from "@/components/customers/CustomerTimelineTab";
 import CustomerQuotesTab from "@/components/customers/CustomerQuotesTab";
+import { NewQuoteDialog } from "@/components/quotes/NewQuoteDialog";
+import { Dialog } from "@/components/ui/dialog";
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
+  const [newQuoteOpen, setNewQuoteOpen] = useState(false);
+  const quoteMut = useMutation({
+    mutationFn: async (p) => (await api.post("/quotes", p)).data,
+    onSuccess: (d) => { toast.success(`Preventivo ${d.number} creato`); setNewQuoteOpen(false); navigate(`/quotes/${d.id}`); },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
+  });
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState("overview");
@@ -87,9 +94,17 @@ export default function CustomerDetailPage() {
             <div className="text-sm text-muted-foreground">Referente: {[c.first_name, c.last_name].filter(Boolean).join(" ")}</div>
           )}
         </div>
-        <Button variant="outline" className="rounded-sm gap-2" onClick={() => setEditOpen(true)} data-testid="edit-customer-button">
-          <PencilSimple size={14} weight="bold" /> Modifica anagrafica
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" className="rounded-sm gap-2" onClick={() => setEditOpen(true)} data-testid="edit-customer-button">
+            <PencilSimple size={14} weight="bold" /> Modifica anagrafica
+          </Button>
+          <Button className="rounded-sm gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => setNewQuoteOpen(true)} data-testid="customer-create-quote">
+            + Crea preventivo
+          </Button>
+        </div>
+        <Dialog open={newQuoteOpen} onOpenChange={setNewQuoteOpen}>
+          <NewQuoteDialog initialCustomer={c} onSubmit={(p) => quoteMut.mutate(p)} loading={quoteMut.isPending} />
+        </Dialog>
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

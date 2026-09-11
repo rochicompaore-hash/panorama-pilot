@@ -67,11 +67,13 @@ class TestGolden23OTTIMO:
         assert fs["pre_commission_margin"] == 30.0
         # msg 400 §D / msg 402 §35: PRE 30.00% esatto → fascia 10% (BUONO)
         assert fs["margin_band"] == "BUONO"
-        assert fs["commission_rate"] == 0.10
-        assert fs["commission_gross"] == 1000.0
+        # policy v3: cap 15%, compat (30-15.01)=14.99%
+        assert fs["commission_rate"] == 0.1499
+        assert fs["commission_gross"] == 1499.0
         assert fs["commission_status"] == "OK"
-        assert fs["final_company_contribution"] == 2000.0
-        assert fs["final_company_margin"] == 20.0
+        assert fs["final_company_contribution"] == 1501.0
+        assert fs["final_company_margin"] == 15.01
+        assert fs["post_margin_percent"] == 15.01 and fs["pre_margin_percent"] == 30.0
 
 
 # ---------------------------------------------------------------------------
@@ -89,10 +91,9 @@ class TestRBAC:
         for k in ADMIN_ONLY_KEYS:
             assert k not in fs, f"LEAK to commercial: {k}"
         # But safe fields do carry values
-        assert fs["margin_band"] == "BUONO"
-        assert fs["commission_rate"] == 0.10
-        assert fs["commission_gross"] == 1000.0
-        assert fs["tachometer_value"] == 20.0   # FINAL margin (msg 402 §36)
+        assert "margin_band" not in fs and "tachometer_value" not in fs   # msg 801 — nessun margine al commerciale
+        assert fs["commission_rate"] == 0.1499
+        assert fs["commission_gross"] == 1499.0
 
 
 # ---------------------------------------------------------------------------
@@ -141,10 +142,10 @@ class TestGolden24BUONO:
         assert fs["net_revenue_ex_vat"] == 10000.0
         assert fs["pre_commission_margin"] == 25.0
         assert fs["margin_band"] == "BUONO"
-        assert fs["commission_rate"] == 0.10
-        assert fs["commission_gross"] == 1000.0
-        assert fs["final_company_contribution"] == 1500.0
-        assert fs["final_company_margin"] == 15.0
+        assert fs["commission_rate"] == 0.0999
+        assert fs["commission_gross"] == 999.0
+        assert fs["final_company_contribution"] == 1501.0
+        assert fs["final_company_margin"] == 15.01
 
 
 # ---------------------------------------------------------------------------
@@ -161,11 +162,11 @@ class TestCRITICO:
         assert r.status_code == 200, r.text
         fs = r.json()["financial_snapshot"]
         assert fs["margin_band"] == "CRITICO"
-        assert fs["commission_rate"] is None
-        assert fs["commission_gross"] is None
-        assert fs["commission_status"] == "AUTHORIZATION_REQUIRED"
-        assert fs["final_company_contribution"] is None
-        assert fs["final_company_margin"] is None
+        assert fs["commission_rate"] == 0.0
+        assert fs["commission_gross"] == 0.0
+        assert fs["commission_status"] == "BLOCKED_MARGIN_FLOOR"
+        assert fs["discount_status"] == "BLOCKED"
+        assert fs["final_company_margin"] == 5.0
 
 
 # ---------------------------------------------------------------------------

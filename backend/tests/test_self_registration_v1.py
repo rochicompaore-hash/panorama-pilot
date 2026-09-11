@@ -11,7 +11,7 @@ from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 TENANT = "5e353147-2416-4ef7-aa3f-3e0007435c42"
-PWD = "Registrazione!2026x"
+PWD = os.environ.get("TEST_SELFREG_PASSWORD") or ("Reg!" + __import__("secrets").token_urlsafe(10) + "x")
 
 
 def _db():

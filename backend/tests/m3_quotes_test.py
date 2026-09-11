@@ -90,8 +90,16 @@ def test_quote_sequence_at_least_1349(s, admin_h):
 
 @pytest.fixture(scope="module")
 def created_quote(s, admin_h, seed_lead):
+    # msg 803 §18 — cliente completo + cantiere (pre-firma check per sign)
+    tag = uuid.uuid4().hex[:6]
+    rc = s.post(f"{BASE_URL}/api/customers", headers=admin_h, json={
+        "customer_type": "private", "first_name": "TEST_M3", "last_name": f"Cliente{tag}", "email": f"m3_{tag}@example.com",
+        "phone": "3331234567", "tax_code": "RSSMRA80A01H501U",
+        "address": {"street": "Via Roma 1", "city": "Milano", "zip_code": "20100", "province": "MI"}})
+    assert rc.status_code in (200, 201), rc.text
     r = s.post(f"{BASE_URL}/api/quotes", headers=admin_h, json={
-        "lead_id": seed_lead, "title": "TEST_M3 First Quote"
+        "lead_id": seed_lead, "customer_id": rc.json()["id"], "title": "TEST_M3 First Quote",
+        "site_address": {"street": "Via Cantiere 9", "city": "Monza", "zip_code": "20900", "province": "MB"},
     })
     assert r.status_code in (200, 201), r.text
     q = r.json()
@@ -288,9 +296,9 @@ def test_convert_to_contract(s, admin_h, created_quote):
     c = r.json()
     assert c["number"].startswith("CON-")
     assert c["quote_id"] == qid
-    assert c["quote_snapshot"].get("lines")
+    assert (c["quote_snapshot"].get("economics") or {}).get("lines")  # msg 803: lines sotto economics
     assert c["quote_snapshot"].get("openings") is not None
-    assert c["quote_snapshot"].get("totals")
+    assert c["quote_snapshot"].get("quote_totals")
     assert c["quote_snapshot"].get("quote_number")
     created_quote["_contract_id"] = c["id"]
 

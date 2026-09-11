@@ -163,10 +163,12 @@ class TestGoldenScenarios:
         fs = compute_financial_snapshot(quote)
         assert fs["pre_commission_margin"] == 25.0
         assert fs["margin_band"] == "BUONO"
-        assert fs["commission_rate"] == 0.10
-        assert fs["commission_gross"] == 1_000.0
-        assert fs["final_company_contribution"] == 1_500.0
-        assert fs["final_company_margin"] == 15.0
+        # policy v3 (msg 796/802): sconto 0 → cap 15%, floor >15% → actual = 9.99% → POST 15.01%
+        assert fs["commission_rate"] == 0.0999
+        assert fs["commission_gross"] == 999.0
+        assert fs["final_company_contribution"] == 1_501.0
+        assert fs["final_company_margin"] == 15.01
+        assert fs["discount_status"] == "LOW_MARGIN"
 
     def test_critico_no_commission_defined(self):
         """§15 — MARGIN<8% → commission_rate=None, status=AUTHORIZATION_REQUIRED."""
@@ -176,12 +178,12 @@ class TestGoldenScenarios:
         fs = compute_financial_snapshot(quote)
         assert fs["pre_commission_margin"] == 5.0
         assert fs["margin_band"] == "CRITICO"
-        assert fs["commission_rate"] is None
-        assert fs["commission_gross"] is None
-        assert fs["commission_status"] == "AUTHORIZATION_REQUIRED"
-        # §15 — NON inventare un final margin
-        assert fs["final_company_contribution"] is None
-        assert fs["final_company_margin"] is None
+        # policy v3 (msg 802): POST <= 15% → BLOCKED, commissione 0, nessuna commissione "inventata"
+        assert fs["commission_rate"] == 0.0
+        assert fs["commission_gross"] == 0.0
+        assert fs["commission_status"] == "BLOCKED_MARGIN_FLOOR"
+        assert fs["discount_status"] == "BLOCKED"
+        assert fs["final_company_margin"] == 5.0
 
     def test_empty_quote(self):
         """No lines, no revenue → margin=None, band=UNKNOWN."""
@@ -203,9 +205,9 @@ class TestGoldenScenarios:
         # Applica sconto simulato: subtotal 9990 con stesso costo
         base["subtotal"] = 9_998.0
         fs2 = compute_financial_snapshot(base)
-        # (9998-6999)/9998 = 29.996% -> BUONO
+        # (9998-6999)/9998 = 29.996% -> BUONO (fascia diagnostica); commissione modulare: cap 15% → compat 14.98%
         assert fs2["margin_band"] == "BUONO"
-        assert fs2["commission_rate"] == 0.10
+        assert fs2["commission_rate"] == 0.1498
 
 
 class TestRBACRedaction:
@@ -242,10 +244,10 @@ class TestRBACRedaction:
     def test_commerciale_sees_margin_and_commission(self):
         snap = self._sample_snapshot()
         red = redact_financial_snapshot_for_role(snap, is_admin=False)
-        # msg 396 §6 — commerciale vede TACHOMETER (final_company_margin), non pre_commission
-        assert red["tachometer_value"] == snap["final_company_margin"]
-        assert red["margin_band"] == "OTTIMO"
+        # msg 801 — commerciale NON vede alcun margine (né tachometer, né fascia): solo commissione + sconti
+        assert "tachometer_value" not in red and "margin_band" not in red and "final_company_margin" not in red
         assert red["commission_rate"] == 0.15
+        assert red["actual_commission_rate"] == 0.15
         assert red["commission_gross"] == 1_500.0
         assert red["commission_status"] == "OK"
         assert red["net_revenue_ex_vat"] == 10_000.0
@@ -302,5 +304,5 @@ class TestPolicyVersioning:
         ]})
         # msg 395 bump: v2 include ritenuta d'acconto
         assert fs["margin_policy_version"] == "margin_policy_v2_2026_02"
-        assert fs["commission_policy_version"] == "commission_policy_v1_2026_02"
+        assert fs["commission_policy_version"] == "commission_policy_v3_modular_floor15_2026_09"
         assert fs["commission_base_policy"] == COMMISSION_BASE_POLICY == "NET_REVENUE_EX_VAT"

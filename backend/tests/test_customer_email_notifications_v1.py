@@ -33,7 +33,8 @@ def customers():
         for tag in ("a", "b"):
             cid = str(uuid.uuid4())
             await db.customers.insert_one({"_id": cid, "tenant_id": TENANT, "first_name": f"Cust{tag.upper()}", "last_name": "Test", "email": f"reg-cust{tag}-{cid[:6]}@example.com",
-                                           "phone": "+39 333 0000000", "customer_type": "private", "status": "active", "deleted_at": None, "created_at": "2026-01-01T00:00:00+00:00"})
+                                           "phone": "+39 333 0000000", "customer_type": "private", "status": "active", "deleted_at": None, "created_at": "2026-01-01T00:00:00+00:00",
+                                           "tax_code": "RSSMRA80A01H501U", "address": {"street": "Via Roma 1", "city": "Milano", "zip_code": "20100", "province": "MI"}})  # msg 803 §18 presign
             ids.append(cid)
         return ids
     ids = asyncio.run(run())
@@ -81,6 +82,7 @@ def test_quote_document_and_order_status_emails(h, customers):
     site = requests.post(f"{BASE}/sites", json={"name": "Cantiere email", "address": "Via Roma", "street_number": "10", "postal_code": "20100", "city": "Milano",
                                               "province": "MI", "floor": "1", "has_elevator": True, "site_contact_phone": "3331234567", "customer_id": ca}, headers=h).json()
     q = requests.post(f"{BASE}/quotes", json={"title": "Email events", "customer_id": ca, "site_id": site["id"]}, headers=h).json(); qid = q["id"]
+    requests.post(f"{BASE}/quotes/{qid}/lines", json={"description": "Finestra", "category": "window", "quantity": 1, "base_price": 1000.0, "internal_cost": 400.0}, headers=h)  # msg 803 §18
     op = requests.post(f"{BASE}/quotes/{qid}/openings", json={"code": "V1", "room": "Cucina", "width_mm": 1200, "height_mm": 1400}, headers=h).json()
     cfg = {"window_type": "WINDOW", "number_of_sashes": 2, "width_mm": 1200, "height_mm": 1400, "color_mode": "WHITE_MASS", "color_internal": "003", "color_external": "003",
            "color_internal_name": "BIANCO MASSA", "color_external_name": "BIANCO MASSA", "glass_type": "DOUBLE_SATIN", "opening_configuration": "ANTA_RIBALTA", "quantity": 1}

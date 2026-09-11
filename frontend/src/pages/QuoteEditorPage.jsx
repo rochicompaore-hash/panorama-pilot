@@ -17,6 +17,7 @@ import { ConflictModal } from "@/components/app/ConflictModal";
 import { MultiCategoryConfiguratorDialog } from "@/components/app/MultiCategoryConfiguratorDialog";
 import { ProductVisualThumb } from "@/components/app/ProductVisualSVG";
 import { MarginTachometer } from "@/components/app/MarginTachometer";
+import { CommissionTachometer } from "@/components/app/CommissionTachometer";
 import { AutosaveIndicator } from "@/components/app/AutosaveIndicator";
 import { useConflict, getVersion, withVersion, withForce } from "@/hooks/useConflict";
 import { useAutosave } from "@/hooks/useAutosave";
@@ -304,6 +305,7 @@ export default function QuoteEditorPage() {
           {editable && has("quotes.send") && q.quote_status === "draft" && <Button variant="outline" className="rounded-sm" onClick={async () => { await autosave.flushNow(); changeStatus.mutate("sent"); }} data-testid="quote-send"><PaperPlaneTilt size={14} className="mr-1" /> Invia</Button>}
           {q.quote_status === "sent" && <Button variant="outline" className="rounded-sm" onClick={() => changeStatus.mutate("accepted")} data-testid="quote-accept"><Check size={14} className="mr-1" /> Accettato</Button>}
           {["accepted", "approved"].includes(q.quote_status) && !q.contract_id && has("quotes.convert_contract") && <Button className="rounded-sm bg-emerald-600 hover:bg-emerald-700" onClick={async () => { await autosave.flushNow(); convert.mutate(); }} data-testid="quote-convert"><FileText size={14} className="mr-1" /> Genera contratto</Button>}
+          {["accepted", "approved", "converted"].includes(q.quote_status) && q.contract_id && <Button className="rounded-sm" variant="outline" onClick={() => navigate(`/contracts/${q.contract_id}`)} data-testid="quote-open-contract"><FileText size={14} className="mr-1" /> Apri contratto</Button>}
           {editable && q.is_current && <Button variant="outline" className="rounded-sm" onClick={async () => { await autosave.flushNow(); revise.mutate(); }} data-testid="quote-revise"><ArrowsClockwise size={14} className="mr-1" /> Nuova revisione</Button>}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -700,100 +702,89 @@ function MarginPanel({ financial, isAdmin }) {
   if (!fs) {
     return (
       <Card className="rounded-sm border-border p-6" data-testid="margin-panel-empty">
-        <div className="overline mb-2">Marginalità</div>
-        <div className="text-xs text-muted-foreground">Aggiungi almeno una riga per calcolare il margine.</div>
+        <div className="overline mb-2">Commissione e sconti</div>
+        <div className="text-xs text-muted-foreground">Aggiungi almeno una riga per calcolare la commissione.</div>
       </Card>
     );
   }
-  const pct = fs.tachometer_value;   // msg 396 §4/§13 — FINAL_COMPANY_MARGIN
-  const band = fs.margin_band;
-  const commRate = fs.commission_rate;
+  const commRate = fs.actual_commission_rate ?? fs.commission_rate;
   const commGross = fs.commission_gross;
-  const status = fs.commission_status;
-  const isCritical = status === "AUTHORIZATION_REQUIRED";
-  const isEneaIncomplete = fs.financial_snapshot_status === "INCOMPLETE"
-    && (fs.financial_snapshot_errors || []).includes("MISSING_INTERNAL_COST_ENEA");
+  const blocked = fs.discount_status === "BLOCKED";
+  const isIncomplete = fs.financial_snapshot_status === "INCOMPLETE";
+  const postPct = fs.post_margin_percent;
+  const postClass = postPct == null ? null : postPct <= 15 ? "BLOCKED" : postPct < 20 ? "LOW_MARGIN" : "NORMAL";
 
   return (
     <Card className="rounded-sm border-border p-6" data-testid="margin-panel">
       <div className="flex items-center justify-between mb-2">
-        <div className="overline">Margine aziendale</div>
+        <div className="overline">{isAdmin ? "Margine aziendale" : "Commissione prevista"}</div>
         {frozen && <Badge className="rounded-sm bg-slate-500/20 text-slate-700 text-[10px]">CONGELATA</Badge>}
       </div>
-      <MarginTachometer marginPct={pct} band={band} />
 
-      {isEneaIncomplete && (
+      {isAdmin ? (
+        <MarginTachometer marginPct={fs.tachometer_value} band={fs.margin_band} />
+      ) : (
+        <CommissionTachometer ratePct={commRate != null ? commRate * 100 : null} />
+      )}
+
+      {isIncomplete && (
         <div className="mt-3 rounded-sm border border-amber-500 bg-amber-500/10 p-3" data-testid="margin-enea-incomplete">
-          <div className="text-xs font-bold text-amber-800">MARGINE NON DEFINITIVO</div>
-          <div className="text-[11px] text-amber-800/90 mt-0.5">Costo interno Pratica ENEA non configurato. La commissione mostrata non è finale.</div>
+          <div className="text-xs font-bold text-amber-800">COMMISSIONE NON DEFINITIVA</div>
+          <div className="text-[11px] text-amber-800/90 mt-0.5">Alcuni costi interni non sono ancora configurati.</div>
         </div>
       )}
 
-      {isCritical && (
-        <div className="mt-3 rounded-sm border border-destructive bg-destructive/10 p-3" data-testid="margin-critical-banner">
-          <div className="text-xs font-bold text-destructive">PREVENTIVO DA AUTORIZZARE</div>
-          <div className="text-[11px] text-destructive/80 mt-0.5">Margine sotto la soglia minima (8%). La commissione non è definita automaticamente.</div>
-        </div>
-      )}
-
-      {/* Commercial view (ALWAYS visible — commercial sees this subset even as admin) */}
+      {/* Commercial view — sconto effettivo / commissione / sconto massimo (msg 801). NESSUN margine. */}
       <div className="mt-4 pt-3 border-t space-y-1.5 text-sm" data-testid="margin-panel-commercial">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Ricavo netto</span>
-          <span className="font-mono-plex">{fmtEUR(fs.net_revenue_ex_vat)}</span>
+        <div className="flex justify-between" data-testid="margin-panel-effective-discount">
+          <span className="text-muted-foreground">Sconto effettivo</span>
+          <span className="font-mono-plex font-bold">{fmtPct(fs.effective_discount_percent)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Commissione</span>
-          <span className="font-mono-plex" data-testid="margin-panel-commission-rate">
-            {commRate != null ? fmtPct(commRate * 100) : "n/d"}
-          </span>
+          <span className="text-muted-foreground">Commissione prevista</span>
+          <span className="font-mono-plex" data-testid="margin-panel-commission-rate">{commRate != null ? fmtPct(commRate * 100) : "n/d"}</span>
         </div>
         <div className="flex justify-between">
-          <span className="font-bold">Commissione lorda stimata</span>
-          <span className="font-mono-plex font-black" data-testid="margin-panel-commission-gross">
-            {commGross != null ? fmtEUR(commGross) : "—"}
-          </span>
+          <span className="text-muted-foreground">Commissione lorda stimata</span>
+          <span className="font-mono-plex font-black" data-testid="margin-panel-commission-gross">{commGross != null ? fmtEUR(commGross) : "—"}</span>
         </div>
-        {fs.effective_discount_percent != null && (
-          <div className="flex justify-between" data-testid="margin-panel-effective-discount">
-            <span className="text-muted-foreground">Sconto effettivo applicato</span>
-            <span className="font-mono-plex">{fmtPct(fs.effective_discount_percent)}</span>
-          </div>
-        )}
-        {fs.max_discount_without_approval_percent != null && (
-          <div className="flex justify-between" data-testid="margin-panel-max-discount">
-            <span className="text-muted-foreground">Sconto massimo concedibile</span>
-            <span className="font-mono-plex">{fmtPct(fs.max_discount_without_approval_percent)}</span>
-          </div>
-        )}
-        {fs.discount_status === "BLOCKED" && (
-          <div className="rounded-sm border border-destructive bg-destructive/10 p-2 text-[11px] font-bold text-destructive" data-testid="margin-discount-blocked">
-            SCONTO BLOCCATO — margine aziendale sotto il {fs.margin_floor_percent ?? 20}%
-          </div>
-        )}
+        <div className="flex justify-between" data-testid="margin-panel-max-discount">
+          <span className="text-muted-foreground">Sconto massimo disponibile</span>
+          <span className="font-mono-plex">{fmtPct(fs.max_discount_without_approval_percent)}</span>
+        </div>
+        <div className={`rounded-sm border p-2 text-[11px] font-bold ${blocked ? "border-destructive bg-destructive/10 text-destructive" : "border-emerald-600/40 bg-emerald-500/10 text-emerald-800"}`}
+             data-testid={blocked ? "margin-discount-blocked" : "margin-price-allowed"}>
+          {blocked ? "PREZZO NON CONSENTITO — riduci lo sconto o rivedi il prezzo" : "PREZZO CONSENTITO"}
+        </div>
         {fs.director_approval_required && (
           <div className="rounded-sm border border-amber-500 bg-amber-500/10 p-2 text-[11px] font-bold text-amber-800" data-testid="margin-director-approval">
-            SCONTO &gt; 30% — APPROVAZIONE DIREZIONE RICHIESTA (commissione 0%)
+            SCONTO &gt; 30% — AUTORIZZAZIONE DIREZIONE RICHIESTA (commissione 0%)
           </div>
         )}
       </div>
 
-      {/* ADMIN MASTER ONLY — dual margin (msg 800 §9) */}
+      {/* ADMIN MASTER ONLY — dual margin (msg 800 §9) + breakdown */}
       {isAdmin && fs.pre_margin_amount != null && (
         <div className="mt-4 pt-3 border-t space-y-2 text-xs" data-testid="margin-panel-profitability">
-          <div className="text-[10px] font-mono-plex text-muted-foreground uppercase">Redditività commessa · Admin Master</div>
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-mono-plex text-muted-foreground uppercase">Redditività commessa · Admin Master</div>
+            {postClass && (
+              <Badge className={`rounded-sm text-[10px] ${postClass === "NORMAL" ? "bg-emerald-500/15 text-emerald-800" : postClass === "LOW_MARGIN" ? "bg-amber-500/15 text-amber-800" : "bg-destructive/15 text-destructive"}`} data-testid="margin-post-class">
+                {postClass === "NORMAL" ? "NORMALE" : postClass === "LOW_MARGIN" ? "MARGINALITÀ BASSA" : "CRITICA / BLOCCATA"}
+              </Badge>
+            )}
+          </div>
           <div className="flex justify-between items-baseline" data-testid="margin-pre">
             <span className="text-muted-foreground">Margine pre ritenuta/commissione</span>
             <span className="font-mono-plex font-bold">{fmtEUR(fs.pre_margin_amount)} <span className="text-muted-foreground">| {fmtPct(fs.pre_margin_percent)}</span></span>
           </div>
           <div className="flex justify-between items-baseline" data-testid="margin-post">
             <span className="font-bold">Margine finale impresa</span>
-            <span className="font-mono-plex font-black text-[hsl(200_82%_45%)]">{fs.post_margin_amount != null ? fmtEUR(fs.post_margin_amount) : "—"} <span className="text-muted-foreground font-normal">| {fs.post_margin_percent != null ? fmtPct(fs.post_margin_percent) : "n/d"}</span></span>
+            <span className="font-mono-plex font-black text-[hsl(200_82%_45%)]">{fs.post_margin_amount != null ? fmtEUR(fs.post_margin_amount) : "—"} <span className="text-muted-foreground font-normal">| {postPct != null ? fmtPct(postPct) : "n/d"}</span></span>
           </div>
         </div>
       )}
 
-      {/* Admin-only breakdown (§8 msg 395 + §7 msg 396) */}
       {isAdmin && fs.supply_cost != null && (
         <div className="mt-4 pt-3 border-t border-dashed space-y-1 text-xs" data-testid="margin-panel-admin">
           <div className="text-[10px] font-mono-plex text-muted-foreground uppercase mb-1">Riservato Direzione</div>
@@ -805,24 +796,14 @@ function MarginPanel({ financial, isAdmin }) {
           {fs.withholding_applicable && (
             <div className="flex justify-between" data-testid="margin-panel-withholding"><span className="text-muted-foreground">Ritenuta d'acconto ({(fs.withholding_rate * 100).toFixed(0)}%)</span><span className="font-mono-plex">− {fmtEUR(fs.withholding_cost)}</span></div>
           )}
-          <div className="flex justify-between pt-1 border-t"><span className="font-bold">Margine pre-commissione</span>
-            <span className="font-mono-plex font-bold">{fmtEUR(fs.pre_commission_contribution)} <span className="text-muted-foreground">({fmtPct(fs.pre_commission_margin)})</span></span></div>
           {commGross != null && (
-            <div className="flex justify-between"><span className="text-muted-foreground">− Commissione commerciale</span><span className="font-mono-plex">− {fmtEUR(commGross)}</span></div>
-          )}
-          {fs.final_company_contribution != null && (
-            <>
-              <div className="flex justify-between pt-1 border-t"><span className="font-bold">Restante azienda</span>
-                <span className="font-mono-plex font-black text-[hsl(200_82%_45%)]">{fmtEUR(fs.final_company_contribution)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Margine aziendale finale</span><span className="font-mono-plex font-bold">{fmtPct(fs.final_company_margin)}</span></div>
-            </>
+            <div className="flex justify-between"><span className="text-muted-foreground">Commissione commerciale</span><span className="font-mono-plex">− {fmtEUR(commGross)}</span></div>
           )}
         </div>
       )}
     </Card>
   );
 }
-
 // ---------------------------------------------------------------------------
 // Installation Mode V1 (msg 393 §17) — selector top-preventivo
 // ---------------------------------------------------------------------------

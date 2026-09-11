@@ -75,10 +75,10 @@ def test_rbac_commercial_gets_reduced_financial_snapshot(admin, commercial):
     assert "subtotal" in body and "total" in body
     assert body.get("global_discount_amount") == 1000
     fs = body.get("financial_snapshot") or {}
-    # tachometer stays visible
-    assert "tachometer_value" in fs
-    # sensitive fields MUST NOT be exposed (per PO msg 407 spec)
-    for forbidden in ("supply_cost", "other_direct_costs", "pre_commission_margin",
+    # msg 801 — commerciale vede commissione + sconti, NESSUN margine (tachometer rimosso)
+    assert "actual_commission_rate" in fs and "effective_discount_percent" in fs
+    for forbidden in ("supply_cost", "other_direct_costs", "pre_commission_margin", "tachometer_value",
+                      "final_company_margin", "margin_band", "pre_margin_percent", "post_margin_percent",
                       "pre_commission_contribution", "final_company_contribution"):
         assert forbidden not in fs, f"RBAC leak: '{forbidden}' exposed to commercial in financial_snapshot: {fs}"
     # Observability: commission_gross / final_company_margin / net_revenue_ex_vat currently

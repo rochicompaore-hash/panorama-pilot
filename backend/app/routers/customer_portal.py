@@ -292,12 +292,24 @@ async def cp_documents(job_id: Optional[str] = None, u: dict = Depends(get_curre
     items = []
     async for d in db.quote_pdfs.find({"tenant_id": u["tenant_id"], "quote_id": {"$in": job_ids}, "kind": "definitive", "invalidated_at": None}).sort("generated_at", -1):
         items.append({"id": d["_id"], "job_id": d["quote_id"], "category": "PREVENTIVO", "filename": d.get("filename"), "generated_at": d.get("generated_at"), "size_bytes": d.get("size_bytes")})
+    # msg 803 §15 — contratto firmato (ACTIVE) disponibile come documento cliente
+    async for c in db.contracts.find({"tenant_id": u["tenant_id"], "quote_id": {"$in": job_ids}, "contract_status": "signed", "deleted_at": None}).sort("signed_at", -1):
+        items.append({"id": f"contract:{c['_id']}", "job_id": c["quote_id"], "category": "CONTRATTO", "filename": f"Contratto {c.get('number')}.pdf",
+                      "generated_at": c.get("signed_at"), "contract_number": c.get("number"), "lifecycle_status": c.get("lifecycle_status")})
     return {"items": items}
 
 
 @router.get("/documents/{pid}/download")
 async def cp_document_download(pid: str, u: dict = Depends(get_current_customer)):
     db = get_db()
+    if pid.startswith("contract:"):
+        c = await db.contracts.find_one({"_id": pid.split(":", 1)[1], "tenant_id": u["tenant_id"], "contract_status": "signed", "deleted_at": None})
+        if not c or not await db.quotes.find_one({"_id": c.get("quote_id"), **_job_query(u)}):
+            raise HTTPException(status_code=404, detail="Documento non trovato")
+        from app.services.contract_pdf import render_contract_pdf
+        pdf = render_contract_pdf(c, watermark="signed")
+        return Response(content=pdf, media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="Contratto {c.get("number")}.pdf"', "Cache-Control": "private, no-store"})
     d = await db.quote_pdfs.find_one({"_id": pid, "tenant_id": u["tenant_id"], "kind": "definitive"})
     if not d or not await db.quotes.find_one({"_id": d.get("quote_id"), **_job_query(u)}):
         raise HTTPException(status_code=404, detail="Documento non trovato")

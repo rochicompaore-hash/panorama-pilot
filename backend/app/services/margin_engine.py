@@ -23,8 +23,10 @@ import math
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 MARGIN_POLICY_VERSION = "margin_policy_v2_2026_02"
-COMMISSION_POLICY_VERSION = "commission_policy_v2_modular_by_discount_2026_09"
-MARGIN_FLOOR_PERCENT = 20.0
+COMMISSION_POLICY_VERSION = "commission_policy_v3_modular_floor15_2026_09"
+MARGIN_FLOOR_PERCENT = 15.0          # msg 802 — POST_MARGIN > 15.00% ALLOWED, <= 15.00% BLOCKED (strict)
+LOW_MARGIN_THRESHOLD_PERCENT = 20.0  # 15 < POST < 20 → LOW_MARGIN (consentito, nessuna approvazione)
+FLOOR_EPSILON = 0.0001               # 0.01 punti % — garantisce POST strettamente > floor
 DIRECTOR_APPROVAL_DISCOUNT_PERCENT = 30.0
 # (sconto massimo della fascia incluso, cap commissione) — msg 796
 DISCOUNT_COMMISSION_BANDS = [(5.0, 0.15), (10.0, 0.12), (15.0, 0.10), (20.0, 0.08), (25.0, 0.05), (30.0, 0.03)]
@@ -103,14 +105,14 @@ def effective_discount_percent(quote: Dict[str, Any]) -> float:
 
 
 def max_discount_for_margin_floor(commercial_subtotal: float, direct_costs: float, wh_rate: float) -> Optional[float]:
-    """Sconto massimo (%) tale che il margine pre-commissione resti ≥ floor (la commissione si adatta fino a 0)."""
+    """Sconto massimo (%) tale che POST_MARGIN resti STRETTAMENTE > floor (commissione modulare si adatta fino a 0)."""
     if commercial_subtotal <= 0:
         return None
-    k = (1.0 - MARGIN_FLOOR_PERCENT / 100.0) - wh_rate
+    k = (1.0 - MARGIN_FLOOR_PERCENT / 100.0 - FLOOR_EPSILON) - wh_rate
     if k <= 0:
         return 0.0
     d = 1.0 - direct_costs / (k * commercial_subtotal)
-    return round(max(0.0, min(100.0, d * 100.0)), 2)
+    return max(0.0, min(100.0, math.floor(d * 100.0 * 100.0 + 1e-9) / 100.0))
 
 
 # ---------------------------------------------------------------------------
@@ -273,16 +275,16 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
     cap, director_approval = commission_cap_for_discount(eff_discount)
     max_compat = None
     if net_revenue > 0:
-        # floor (non round) a 4 dp: la commissione non deve MAI far scendere il POST sotto il 20% per arrotondamento
-        max_compat = max(0.0, math.floor((pre_commission_contribution - net_revenue * MARGIN_FLOOR_PERCENT / 100.0) / net_revenue * 10_000) / 10_000)
+        # floor (non round) a 4 dp meno epsilon: il POST deve restare STRETTAMENTE > floor (15.00% → BLOCKED, 15.01% → ALLOWED)
+        max_compat = max(0.0, math.floor((pre_commission_contribution / net_revenue - MARGIN_FLOOR_PERCENT / 100.0 - FLOOR_EPSILON) * 10_000 + 1e-9) / 10_000)
     rate = None if pre_commission_margin is None else round(min(cap, max_compat if max_compat is not None else cap), 4)
-    if pre_commission_margin is not None and pre_commission_margin < MARGIN_FLOOR_PERCENT:
-        discount_status, status = "BLOCKED", "BLOCKED_MARGIN_FLOOR"
-    elif pre_commission_margin is None:
+    post_margin_full = None if pre_commission_margin is None else pre_commission_margin - (rate or 0) * 100.0
+    if post_margin_full is None:
         discount_status = "NO_DATA"
+    elif post_margin_full <= MARGIN_FLOOR_PERCENT + 1e-9:
+        discount_status, status = "BLOCKED", "BLOCKED_MARGIN_FLOOR"
     else:
-        # margine finale (post-commissione) è ≥ floor per costruzione; 20–20.99 = critico
-        discount_status = "CRITICAL" if (pre_commission_margin - (rate or 0) * 100.0) < MARGIN_FLOOR_PERCENT + 1.0 else "ALLOWED"
+        discount_status = "LOW_MARGIN" if post_margin_full < LOW_MARGIN_THRESHOLD_PERCENT else "ALLOWED"
         status = "DIRECTOR_APPROVAL_REQUIRED" if director_approval else "OK"
     commercial_subtotal = float(quote.get("commercial_subtotal") or net_revenue)
     max_disc_floor = max_discount_for_margin_floor(commercial_subtotal, supply + install + other, wh_rate)
@@ -385,11 +387,9 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
 # status. Nothing else — no costs, no company contribution, no policy versions.
 COMMERCIAL_SAFE_KEYS = {
     "net_revenue_ex_vat",
-    # msg 396 §6 — commerciale vede TACHIMETRO (final_company_margin) e commissione
-    "final_company_margin",
-    "tachometer_value",
-    "margin_band",
+    # msg 801 — NESSUN margine aziendale (né %, né €, né fascia) al commerciale: solo commissione + sconti
     "commission_rate",
+    "actual_commission_rate",
     "commission_gross",
     "commission_status",
     # msg 796 — commerciale vede sconto effettivo, commissione, margine finale, sconto massimo (nessun costo)
@@ -399,7 +399,6 @@ COMMERCIAL_SAFE_KEYS = {
     "director_approval_required",
     "max_discount_available_percent",
     "max_discount_without_approval_percent",
-    "margin_floor_percent",
     # policy version + snapshot health hint
     "commission_policy_version",
     "financial_snapshot_status",

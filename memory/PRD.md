@@ -1,3 +1,38 @@
+## Iter 55 — STABILIZZAZIONE FINALE + E2E + MASTER CAPABILITY GAP AUDIT V1 (11 Set 2026)
+
+**Autorizzato:** PO "CONFERMA PO — OPZIONE B" + "PO DIRECTIVE MASTER CAPABILITY GAP AUDIT V1" (audit only).
+
+### Consegnato
+- Fix SOLO fixture/setup test legacy incompatibili con pre-firma check msg 803 §18 (NESSUNA modifica business logic): `test_workflow_m6_wf.py` (IndentationError riga 330), `m3_quotes_test.py` (cliente completo + site_address; assert snapshot `economics.lines` / `quote_totals`), `test_blocco_bcd_iter20.py` (fixture crea preventivo accettato completo; rimosso `pytest.skip` su PRESIGN — non si dichiara verde ciò che è escluso), `test_customer_email_notifications_v1.py` (tax_code + address sui clienti fixture).
+- FULL_PYTEST: **1224 passed, 9 failed, 1 error, 56 skipped** → RELATED_FAILURES = 0. KNOWN_UNRELATED: 429 brute-force login (2), race xdist su utente viewer/contatore clienti in `security_audit_test` (7, passano in seriale `-n0`), 1 read timeout infra.
+- CONTRACT_E2E + FAST_FLOW_E2E via testing agent `iteration_47.json`: PASS (backend 42/42 incl. 12 nuovi in `test_iter47_po_verification.py`; frontend 1366×768 PASS su quote-convert → contract-viewer, presign-ok, PDF iframe, Fast Flow A/B, inline create senza duplicati, RBAC commerciale no leak, tenant isolation).
+- **APPLICATION_CODE = STRICT_FEATURE_FREEZE. HARD STOP.**
+- Audit: `/app/memory/PANORAMA_MASTER_CAPABILITY_MATRIX_V1.md` (22 domini, control tower, top 20/30/20/20, roadmap P0–P4). Completamento medio ~52%.
+
+---
+
+## Iter 53 — MODULAR COMMISSION + ADMIN MASTER DUAL MARGIN + COMMERCIAL COMMISSION TACHOMETER + FLOOR >15% (Set 2026)
+
+**Autorizzato:** msg 796 (commissione modulare per sconto), msg 800 (Admin Master dual margin), msg 801 (UI commerciale: rimozione margine + tachimetro commissione), msg 802 (floor POST_MARGIN > 15%).
+
+### Consegnato
+- `margin_engine.py`: `effective_discount_percent` (global + promo + FULL_UPFRONT vs `commercial_subtotal`), fasce cap 15/12/10/8/5/3/0 (+DIRECTOR_APPROVAL >30%), `ACTUAL_COMMISSION_RATE = min(cap, compat floor)` con floor **strettamente > 15.00%** (epsilon 0.01pp, floor a 4dp), `discount_status ∈ {BLOCKED (<=15), LOW_MARGIN (15–20), ALLOWED (>=20), NO_DATA}`, `max_discount_for_margin_floor` (>15 strict). Snapshot esteso: `pre_margin_amount/percent` (NO ritenuta/commissione), `post_margin_amount/percent` (= FINAL), `actual_commission_rate`, `commercial_commission`. `commission_policy_version = commission_policy_v3_modular_floor15_2026_09`.
+- RBAC 3 livelli server-side: **Admin Master** (`is_superadmin` o ruolo Super Admin / tenant_owner → `is_admin_master()`) = snapshot completo; **Commerciale e Admin Azienda** = solo `COMMERCIAL_SAFE_KEYS` (commissione, sconto effettivo, sconto max, stato) — NESSUN margine (%/€/fascia/tachometer). Marker `__ADMIN_MASTER__` in `_get_perms`.
+- `quotes.py`: `_raise_if_price_blocked` (400 `DISCOUNT_BLOCKED_MARGIN_FLOOR`, messaggio senza %), pre-check PRIMA di persistere su PATCH sconto/pagamento (bug fix: prima lo sconto bloccato veniva salvato), gate su `update_line` (base_price/discount). Nessun bypass superadmin.
+- PDF leak fix: `pdf_renderer.build_snapshot` strip ricorsivo di `position_internal_cost_total`, `standard_services_internal_cost_total`, `internal_cost_total`, `unit_internal_reference_price`, `simple_snapshot`, `commercial_snapshot`.
+- Frontend: `CommissionTachometer.jsx` (0–15%, tick 0/3/5/8/10/12/15, zone neutre) per commerciale; `MarginPanel` → commerciale: sconto effettivo / commissione / sconto max / PREZZO CONSENTITO|NON CONSENTITO / badge >30%; Admin Master: MarginTachometer + REDDITIVITÀ COMMESSA (pre €|%, post €|%, badge NORMALE/MARGINALITÀ BASSA/CRITICA) + Riservato Direzione. Prop `isAdmin = financial.is_admin_master_view`.
+- Utente test `admin_azienda_test@infissiexpress.com` (Admin Azienda, non master).
+
+### Test
+- `tests/test_margin_dynamic_commission.py` 59 test (boundary 12 fasce, FULL_UPFRONT, ritenuta post-sconto, floor 14.99/15/15.01/16/19.99/20/25, cap10→guard7, max discount, dual margin, API redaction 3 ruoli, cross-owner, PDF no-leak, edit price gate, freeze).
+- Suite legacy aggiornata alla policy v3. Totale: 1196+ passed; residui non correlati: `test_p0_formula_technical_quoteline` (quote fixture ormai `converted`), `test_parametric_m6` 403, `test_prod_gate_iter41` 429 rate-limit.
+
+### Stato
+- APPLICATION_CODE = STRICT_FEATURE_FREEZE (in attesa deploy per SMTP reale).
+- PENDING PO (non iniziati): CUSTOMER → QUOTE FAST FLOW + SEARCHABLE CUSTOMER SELECTOR; ACCEPTED QUOTE → CONTRACT GENERATION V1.
+
+---
+
 ## Iter 52 — Margin Engine V2 (Ritenuta + Tachometer=Final + ENEA Guard) (Feb 2026)
 
 **Autorizzato:** Msg 395 + 396 + ENEA UI (post-P0 SUPPLY_COST).
