@@ -121,6 +121,7 @@ export default function QuoteEditorPage() {
     onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
   });
   const [discountPct, setDiscountPct] = React.useState(0);
+  const maxCommercialStep = financial?.financial_snapshot?.max_commercial_discount_step_percent ?? null;
   const [promoInput, setPromoInput] = React.useState("");
   React.useEffect(() => { if (q) { setDiscountPct(q.global_discount_source === "MANUAL" ? q.global_discount_value || 0 : 0); setPromoInput(q.promo_code || ""); } }, [q?.global_discount_value, q?.promo_code, q?.global_discount_source]); // eslint-disable-line react-hooks/exhaustive-deps
   const patchQuote = useMutation({
@@ -375,8 +376,17 @@ export default function QuoteEditorPage() {
                   <Label className="text-[10px] uppercase font-bold">Sconto / Codice promo (intero preventivo)</Label>
                   <div className="flex gap-2 items-end">
                     <div className="flex-1">
-                      <Label className="text-[10px] uppercase">Sconto %</Label>
-                      <Input type="number" min={0} max={100} step={0.5} disabled={!editable} value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} className="rounded-sm h-9" data-testid="quote-discount-pct-input" />
+                      <Label className="text-[10px] uppercase">Sconto % (max consentito {maxCommercialStep ?? "—"}%)</Label>
+                      <Select disabled={!editable} value={String(Math.round(Number(discountPct) || 0))} onValueChange={(v) => setDiscountPct(Number(v))}>
+                        <SelectTrigger className="rounded-sm h-9" data-testid="quote-discount-pct-select"><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-64">
+                          {Array.from({ length: 31 }, (_, i) => i).map((i) => (
+                            <SelectItem key={i} value={String(i)} disabled={maxCommercialStep != null && i > maxCommercialStep} data-testid={`discount-opt-${i}`}>
+                              {i}%{maxCommercialStep != null && i > maxCommercialStep ? " — non consentito" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <Button type="button" size="sm" variant="outline" className="rounded-sm h-9" disabled={!editable} onClick={() => patchQuote.mutate({ global_discount_percent: Number(discountPct || 0) })} data-testid="quote-discount-apply-btn">Applica</Button>
                   </div>

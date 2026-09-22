@@ -1,0 +1,1106 @@
+[
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante DOUBLE_STANDARD col=WHITE_MASS",
+"OK sale=1016.7 cost=338.9"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante DOUBLE_STANDARD col=003",
+"OK sale=1016.7 cost=338.9"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante DOUBLE_STANDARD col=100",
+"OK sale=1028.77 cost=342.92"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(incomplete:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante TRIPLE_SATIN col=WHITE_MASS",
+"OK sale=1302.43 cost=434.14"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante DOUBLE_STANDARD col=WHITE_MASS",
+"OK sale=1427.64 cost=475.88"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante DOUBLE_STANDARD col=003",
+"OK sale=1427.64 cost=475.88"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante DOUBLE_STANDARD col=100",
+"OK sale=1444.64 cost=481.55"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(incomplete:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante TRIPLE_SATIN col=WHITE_MASS",
+"OK sale=1880.67 cost=626.89"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante DOUBLE_STANDARD col=WHITE_MASS",
+"OK sale=1649.37 cost=549.79"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante DOUBLE_STANDARD col=003",
+"OK sale=1649.37 cost=549.79"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante DOUBLE_STANDARD col=100",
+"OK sale=1665.49 cost=555.16"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(incomplete:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante TRIPLE_SATIN col=WHITE_MASS",
+"OK sale=2126.54 cost=708.85"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante DOUBLE_STANDARD col=WHITE_MASS",
+"OK sale=2334.32 cost=778.11"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante DOUBLE_STANDARD col=003",
+"OK sale=2334.32 cost=778.11"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante DOUBLE_STANDARD col=100",
+"OK sale=2358.8 cost=786.27"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(incomplete:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante TRIPLE_SATIN col=WHITE_MASS",
+"OK sale=3090.89 cost=1030.3"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 1 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 2 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 3 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"WINDOW 4 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 1 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"DOOR_WINDOW 2 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"SLIDING_DOOR_WINDOW 2 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante DOUBLE_STANDARD col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante DOUBLE_STANDARD col=003",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante DOUBLE_STANDARD col=100",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante DOUBLE_STANDARD col=019",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"FINESTRE",
+"ProEvolution Restauro",
+"FORMULA_TECHNICAL",
+"CLASSIFIED",
+"VASISTAS_ONLY 1 ante TRIPLE_SATIN col=WHITE_MASS",
+"DISABLED_FAIL_CLOSED(not_available:)"
+],
+[
+"ZANZARIERE",
+"Zanzariera Switch 5",
+"AREA",
+"CLASSIFIED",
+"BASE color=ZC_BASE_DEFAULT 1200x1400",
+"OK sale=343.2 cost=114.4"
+],
+[
+"ZANZARIERE",
+"Zanzariera Switch 5",
+"AREA",
+"CLASSIFIED",
+"WOOD_EFFECT color=ZC_WOOD_DEFAULT 1200x1400",
+"OK sale=446.16 cost=148.72"
+],
+[
+"ZANZARIERE",
+"Zanzariera Switch 5",
+"AREA",
+"CLASSIFIED",
+"MARBLE color=ZC_MARBLE_DEFAULT 1200x1400",
+"OK sale=377.52 cost=125.84"
+],
+[
+"ZANZARIERE",
+"Zanzariera Switch 5",
+"AREA",
+"CLASSIFIED",
+"SPECIAL color=ZC_SPECIAL_DEFAULT 1200x1400",
+"OK sale=377.52 cost=125.84"
+],
+[
+"ZANZARIERE",
+"Zanzariera Skat",
+"AREA",
+"CLASSIFIED",
+"BASE color=ZC_BASE_DEFAULT 1200x1400",
+"OK sale=287.28 cost=95.76"
+],
+[
+"ZANZARIERE",
+"Zanzariera Skat",
+"AREA",
+"CLASSIFIED",
+"WOOD_EFFECT color=ZC_WOOD_DEFAULT 1200x1400",
+"OK sale=396.24 cost=132.08"
+],
+[
+"ZANZARIERE",
+"Zanzariera Skat",
+"AREA",
+"CLASSIFIED",
+"MARBLE color=ZC_MARBLE_DEFAULT 1200x1400",
+"OK sale=287.28 cost=95.76"
+],
+[
+"ZANZARIERE",
+"Zanzariera Skat",
+"AREA",
+"CLASSIFIED",
+"SPECIAL color=ZC_SPECIAL_DEFAULT 1200x1400",
+"OK sale=287.28 cost=95.76"
+],
+[
+"ZANZARIERE",
+"Zanzariera Uniklat",
+"AREA",
+"CLASSIFIED",
+"BASE color=ZC_BASE_DEFAULT 1200x1400",
+"OK sale=174.24 cost=58.08"
+],
+[
+"ZANZARIERE",
+"Zanzariera Uniklat",
+"AREA",
+"CLASSIFIED",
+"WOOD_EFFECT color=ZC_WOOD_DEFAULT 1200x1400",
+"OK sale=243.96 cost=81.32"
+],
+[
+"ZANZARIERE",
+"Zanzariera Uniklat",
+"AREA",
+"CLASSIFIED",
+"MARBLE color=ZC_MARBLE_DEFAULT 1200x1400",
+"OK sale=191.64 cost=63.88"
+],
+[
+"ZANZARIERE",
+"Zanzariera Uniklat",
+"AREA",
+"CLASSIFIED",
+"SPECIAL color=ZC_SPECIAL_DEFAULT 1200x1400",
+"OK sale=191.64 cost=63.88"
+],
+[
+"ZANZARIERE",
+"Zanzariera Unikver",
+"AREA",
+"CLASSIFIED",
+"BASE color=ZC_BASE_DEFAULT 1200x1400",
+"OK sale=108.66 cost=36.22"
+],
+[
+"ZANZARIERE",
+"Zanzariera Unikver",
+"AREA",
+"CLASSIFIED",
+"WOOD_EFFECT color=ZC_WOOD_DEFAULT 1200x1400",
+"OK sale=152.1 cost=50.7"
+],
+[
+"ZANZARIERE",
+"Zanzariera Unikver",
+"AREA",
+"CLASSIFIED",
+"MARBLE color=ZC_MARBLE_DEFAULT 1200x1400",
+"OK sale=119.55 cost=39.85"
+],
+[
+"ZANZARIERE",
+"Zanzariera Unikver",
+"AREA",
+"CLASSIFIED",
+"SPECIAL color=ZC_SPECIAL_DEFAULT 1200x1400",
+"OK sale=119.55 cost=39.85"
+],
+[
+"ZANZARIERE",
+"Zanzariera Unikcat",
+"AREA",
+"CLASSIFIED",
+"BASE color=ZC_BASE_DEFAULT 1200x1400",
+"OK sale=117.54 cost=39.18"
+],
+[
+"ZANZARIERE",
+"Zanzariera Unikcat",
+"AREA",
+"CLASSIFIED",
+"WOOD_EFFECT color=ZC_WOOD_DEFAULT 1200x1400",
+"OK sale=164.55 cost=54.85"
+],
+[
+"ZANZARIERE",
+"Zanzariera Unikcat",
+"AREA",
+"CLASSIFIED",
+"MARBLE color=ZC_MARBLE_DEFAULT 1200x1400",
+"OK sale=129.27 cost=43.09"
+],
+[
+"ZANZARIERE",
+"Zanzariera Unikcat",
+"AREA",
+"CLASSIFIED",
+"SPECIAL color=ZC_SPECIAL_DEFAULT 1200x1400",
+"OK sale=129.27 cost=43.09"
+],
+[
+"TAPPARELLE",
+"Tapparella PVC (3 varianti \u2014 \u00d73)",
+"AREA",
+"CLASSIFIED",
+"RAL color=RAL_STANDARD 1200x1400",
+"OK sale=176.4 cost=58.8"
+],
+[
+"TAPPARELLE",
+"Tapparella PVC (3 varianti \u2014 \u00d73)",
+"AREA",
+"CLASSIFIED",
+"LEGNO color=WOOD_EFFECT 1200x1400",
+"OK sale=201.6 cost=67.2"
+],
+[
+"TAPPARELLE",
+"Tapparella PVC (3 varianti \u2014 \u00d73)",
+"AREA",
+"CLASSIFIED",
+"RAFFAELLO color=RAFFAELLO 1200x1400",
+"OK sale=226.8 cost=75.6"
+],
+[
+"PERSIANE_SCURI",
+"Persiana in alluminio (RAL / Effetto legno / Speciali)",
+"AREA_PURCHASE_MULTIPLIER",
+"CLASSIFIED",
+"RAL color=RAL 1200x1400",
+"OK sale=1197.0 cost=478.8"
+],
+[
+"PERSIANE_SCURI",
+"Persiana in alluminio (RAL / Effetto legno / Speciali)",
+"AREA_PURCHASE_MULTIPLIER",
+"CLASSIFIED",
+"RAL color=RAL orientabile 1200x1400",
+"OK sale=1612.8 cost=645.12"
+],
+[
+"PERSIANE_SCURI",
+"Persiana in alluminio (RAL / Effetto legno / Speciali)",
+"AREA_PURCHASE_MULTIPLIER",
+"CLASSIFIED",
+"WOOD color=WOOD_EFFECT 1200x1400",
+"OK sale=1255.8 cost=502.32"
+],
+[
+"PERSIANE_SCURI",
+"Persiana in alluminio (RAL / Effetto legno / Speciali)",
+"AREA_PURCHASE_MULTIPLIER",
+"CLASSIFIED",
+"WOOD color=WOOD_EFFECT orientabile 1200x1400",
+"OK sale=1671.6 cost=668.64"
+],
+[
+"PERSIANE_SCURI",
+"Persiana in alluminio (RAL / Effetto legno / Speciali)",
+"AREA_PURCHASE_MULTIPLIER",
+"CLASSIFIED",
+"SPECIAL color=SPECIAL_RAFFAELLO 1200x1400",
+"OK sale=1470.0 cost=588.0"
+],
+[
+"PERSIANE_SCURI",
+"Persiana in alluminio (RAL / Effetto legno / Speciali)",
+"AREA_PURCHASE_MULTIPLIER",
+"CLASSIFIED",
+"SPECIAL color=SPECIAL_RAFFAELLO orientabile 1200x1400",
+"OK sale=1885.8 cost=754.32"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=BIANCO_MASSA col=003 1200x250 depth=163 cielino=SI",
+"OK sale=324.78 cost=129.91"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=BIANCO_MASSA col=003 1200x250 depth=163 cielino=NO",
+"OK sale=297.78 cost=119.11"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=BIANCO_MASSA col=003 1200x250 depth=326 cielino=SI",
+"OK sale=329.18 cost=131.67"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=BIANCO_MASSA col=003 1200x250 depth=326 cielino=NO",
+"OK sale=302.18 cost=120.87"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=BIANCO_MASSA col=003 1200x250 depth=489 cielino=SI",
+"OK sale=333.58 cost=133.43"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=BIANCO_MASSA col=003 1200x250 depth=489 cielino=NO",
+"OK sale=306.58 cost=122.63"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=BIANCO_MASSA col=003 1200x250 depth=652 cielino=SI",
+"OK sale=337.98 cost=135.19"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=BIANCO_MASSA col=003 1200x250 depth=652 cielino=NO",
+"OK sale=310.98 cost=124.39"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=STANDARD col=100 1200x250 depth=163 cielino=SI",
+"OK sale=390.33 cost=156.13"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=STANDARD col=100 1200x250 depth=163 cielino=NO",
+"OK sale=351.33 cost=140.53"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=STANDARD col=100 1200x250 depth=326 cielino=SI",
+"OK sale=396.69 cost=158.68"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=STANDARD col=100 1200x250 depth=326 cielino=NO",
+"OK sale=357.69 cost=143.08"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=STANDARD col=100 1200x250 depth=489 cielino=SI",
+"OK sale=403.05 cost=161.22"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=STANDARD col=100 1200x250 depth=489 cielino=NO",
+"OK sale=364.05 cost=145.62"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=STANDARD col=100 1200x250 depth=652 cielino=SI",
+"OK sale=409.4 cost=163.76"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=STANDARD col=100 1200x250 depth=652 cielino=NO",
+"OK sale=370.4 cost=148.16"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=NON_STANDARD col=019 1200x250 depth=163 cielino=SI",
+"OK sale=436.19 cost=174.48"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=NON_STANDARD col=019 1200x250 depth=163 cielino=NO",
+"OK sale=385.19 cost=154.08"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=NON_STANDARD col=019 1200x250 depth=326 cielino=SI",
+"OK sale=444.5 cost=177.8"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=NON_STANDARD col=019 1200x250 depth=326 cielino=NO",
+"OK sale=393.5 cost=157.4"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=NON_STANDARD col=019 1200x250 depth=489 cielino=SI",
+"OK sale=452.81 cost=181.13"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=NON_STANDARD col=019 1200x250 depth=489 cielino=NO",
+"OK sale=401.81 cost=160.73"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=NON_STANDARD col=019 1200x250 depth=652 cielino=SI",
+"OK sale=461.13 cost=184.45"
+],
+[
+"CASSONETTI",
+"Cassonetto \u2014 Listino Ufficiale 2026",
+"GRID",
+"CLASSIFIED",
+"grid fam=NON_STANDARD col=019 1200x250 depth=652 cielino=NO",
+"OK sale=410.13 cost=164.05"
+],
+[
+"ZANZARIERE",
+"TEST AREA 100\u20ac/m\u00b2 min 1.50",
+"AREA",
+"TEST_FIXTURE",
+"unit color=None 1200x1400",
+"MISSING_INTERNAL_COST sale=168.0"
+],
+[
+"ACCESSORI",
+"TEST Accessorio 50\u20ac/pz",
+"PER_ITEM",
+"TEST_FIXTURE",
+"default",
+"MISSING_INTERNAL_COST sale=50.0"
+],
+[
+"ACCESSORI",
+"TEST Prodotto Lineare 25\u20ac/ml",
+"LINEAR_METER",
+"TEST_FIXTURE",
+"default",
+"MISSING_INTERNAL_COST sale=50.0"
+],
+[
+"SERVIZI",
+"TEST Servizio Fisso 120\u20ac",
+"FIXED_PRICE",
+"TEST_FIXTURE",
+"default",
+"MISSING_INTERNAL_COST sale=120.0"
+],
+[
+"ZANZARIERE",
+"TEST Zanzariera 130\u20ac/m\u00b2 min 1.50",
+"AREA",
+"TEST_FIXTURE",
+"unit color=None 1200x1400",
+"MISSING_INTERNAL_COST sale=218.4"
+]
+]

@@ -28,6 +28,7 @@ MARGIN_FLOOR_PERCENT = 15.0          # msg 802 — POST_MARGIN > 15.00% ALLOWED,
 LOW_MARGIN_THRESHOLD_PERCENT = 20.0  # 15 < POST < 20 → LOW_MARGIN (consentito, nessuna approvazione)
 FLOOR_EPSILON = 0.0001               # 0.01 punti % — garantisce POST strettamente > floor
 DIRECTOR_APPROVAL_DISCOUNT_PERCENT = 30.0
+COMMERCIAL_DISCOUNT_DROPDOWN_MAX = 30    # PO Fase A §5 — dropdown 0..30% step 1%
 # (sconto massimo della fascia incluso, cap commissione) — msg 796
 DISCOUNT_COMMISSION_BANDS = [(5.0, 0.15), (10.0, 0.12), (15.0, 0.10), (20.0, 0.08), (25.0, 0.05), (30.0, 0.03)]
 WITHHOLDING_POLICY_VERSION = "withholding_policy_v1_2026_02"
@@ -289,6 +290,12 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
     commercial_subtotal = float(quote.get("commercial_subtotal") or net_revenue)
     max_disc_floor = max_discount_for_margin_floor(commercial_subtotal, supply + install + other, wh_rate)
     max_disc_no_approval = None if max_disc_floor is None else round(min(max_disc_floor, DIRECTOR_APPROVAL_DISCOUNT_PERCENT), 2)
+    # Dropdown sconto commerciale step 1% (PO Fase A §5-§6): stacking moltiplicativo (1-g)(1-p) ≤ (1-D); mai arrotondare verso l'alto.
+    pay_pct = float(quote.get("automatic_discount_percent") or 0)
+    max_commercial_step = None
+    if max_disc_floor is not None:
+        g = 1.0 - (1.0 - max_disc_floor / 100.0) / max(1e-9, 1.0 - pay_pct / 100.0)
+        max_commercial_step = int(max(0, min(COMMERCIAL_DISCOUNT_DROPDOWN_MAX, math.floor(g * 100.0 + 1e-9))))
 
     # Se ENEA cost mancante ⇒ commissione non definitiva (§5 msg 395).
     fs_status = "COMPLETE"
@@ -368,6 +375,7 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
         "director_approval_required": bool(director_approval),
         "max_discount_available_percent": max_disc_floor,
         "max_discount_without_approval_percent": max_disc_no_approval,
+        "max_commercial_discount_step_percent": max_commercial_step,
         "final_company_contribution": final_company_contribution,
         "final_company_margin": final_company_margin,
         # Tachometer authoritative value (msg 396 §4/§13)
@@ -399,6 +407,7 @@ COMMERCIAL_SAFE_KEYS = {
     "director_approval_required",
     "max_discount_available_percent",
     "max_discount_without_approval_percent",
+    "max_commercial_discount_step_percent",
     # policy version + snapshot health hint
     "commission_policy_version",
     "financial_snapshot_status",

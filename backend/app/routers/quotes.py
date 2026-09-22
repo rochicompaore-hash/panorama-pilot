@@ -318,8 +318,9 @@ async def update_quote(
     if "global_discount_percent" in payload:
         pct = payload.pop("global_discount_percent")
         pct = float(pct or 0)
-        if pct < 0 or pct > 100:
-            raise HTTPException(status_code=400, detail={"code": "GLOBAL_DISCOUNT_INVALID", "message": "Percentuale sconto 0-100"})
+        if pct < 0 or pct > 30 or abs(pct - round(pct)) > 1e-9:
+            raise HTTPException(status_code=400, detail={"code": "GLOBAL_DISCOUNT_INVALID", "message": "Sconto commerciale selezionabile: 0–30% a step di 1%"})
+        pct = float(int(round(pct)))
         payload.update({"promo_code": None, "promo_code_description": None, "global_discount_source": "MANUAL" if pct > 0 else None,
                         "global_discount_type": "PERCENT" if pct > 0 else None, "global_discount_value": pct})
     if "delivery_mode" in payload and payload["delivery_mode"]:
