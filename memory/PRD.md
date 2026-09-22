@@ -1,3 +1,22 @@
+## Iter 56 — FASE A: PREVENTIVATORE COMPLETO + SCONTO DROPDOWN + SMONTAGGIO + PRICING GAP AUDIT (22 Set 2026)
+
+**Autorizzato:** PO revoca temporanea freeze (Fase A). Fase B (Financing Engine V1) NON iniziata.
+
+### Consegnato
+- `margin_engine.py`: `max_commercial_discount_step_percent` (int 0..30, floor mai verso l'alto, tiene conto stacking moltiplicativo con FULL_UPFRONT 5%); aggiunto a `COMMERCIAL_SAFE_KEYS`; costante `COMMERCIAL_DISCOUNT_DROPDOWN_MAX=30`.
+- `quotes.py` PATCH `global_discount_percent`: solo interi 0..30 (400 `GLOBAL_DISCOUNT_INVALID`); pre-check floor >15% invariato (`DISCOUNT_BLOCKED_MARGIN_FLOOR`).
+- `QuoteEditorPage.jsx`: sconto = Select 0–30% step 1 (`quote-discount-pct-select`, `discount-opt-{i}`), opzioni > max disabilitate "non consentito", label "max consentito N%".
+- Smontaggio: già presente (REMOVE_* 30 € sale / 20 € int, qty riga, bucket OTHER) — verificato 3×30=90 €.
+- Audit prezzi: `/app/memory/PREVENTIVATORE_PRICING_GAP_AUDIT_V1.md` (+ script `/app/memory/scripts/pricing_gap_audit.py`). 4.540 prezzi pubblicati, 7 sale/cost mancanti (DISPOSAL×5, LOGISTICS×2), 6 famiglie senza formula (3/4 ante, scorrevole, vasistas, Restauro, colore SPECIAL), 9 legacy disabilitati. Cassonetti: nessun doppio markup.
+
+### Test
+- `tests/test_fase_a_preventivatore.py` 8/8 (step validation, max step int, FULL_UPFRONT max 8→3, blocco oltre max, smontaggio 90 € + OTHER cost). Regressione margin/pdf/discount/installation 134/134. Testing agent `iteration_48.json` frontend PASS (dropdown, smontaggio +90 €, riepilogo, reload, RBAC commerciale zero leak; PDF preview apre in nuova tab — by design).
+
+### Stato
+- APPLICATION_CODE = STRICT_FEATURE_FREEZE (Fase A chiusa). Prossimo: FASE B Financing Engine V1 su autorizzazione PO.
+
+---
+
 ## Iter 55 — STABILIZZAZIONE FINALE + E2E + MASTER CAPABILITY GAP AUDIT V1 (11 Set 2026)
 
 **Autorizzato:** PO "CONFERMA PO — OPZIONE B" + "PO DIRECTIVE MASTER CAPABILITY GAP AUDIT V1" (audit only).
