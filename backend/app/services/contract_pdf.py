@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from weasyprint import HTML
+from app.services.weasy import html_to_pdf
 
 from app.services.storage import get_storage, build_key
 
@@ -65,7 +65,7 @@ def render_contract_pdf(contract: Dict[str, Any], watermark: Optional[str] = Non
         watermark=watermark,
         generated_at=datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC"),
     )
-    pdf_bytes = HTML(string=html_str, base_url=str(TEMPLATE_DIR)).write_pdf()
+    pdf_bytes = html_to_pdf(html_str, str(TEMPLATE_DIR))
     return pdf_bytes
 
 

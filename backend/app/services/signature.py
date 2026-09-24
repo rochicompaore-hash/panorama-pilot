@@ -23,7 +23,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from zoneinfo import ZoneInfo
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from weasyprint import HTML
+from app.services.weasy import html_to_pdf
 from pypdf import PdfReader, PdfWriter
 
 from app.config import settings
@@ -184,7 +184,7 @@ def render_signed_pdf(
         evidence=evidence,
         now=datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
     )
-    sig_page_bytes = HTML(string=html_str, base_url=str(TEMPLATE_DIR)).write_pdf()
+    sig_page_bytes = html_to_pdf(html_str, str(TEMPLATE_DIR))
     # 3) Merge
     writer = PdfWriter()
     for reader_bytes in (base_bytes, sig_page_bytes):

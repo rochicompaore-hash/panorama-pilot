@@ -17,6 +17,8 @@ load_dotenv(Path(__file__).parent / ".env")
 # ------------------------------------------------------------------------------
 import logging
 from fastapi import FastAPI, APIRouter
+from fastapi.responses import JSONResponse
+from app.services.weasy import PdfEngineUnavailable
 from starlette.middleware.cors import CORSMiddleware
 
 # ------------------------------------------------------------------------------
@@ -141,6 +143,12 @@ logging.basicConfig(
 logger = logging.getLogger("infissi")
 
 app = FastAPI(title="Infissi Express Cloud API", version="1.0.0-M1")
+
+
+@app.exception_handler(PdfEngineUnavailable)
+async def _pdf_engine_unavailable(_request, exc):
+    return JSONResponse(status_code=503, content={"detail": {"code": "PDF_ENGINE_UNAVAILABLE", "message": str(exc)}})
+
 api = APIRouter(prefix="/api")
 
 

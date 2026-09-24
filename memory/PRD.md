@@ -1,3 +1,9 @@
+## Iter 57 — DEPLOY FIX WeasyPrint (23 Set 2026)
+- Root cause: `from weasyprint import HTML` a livello modulo (`pdf_renderer.py`, `contract_pdf.py`, `signature.py`) → `OSError libgobject-2.0-0` all'avvio in produzione → backend morto, health check fallito.
+- Fix: `app/services/weasy.py` lazy-load (`html_to_pdf`) + `PdfEngineUnavailable` → handler 503 `PDF_ENGINE_UNAVAILABLE` in `server.py`. Boot non dipende più dalle librerie native; PDF 35/35 test verdi in preview. `.emergent/system_deps.txt` popolato con libpango/libgobject/cairo per abilitare i PDF anche in produzione. deployment_agent = PASS.
+
+---
+
 ## Iter 56 — FASE A: PREVENTIVATORE COMPLETO + SCONTO DROPDOWN + SMONTAGGIO + PRICING GAP AUDIT (22 Set 2026)
 
 **Autorizzato:** PO revoca temporanea freeze (Fase A). Fase B (Financing Engine V1) NON iniziata.

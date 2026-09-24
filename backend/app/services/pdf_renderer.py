@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from weasyprint import HTML, CSS
+from app.services.weasy import html_to_pdf
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -115,7 +115,7 @@ def render_quote_pdf(snapshot: dict, watermark: Optional[str] = None, signed_evi
         now=datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
     )
     # WeasyPrint: base_url points to templates dir for any relative asset (should be none for security)
-    pdf_bytes = HTML(string=html_str, base_url=str(TEMPLATE_DIR)).write_pdf()
+    pdf_bytes = html_to_pdf(html_str, str(TEMPLATE_DIR))
     return pdf_bytes
 
 
