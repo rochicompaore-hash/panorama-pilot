@@ -35,9 +35,9 @@ const fmt = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency:
 export default function TreasuryCFOPage() {
   const [tab, setTab] = useState("tower");
   const [cfoCash, setCfoCash] = useState(null);
-  useEffect(() => { api.get("/cfo/overview", { params: { legal_entity_id: legalEntityFilter === "all" ? "GROUP" : legalEntityFilter } }).then((r) => setCfoCash(r.data.cash_position)).catch(() => setCfoCash({ status: "INCOMPLETE" })); }, [legalEntityFilter]);
   const [entities, setEntities] = useState([]);
   const [legalEntityFilter, setLegalEntityFilter] = useState("all");
+  useEffect(() => { api.get("/cfo/overview", { params: { legal_entity_id: legalEntityFilter === "all" ? "GROUP" : legalEntityFilter } }).then((r) => setCfoCash(r.data.cash_position)).catch(() => setCfoCash({ status: "INCOMPLETE" })); }, [legalEntityFilter]);
   const [treasury, setTreasury] = useState(null);
   const [cfo, setCfo] = useState(null);
   const [consolidation, setConsolidation] = useState(null);

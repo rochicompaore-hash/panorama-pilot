@@ -57,8 +57,10 @@ async def _compose(db, quote: dict, user: dict, message: Optional[str], pdf: Opt
     sender = await resolve_sender(db, quote["tenant_id"])
     name = " ".join(x for x in (cust.get("first_name"), cust.get("last_name")) if x) or cust.get("company_name") or cust.get("name") or "cliente"
     ctx = {"quote_number": quote.get("number"), "customer_name": escape(name), "total": _fmt_eur(quote.get("total")), "company_name": escape(brand["name"]),
-           "brand_name": escape(brand["name"]), "message": escape(message.strip()).replace("\n", "<br />") if message else None,
+           "brand_name": escape(brand["name"]),
            "company_phone": brand.get("phone"), "company_email": brand.get("email"), "company_website": brand.get("website"), "app_base_url": get_mail_config().app_base_url}
+    if message and message.strip():
+        ctx["message"] = escape(message.strip()).replace("\n", "<br />")
     subject, html, text, tv = await render_template("QUOTE_SENT", ctx, tenant_id=quote["tenant_id"])
     if message:
         text = text.replace(escape(message.strip()).replace("\n", "<br />"), message.strip())

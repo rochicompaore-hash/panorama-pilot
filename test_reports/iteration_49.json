@@ -1,0 +1,40 @@
+{
+  "summary": "Frontend-only test of CFO Control Tower, the quote editor (IVA selector, lead time, discount up to 40%, Competitor Analyzer, email dialog/blockers, email card), commercial-role restrictions and Email settings 'Mittente tenant'. CRITICAL: /cfo crashed on every load with 'ReferenceError: Cannot access legalEntityFilter before initialization' (TDZ). I applied a minimal fix (moved one line) to unblock testing, so the main agent must review it. After the fix, all requested flows pass. One minor bug: the QUOTE_SENT email body renders a literal 'None' when no custom message is given.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/quotes/{id}/email/preview (routers/quote_email.py::_compose + seed_email_templates QUOTE_SENT)", "issue": "With no custom message, ctx['message']=None. Jinja `default()` only replaces UNDEFINED values, not None, so the email preview body (and the real sent email) shows a literal 'None' line instead of 'Restiamo a disposizione per qualsiasi chiarimento.'. Fix: omit the key when message is empty, or use `{{ message | default('...', true) }}`."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "TreasuryCFOPage", "issue": "Page crashed on mount: the useEffect at line 38 referenced legalEntityFilter before its useState declaration (line 40), causing a TDZ ReferenceError and a red runtime overlay. FIXED by the testing agent by moving the useEffect below the useState declarations.", "selector": "[data-testid=cfo-dashboard-page]", "priority": "CRITICAL (fixed)"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CFO Control Tower – legal entity AUXER", "issues": ["The break-even KPI shows 338.145 € (struttura 91.367 €) for a single company, while the header card 'Struttura mensile' for the same company shows 0 €. Break-even looks group-scoped rather than legal-entity-scoped. Please verify."]},
+      {"screen": "CFO legal entity filter", "issues": ["The dropdown is polluted with about 35 TEST_LE_* entities from earlier test runs. Clean up the test data."]},
+      {"screen": "Quote editor – margin panel (admin)", "issues": ["'Sconto massimo disponibile 30,00 %' appears next to the discount label 'MAX CONSENTITO 40% · Admin Master fino a 40%'. These may confuse the user."]},
+      {"screen": "Sidebar as commercial_test (role UTENTE)", "issues": ["The 'PLATFORM OWNER' section (SaaS Modularization, Configurazione landing) is visible to a commercial user. Verify permissions. The section headers 'PRODUZIONE E POSA' and 'AMMINISTRAZIONE E CFO' are shown empty."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Review/keep the TDZ fix in /app/frontend/src/pages/TreasuryCFOPage.jsx (useEffect for /cfo/overview moved below the legalEntityFilter useState)",
+    "Fix the literal 'None' in the QUOTE_SENT email body when no custom message is set (quote_email.py _compose / template default(...,true))",
+    "Check break-even legal-entity scoping in cfo_engine",
+    "Check why the Platform Owner menu section is visible to the commercial role"
+  ],
+  "critical_code_review_comments": [
+    "TreasuryCFOPage.jsx: hooks referenced variables before declaration. Keep useState declarations at the top, before effects.",
+    "QuoteEditorPage.jsx is 976 lines (>700). Consider splitting (MarginPanel, totals/VAT card, discount section).",
+    "Discount dropdown requires a separate 'Applica' click (onValueChange only sets local state). That is acceptable but not obvious; the review request expected selection alone to trigger the update."
+  ],
+  "updated_files": ["/app/frontend/src/pages/TreasuryCFOPage.jsx"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% of requested flows after the CFO crash fix (0% for CFO before the fix)"},
+  "seed_data_creation": "CFO GROUP settings saved (monthly_revenue_target=300000) and bank balance certified at 32540 for today on 'Conto Operativo'. Tenant sender from_name saved as 'Infissi Express'. The quote 28b43714 discount was set to 35% and then reset to 0% (verified after reload). VAT regime reset to VAT_ORDINARY. Quote status unchanged (DRAFT).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login testids: login-email-input/login-password-input/login-submit-button. The discount applies only via quote-discount-apply-btn (toast 'Preventivo aggiornato e ricalcolato'). The VAT select applies immediately. Email dialog blockers: DEFINITIVE_PDF_MISSING · RESEND_CONFIGURATION=BLOCKED_BY_SECRET. Email settings route: /email-settings, tab-sender.",
+  "rca of the issue": "CFO crash: a recent edit inserted `useEffect(... legalEntityFilter ...)` before `const [legalEntityFilter] = useState('all')`. During render, the effect's deps array is evaluated immediately, so it hit the TDZ and threw a ReferenceError. Mitigation: move the effect after the declaration (done). Email 'None': Python None is passed into the Jinja context and the `default` filter without boolean=true does not replace None."
+}
