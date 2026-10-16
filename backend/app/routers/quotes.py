@@ -19,13 +19,16 @@ from app.services.audit import record_audit
 from app.services.timeline import record_activity
 from app.services.pricing import compute_line, compute_quote_totals
 from app.services.margin_engine import (
+    ADMIN_MASTER_MAX_DISCOUNT_PERCENT,
     compute_financial_snapshot,
     redact_financial_snapshot_for_role,
     is_admin_master,
 )
 from app.services.multi_category_pricing import resolve_and_compute
 from app.services.payment_terms import resolve_payment_terms, apply_automatic_discount, PAYMENT_POLICIES, apply_global_discount, resolve_promo_code, DISCOUNT_POLICY_VERSION
+from app.services.vat_engine import apply_vat, resolve_vat_regime, REQUESTABLE as VAT_REQUESTABLE, VAT_SELECTOR_OPTIONS, VAT_MODE_LABELS
 from app.services.delivery_policy import resolve_delivery, apply_delivery_surcharge, DELIVERY_MODES
+from app.services.delivery_lead_time import compute_quote_lead_time
 from app.models_multi_category import ConfigureRequest, SimplePricingInputs
 from app.services.service_resolver import build_profiling_service
 from app.services.service_resolver import (
@@ -112,8 +115,15 @@ def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
     # msg 402 Lotto 5 — sconto automatico da payment terms (FULL_UPFRONT = 5%) sulla base già scontata
     totals = apply_automatic_discount(totals, existing_quote.get("automatic_discount_percent") or 0)
     totals["total_discount_amount"] = round(float(totals.get("global_discount_amount") or 0) + float(totals.get("payment_discount_amount") or 0), 2)
+    # VAT Engine V2 — breakdown reale per aliquota, regime dal Fiscal Dossier (backend source of truth)
+    totals = apply_vat(totals, lines, existing_quote.get("vat_regime") or "VAT_ORDINARY")
     totals["discounted_net_revenue"] = totals["subtotal"]
     totals["discount_policy_version"] = DISCOUNT_POLICY_VERSION
+    # Policy tempi di consegna PO: classe canonica per codice colore, commessa = lead time maggiore (solo STANDARD; EXPRESS resta da confermare)
+    lt = compute_quote_lead_time(lines)
+    if (existing_quote.get("delivery_mode") or "STANDARD") != "STANDARD":
+        lt.pop("delivery_customer_text", None)
+    totals.update(lt)
     if _is_frozen(existing_quote):
         return totals
     proposed = dict(existing_quote)
@@ -157,6 +167,7 @@ async def _get_perms(user: dict) -> set:
     roles = await get_db().roles.find({"_id": {"$in": user.get("role_ids") or []}, "deleted_at": None}, {"name": 1, "code": 1}).to_list(20)
     if is_admin_master(user, roles):
         perms.add(ADMIN_MASTER_MARKER)
+        perms.update({"quotes.override_discount_cap", "quotes.vat_validate"})
     return perms
 
 
@@ -198,6 +209,11 @@ async def list_quotes(
     docs = await db.quotes.find(query).sort([("number_int", -1), ("created_at", -1)]).skip(skip).limit(limit).to_list(limit)
     perms = await _get_perms(user)
     return {"total": total, "items": [_strip_costs_if_needed(from_mongo(d), perms) for d in docs]}
+
+
+@router.get("/vat-options")
+async def vat_options(user: dict = Depends(require_permission("quotes.view"))):
+    return {"options": VAT_SELECTOR_OPTIONS, "labels": VAT_MODE_LABELS, "default": "VAT_ORDINARY"}
 
 
 @router.get("/{qid}")
@@ -262,6 +278,8 @@ async def create_quote(body: QuoteCreate, request: Request, user: dict = Depends
         created_by=user["id"], updated_by=user["id"],
     )
     doc = to_mongo(q.model_dump(by_alias=True))
+    # IVA default PO: 22% ordinaria finché il Fiscal Dossier non valida un regime diverso
+    doc.update({"vat_regime": "VAT_ORDINARY", "vat_regime_reason": "DEFAULT_22", "fiscal_dossier": {"requested_regime": "VAT_ORDINARY"}})
     await db.quotes.insert_one(doc)
     await record_audit(action="quotes.create", tenant_id=user["tenant_id"], user_id=user["id"],
                        user_email=user["email"], ip=get_client_ip(request),
@@ -318,8 +336,12 @@ async def update_quote(
     if "global_discount_percent" in payload:
         pct = payload.pop("global_discount_percent")
         pct = float(pct or 0)
-        if pct < 0 or pct > 30 or abs(pct - round(pct)) > 1e-9:
-            raise HTTPException(status_code=400, detail={"code": "GLOBAL_DISCOUNT_INVALID", "message": "Sconto commerciale selezionabile: 0–30% a step di 1%"})
+        if pct < 0 or pct > 100 or abs(pct - round(pct)) > 1e-9:
+            raise HTTPException(status_code=400, detail={"code": "GLOBAL_DISCOUNT_INVALID", "message": "Sconto commerciale selezionabile solo a step interi di 1%"})
+        if pct > ADMIN_MASTER_MAX_DISCOUNT_PERCENT:
+            raise HTTPException(status_code=403, detail={"code": "ADMIN_DISCOUNT_CAP_EXCEEDED", "message": f"Sconto oltre {ADMIN_MASTER_MAX_DISCOUNT_PERCENT}%: non consentito a nessun ruolo"})
+        if pct > 30 and not user_has_permission(user, await _get_perms(user), "quotes.override_discount_cap"):
+            raise HTTPException(status_code=403, detail={"code": "ADMIN_APPROVAL_REQUIRED", "message": "Sconto oltre 30%: richiede autorizzazione amministrativa"})
         pct = float(int(round(pct)))
         payload.update({"promo_code": None, "promo_code_description": None, "global_discount_source": "MANUAL" if pct > 0 else None,
                         "global_discount_type": "PERCENT" if pct > 0 else None, "global_discount_value": pct})
@@ -986,6 +1008,7 @@ async def get_financial_snapshot(qid: str, user: dict = Depends(require_permissi
         "frozen": _is_frozen(doc),
         "is_admin_view": is_master,
         "is_admin_master_view": is_master,
+        "can_override_discount_cap": user_has_permission(user, perms, "quotes.override_discount_cap"),
         "financial_snapshot": redact_financial_snapshot_for_role(snap, is_master),
     }
 

@@ -22,11 +22,12 @@ class MailConfig:
 
     @property
     def is_configured(self) -> bool:
-        # SMTP considered configured only if host + user + password all present
-        return bool(self.smtp_host and self.smtp_user and self.smtp_password)
+        # Provider operativo: RESEND (primario). SMTP legacy solo se Resend assente.
+        return self.provider_name != "mock"
 
 
 def get_mail_config() -> MailConfig:
+    resend_key = os.environ.get("RESEND_API_KEY", "").strip()
     smtp_host = os.environ.get("MAIL_HOST", "").strip()
     smtp_port = int(os.environ.get("MAIL_PORT", "465"))
     smtp_security = os.environ.get("MAIL_SECURITY", "ssl").strip().lower()
@@ -41,7 +42,9 @@ def get_mail_config() -> MailConfig:
     test_redirect_to = os.environ.get("MAIL_TEST_REDIRECT_TO", "").strip() or None
     app_base_url = os.environ.get("APP_BASE_URL", "http://localhost:3000").strip()
 
-    if smtp_host and smtp_user and smtp_password:
+    if resend_key:
+        provider_name = "resend"
+    elif smtp_host and smtp_user and smtp_password:
         provider_name = "siteground_smtp"
     else:
         provider_name = "mock"
@@ -71,4 +74,9 @@ def get_public_config() -> dict:
         "password_configured": bool(c.smtp_password),
         "provider_name": c.provider_name,
         "is_configured": c.is_configured,
+        "resend_configured": c.provider_name == "resend",
+        "resend_webhook_configured": bool(os.environ.get("RESEND_WEBHOOK_SECRET", "").strip()),
+        "resend_configuration": "OK" if c.provider_name == "resend" else "BLOCKED_BY_SECRET",
+        "mock_mode": c.provider_name == "mock",
+        "managed_domain": os.environ.get("PANORAMA_MANAGED_DOMAIN", "").strip() or None,
     }

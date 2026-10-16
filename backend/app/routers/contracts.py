@@ -203,10 +203,38 @@ async def patch_contract_parties(cid: str, body: PartiesPatch, request: Request,
     return {"ok": True, "changes": changes, "customer_synced": synced, "presign_errors": presign_errors({**doc, "quote_snapshot": snap})}
 
 
+async def _ensure_payment_plan(db, doc: dict, when: datetime) -> None:
+    """CFO V1 §11: contratto firmato → payment_plan collegato (contract_id, order_id, customer_id, legal_entity_id) dalle condizioni contrattuali.
+    Idempotente. Nessun piano per contratti senza importi (LEGACY_ECONOMIC_DATA_INCOMPLETE)."""
+    from app.models import new_id
+    eco = doc.get("economic_snapshot") or {}
+    qs = doc.get("quote_snapshot") or {}
+    total = float(eco.get("total") or qs.get("total") or 0)
+    if total <= 0 or await db.payment_plans.find_one({"tenant_id": doc["tenant_id"], "contract_id": doc["_id"], "deleted_at": None}):
+        return
+    schedule = ((eco.get("payment_terms") or {}).get("schedule")) or qs.get("payment_schedule") or [{"step": "ORDER", "percent": 50, "label": "Acconto alla firma"}, {"step": "GOODS_READY", "percent": 50, "label": "Saldo ad avviso merce pronta"}]
+    trig = {"ORDER": "signature", "GOODS_READY": "goods_ready", "TECHNICAL_SURVEY": "technical_survey", "FINANCING": "financing", "INSTALLATION": "installation"}
+    inst, acc = [], 0.0
+    for i, st in enumerate(schedule):
+        pct = st.get("percent")
+        amt = round(total * float(pct) / 100, 2) if pct is not None else None
+        if i == len(schedule) - 1 and amt is not None:
+            amt = round(total - acc, 2)
+        acc += amt or 0
+        t = trig.get(str(st.get("step") or "").upper(), str(st.get("step") or "").lower())
+        inst.append({"ref": f"I{i + 1}", "label": st.get("label"), "trigger": t, "percent": pct, "amount": amt, "due_date": when.date().isoformat() if t == "signature" else None,
+                     "paid_amount": 0, "paid_at": None, "payment_method": None, "installment_status": "pending" if amt is not None else "amount_to_define", "reminder_sent_at": None})
+    order = await db.sales_orders.find_one({"tenant_id": doc["tenant_id"], "contract_id": doc["_id"], "deleted_at": None}, {"_id": 1})
+    await db.payment_plans.insert_one({"_id": new_id(), "tenant_id": doc["tenant_id"], "contract_id": doc["_id"], "sales_order_id": (order or {}).get("_id"), "customer_id": doc.get("customer_id"),
+                                       "legal_entity_id": doc.get("legal_entity_id"), "total_amount": total, "currency": "EUR", "installments": inst, "outstanding_amount": total, "paid_amount": 0,
+                                       "plan_status": "active", "source": "CONTRACT_SIGNED", "status": "active", "deleted_at": None, "version": 1, "created_at": when, "updated_at": when, "created_by": None, "updated_by": None})
+
+
 async def _activate_signed_contract(db, doc: dict, when: datetime) -> None:
     """Post-firma (msg 803 §12-§13-§15): freeze snapshot, CONTRACT ACTIVE, evento CONTRACT_AVAILABLE per il Customer Portal."""
     frozen = build_signed_snapshot(doc, when)
     await db.contracts.update_one({"_id": doc["_id"]}, {"$set": {"signed_snapshot": frozen, "lifecycle_status": "ACTIVE", "active_at": when}})
+    await _ensure_payment_plan(db, doc, when)
     from app.services.customer_email_events import notify_customer_event
     await notify_customer_event(
         db, tenant_id=doc["tenant_id"], customer_id=doc.get("customer_id"), event_type="CONTRACT_AVAILABLE",

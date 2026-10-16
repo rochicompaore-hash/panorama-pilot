@@ -24,6 +24,8 @@ import { useAutosave } from "@/hooks/useAutosave";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { FilePdf, Download, Eye, CaretDown, Link, Copy, XCircle } from "@phosphor-icons/react";
+import { CompetitorAnalyzerCard } from "@/components/quotes/CompetitorAnalyzerCard";
+import { QuoteEmailDialog, QuoteEmailHistory } from "@/components/quotes/QuoteEmailDialog";
 
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0); } catch { return "€ 0,00"; } }
 function fmtPct(n) { return typeof n === "number" ? `${n.toFixed(2).replace(".", ",")} %` : "—"; }
@@ -122,6 +124,18 @@ export default function QuoteEditorPage() {
   });
   const [discountPct, setDiscountPct] = React.useState(0);
   const maxCommercialStep = financial?.financial_snapshot?.max_commercial_discount_step_percent ?? null;
+  const isAdminMaster = !!financial?.is_admin_master_view;
+  const maxAdminStep = financial?.financial_snapshot?.max_admin_discount_step_percent ?? null;
+  const adminHardCap = financial?.financial_snapshot?.admin_master_max_discount_percent ?? 40;
+  const dropdownMax = isAdminMaster ? adminHardCap : 30;
+  const maxAllowedStep = isAdminMaster ? maxAdminStep : maxCommercialStep;
+  const [emailOpen, setEmailOpen] = React.useState(false);
+  const { data: vatOptions } = useQuery({ queryKey: ["vat-options"], queryFn: async () => (await api.get(`/quotes/vat-options`)).data, staleTime: 600000 });
+  const patchFiscal = useMutation({
+    mutationFn: async (fields) => (await api.patch(`/quotes/${id}/fiscal-dossier`, fields)).data,
+    onSuccess: (d) => { toast.success(`Regime IVA: ${vatOptions?.labels?.[d.vat_regime] || d.vat_regime}`); reload(); },
+    onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
+  });
   const [promoInput, setPromoInput] = React.useState("");
   React.useEffect(() => { if (q) { setDiscountPct(q.global_discount_source === "MANUAL" ? q.global_discount_value || 0 : 0); setPromoInput(q.promo_code || ""); } }, [q?.global_discount_value, q?.promo_code, q?.global_discount_source]); // eslint-disable-line react-hooks/exhaustive-deps
   const patchQuote = useMutation({
@@ -303,7 +317,8 @@ export default function QuoteEditorPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {editable && has("quotes.send") && q.quote_status === "draft" && <Button variant="outline" className="rounded-sm" onClick={async () => { await autosave.flushNow(); changeStatus.mutate("sent"); }} data-testid="quote-send"><PaperPlaneTilt size={14} className="mr-1" /> Invia</Button>}
+          {has("quotes.send") && !["accepted", "converted", "superseded", "rejected", "cancelled", "expired", "signed"].includes(q.quote_status) && <Button className="rounded-sm" onClick={async () => { await autosave.flushNow(); setEmailOpen(true); }} data-testid="quote-send-email"><PaperPlaneTilt size={14} className="mr-1" /> Invia via email</Button>}
+          {editable && has("quotes.send") && q.quote_status === "draft" && <Button variant="outline" className="rounded-sm" onClick={async () => { await autosave.flushNow(); changeStatus.mutate("sent"); }} data-testid="quote-send"><Check size={14} className="mr-1" /> Segna come inviato (senza email)</Button>}
           {q.quote_status === "sent" && <Button variant="outline" className="rounded-sm" onClick={() => changeStatus.mutate("accepted")} data-testid="quote-accept"><Check size={14} className="mr-1" /> Accettato</Button>}
           {["accepted", "approved"].includes(q.quote_status) && !q.contract_id && has("quotes.convert_contract") && <Button className="rounded-sm bg-emerald-600 hover:bg-emerald-700" onClick={async () => { await autosave.flushNow(); convert.mutate(); }} data-testid="quote-convert"><FileText size={14} className="mr-1" /> Genera contratto</Button>}
           {["accepted", "approved", "converted"].includes(q.quote_status) && q.contract_id && <Button className="rounded-sm" variant="outline" onClick={() => navigate(`/contracts/${q.contract_id}`)} data-testid="quote-open-contract"><FileText size={14} className="mr-1" /> Apri contratto</Button>}
@@ -365,10 +380,11 @@ export default function QuoteEditorPage() {
                   <Select value={q.delivery_mode || "STANDARD"} disabled={!editable} onValueChange={(v) => patchQuote.mutate({ delivery_mode: v })}>
                     <SelectTrigger className="rounded-sm h-9" data-testid="quote-delivery-select"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="STANDARD" data-testid="delivery-opt-STANDARD">Standard — oltre 90 giorni</SelectItem>
+                      <SelectItem value="STANDARD" data-testid="delivery-opt-STANDARD">Standard — in base alla configurazione (60/90 giorni)</SelectItem>
                       <SelectItem value="EXPRESS" disabled data-testid="delivery-opt-EXPRESS">Accelerata (+20%) — non disponibile: tempistica da definire (PO)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {(q.delivery_mode || "STANDARD") === "STANDARD" && <div className="mt-1" data-testid="quote-lead-time"><span className="text-[10px] uppercase text-muted-foreground">Tempi di consegna</span> <b className="text-sm" data-testid="quote-lead-time-days">{q.delivery_lead_time_days ? `ENTRO ${q.delivery_lead_time_days} GIORNI` : "da definire (nessun colore configurato)"}</b>{q.delivery_lead_time_mixed && <div className="text-[10px] text-amber-700" data-testid="quote-lead-time-mixed">Tempo commessa determinato dalla configurazione con lead time maggiore.</div>}</div>}
                   {q.delivery_customer_text && <div className="mt-1 text-[10px] text-muted-foreground" data-testid="quote-delivery-text">{q.delivery_customer_text}</div>}
                   {Number(q.delivery_surcharge_amount) > 0 && <div className="mt-1 text-xs font-bold text-amber-700" data-testid="quote-delivery-surcharge">Maggiorazione consegna accelerata +{q.delivery_surcharge_percent}% = {fmtEUR(q.delivery_surcharge_amount)}</div>}
                 </div>
@@ -376,13 +392,13 @@ export default function QuoteEditorPage() {
                   <Label className="text-[10px] uppercase font-bold">Sconto / Codice promo (intero preventivo)</Label>
                   <div className="flex gap-2 items-end">
                     <div className="flex-1">
-                      <Label className="text-[10px] uppercase">Sconto % (max consentito {maxCommercialStep ?? "—"}%)</Label>
+                      <Label className="text-[10px] uppercase">Sconto % (max consentito {maxAllowedStep ?? "—"}%{isAdminMaster ? ` · Admin Master fino a ${adminHardCap}%` : ""})</Label>
                       <Select disabled={!editable} value={String(Math.round(Number(discountPct) || 0))} onValueChange={(v) => setDiscountPct(Number(v))}>
                         <SelectTrigger className="rounded-sm h-9" data-testid="quote-discount-pct-select"><SelectValue /></SelectTrigger>
                         <SelectContent className="max-h-64">
-                          {Array.from({ length: 31 }, (_, i) => i).map((i) => (
-                            <SelectItem key={i} value={String(i)} disabled={maxCommercialStep != null && i > maxCommercialStep} data-testid={`discount-opt-${i}`}>
-                              {i}%{maxCommercialStep != null && i > maxCommercialStep ? " — non consentito" : ""}
+                          {Array.from({ length: dropdownMax + 1 }, (_, i) => i).map((i) => (
+                            <SelectItem key={i} value={String(i)} disabled={maxAllowedStep != null && i > maxAllowedStep} data-testid={`discount-opt-${i}`}>
+                              {i}%{maxAllowedStep != null && i > maxAllowedStep ? " — non consentito (margine minimo)" : (i > 30 ? " — autorizzazione Admin Master" : "")}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -539,14 +555,36 @@ export default function QuoteEditorPage() {
           <Card className="rounded-sm border-border p-6" data-testid="totals-card">
             <div className="overline mb-4">Totali</div>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Imponibile</span><span className="font-mono-plex">{fmtEUR(q.subtotal)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">IVA</span><span className="font-mono-plex">{fmtEUR(q.vat_amount)}</span></div>
-              <div className="flex justify-between pt-2 border-t"><span className="font-bold">Totale</span><span className="font-mono-plex text-lg font-black">{fmtEUR(q.total)}</span></div>
+              {Number(q.global_discount_value) > 0 && q.commercial_subtotal != null && <div className="flex justify-between text-xs"><span className="text-muted-foreground">Valore commerciale</span><span className="font-mono-plex" data-testid="totals-commercial-subtotal">{fmtEUR(q.commercial_subtotal)}</span></div>}
+              {Number(q.global_discount_value) > 0 && <div className="flex justify-between text-xs"><span className="text-muted-foreground">Sconto {q.global_discount_type === "PERCENT" ? `${q.global_discount_value}%` : ""}</span><span className="font-mono-plex text-emerald-700" data-testid="totals-discount">−{fmtEUR(Number(q.commercial_subtotal || 0) - Number(q.subtotal || 0))}</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">Imponibile</span><span className="font-mono-plex" data-testid="totals-net">{fmtEUR(q.subtotal)}</span></div>
+              {(q.vat_breakdown || []).length > 1 ? (q.vat_breakdown || []).map((vb) => (
+                <div key={vb.rate} className="flex justify-between text-xs" data-testid={`totals-vat-${Math.round(Number(vb.rate) * 100)}`}><span className="text-muted-foreground">IVA {Math.round(Number(vb.rate) * 100)}% su {fmtEUR(vb.taxable)}</span><span className="font-mono-plex">{fmtEUR(vb.tax)}</span></div>
+              )) : null}
+              <div className="flex justify-between"><span className="text-muted-foreground">IVA{(q.vat_breakdown || []).length === 1 ? ` ${Math.round(Number(q.vat_breakdown[0].rate) * 100)}%` : ((q.vat_breakdown || []).length > 1 ? " (mista)" : "")}</span><span className="font-mono-plex" data-testid="totals-vat">{fmtEUR(q.vat_amount)}</span></div>
+              <div className="flex justify-between pt-2 border-t"><span className="font-bold">Totale IVA inclusa</span><span className="font-mono-plex text-lg font-black" data-testid="totals-gross">{fmtEUR(q.total)}</span></div>
+              <div className="pt-2">
+                <Label className="text-[10px] uppercase">IVA</Label>
+                <Select value={q.fiscal_dossier?.requested_regime || "VAT_ORDINARY"} disabled={!editable} onValueChange={(v) => patchFiscal.mutate({ requested_regime: v })}>
+                  <SelectTrigger className="rounded-sm h-9" data-testid="quote-vat-select"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(vatOptions?.options || []).map((o) => <SelectItem key={o.value} value={o.value} data-testid={`vat-opt-${o.value}`}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {["VAT_DOCUMENTATION_INCOMPLETE", "VAT_REVIEW_REQUIRED"].includes(q.vat_regime) && <div className="mt-1 text-[10px] font-bold text-amber-700" data-testid="quote-vat-warning">IVA AGEVOLATA — DOCUMENTAZIONE DA COMPLETARE: applicata IVA 22% ordinaria finché il dossier fiscale non è validato{q.fiscal_dossier?.documentation_status ? ` (documenti: ${q.fiscal_dossier.documentation_status}${q.fiscal_dossier.customer_declaration ? ", dichiarazione cliente ✓" : ", dichiarazione cliente mancante"})` : ""}.</div>}
+              </div>
+              <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground"><span>Regime IVA applicato: <b data-testid="totals-vat-regime">{vatOptions?.labels?.[q.vat_regime] || q.vat_regime || "IVA 22% ordinaria"}</b></span>{q.fiscal_dossier?.vat_eligibility_status && <Badge variant="outline" className="rounded-sm text-[10px]" data-testid="totals-fiscal-status">Dossier fiscale: {q.fiscal_dossier.vat_eligibility_status}</Badge>}</div>
             </div>
           </Card>
 
           {/* --- Marginalità (Margin Tachometer V1 — msg 392) --- */}
           <MarginPanel financial={financial} isAdmin={!!financial?.is_admin_master_view} />
+          <CompetitorAnalyzerCard quoteId={id} editable={editable} isAdmin={isAdminMaster} />
+          <Card className="rounded-sm border-border p-4" data-testid="quote-emails-card">
+            <div className="overline mb-3">Email preventivo — stato consegna</div>
+            <QuoteEmailHistory quoteId={id} />
+          </Card>
+          <QuoteEmailDialog quoteId={id} open={emailOpen} onOpenChange={setEmailOpen} latestPdf={latestDef} onSent={reload} />
 
           <Card className="rounded-sm border-border p-6" data-testid="revisions-card">
             <div className="overline mb-3">Revisioni</div>

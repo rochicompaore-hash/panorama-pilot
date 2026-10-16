@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.db import get_db
+from app.services.delivery_lead_time import color_delivery_class
 from app.deps import require_permission, get_client_ip
 from app.models import new_id
 from app.models_colors import (
@@ -33,6 +34,8 @@ async def list_colors(
     if cassonetti_price_family:
         q["cassonetti_price_family"] = cassonetti_price_family
     docs = await db.product_colors.find(q).sort([("display_order", 1), ("code", 1)]).to_list(500)
+    for d in docs:
+        d.setdefault("delivery_class", color_delivery_class(d.get("code")))
     return {"items": [from_mongo(d) for d in docs]}
 
 

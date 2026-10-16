@@ -376,7 +376,7 @@
   <div class="card">
     <div class="card-title"><span class="ico">T</span> Tempi indicativi</div>
     <div class="xs muted" style="letter-spacing:1pt; text-transform:uppercase;">{{ q.delivery_label }}</div>
-    {% if (q.delivery_mode or 'STANDARD') == 'STANDARD' %}<div class="big">oltre 90 giorni</div>{% endif %}
+    {% if (q.delivery_mode or 'STANDARD') == 'STANDARD' %}<div class="big">{% if q.delivery_lead_time_days %}entro {{ q.delivery_lead_time_days }} giorni{% else %}da definire in base alla configurazione{% endif %}</div>{% endif %}
     <div class="small">{{ q.delivery_customer_text or 'Tempistica da confermare per iscritto al momento dell\'ordine.' }}</div>
     <div class="xs muted" style="margin-top:2mm;">Le date di produzione, merce pronta e montaggio vengono confermate secondo lo stato reale della commessa.</div>
   </div>
@@ -396,8 +396,10 @@
         <tr><td class="k">Sconto pagamento anticipato ({{ q.automatic_discount_percent | num(0) }}%)</td><td class="v">− {{ q.payment_discount_amount | cur }}</td></tr>
       {% endif %}
       <tr><td class="k">Imponibile</td><td class="v">{{ q.subtotal | cur }}</td></tr>
-      {% for vb in q.vat_breakdown %}<tr><td class="k">IVA {{ vb.rate_pct | num(0) }}%</td><td class="v">{{ vb.tax | cur }}</td></tr>{% endfor %}
-      <tr class="total"><td class="k">Totale finale</td><td class="v">{{ q.total | cur }}</td></tr>
+      {% for vb in q.vat_breakdown %}{% if q.vat_breakdown|length > 1 %}<tr><td class="k">Imponibile IVA {{ vb.rate_pct | num(0) }}%</td><td class="v">{{ vb.taxable | cur }}</td></tr>{% endif %}<tr><td class="k">IVA {{ vb.rate_pct | num(0) }}%</td><td class="v">{{ vb.tax | cur }}</td></tr>{% endfor %}
+      <tr><td class="k">Totale IVA</td><td class="v">{{ q.vat_amount | cur }}</td></tr>
+      <tr class="total"><td class="k">Totale IVA inclusa</td><td class="v">{{ q.total | cur }}</td></tr>
+      <tr><td class="k xs muted" colspan="2">Regime IVA: {{ q.vat_mode_label }}</td></tr>
     </table>
   </div>
 </div>

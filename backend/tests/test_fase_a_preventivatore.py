@@ -63,10 +63,14 @@ class TestDiscountDropdown:
     def qid(self, admin):
         return _mk_quote(admin, [WINDOW])
 
-    @pytest.mark.parametrize("bad", [12.5, 31, -1, 0.3])
+    @pytest.mark.parametrize("bad", [12.5, 101, -1, 0.3])
     def test_non_step_or_out_of_range_rejected(self, admin, qid, bad):
         r = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"global_discount_percent": bad}, timeout=15)
         assert r.status_code == 400 and r.json()["detail"]["code"] == "GLOBAL_DISCOUNT_INVALID", r.text
+
+    def test_over_30_requires_admin_cap_permission(self, commercial, qid):
+        r = commercial.patch(f"{BASE_URL}/api/quotes/{qid}", json={"global_discount_percent": 31}, timeout=15)
+        assert r.status_code == 403 and r.json()["detail"]["code"] == "ADMIN_APPROVAL_REQUIRED", r.text
 
     def test_integer_step_accepted(self, admin, qid):
         r = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"global_discount_percent": 12}, timeout=15)

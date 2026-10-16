@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { Warning, TrendUp, Money, Wallet, Buildings, Info } from "@phosphor-icons/react";
+import { CfoControlTower } from "@/components/cfo/CfoControlTower";
 
 const COLORS = ["#D42027", "#0F1720", "#4B5563", "#94A3B8", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6"];
 
@@ -32,7 +33,9 @@ function KPI({ label, value, sub, testId, danger }) {
 const fmt = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
 
 export default function TreasuryCFOPage() {
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("tower");
+  const [cfoCash, setCfoCash] = useState(null);
+  useEffect(() => { api.get("/cfo/overview", { params: { legal_entity_id: legalEntityFilter === "all" ? "GROUP" : legalEntityFilter } }).then((r) => setCfoCash(r.data.cash_position)).catch(() => setCfoCash({ status: "INCOMPLETE" })); }, [legalEntityFilter]);
   const [entities, setEntities] = useState([]);
   const [legalEntityFilter, setLegalEntityFilter] = useState("all");
   const [treasury, setTreasury] = useState(null);
@@ -118,9 +121,9 @@ export default function TreasuryCFOPage() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPI label="Saldo banche" testId="kpi-bank-total"
-             value={fmt(treasury?.availability?.bank_balance_total)}
-             sub={`disponibile ${fmt(treasury?.availability?.available_balance)}`}/>
+        <KPI label="Saldo banche (certificato)" testId="kpi-bank-total"
+             value={cfoCash?.status === "INCOMPLETE" ? "NON CERTIFICATO" : fmt(cfoCash?.available_cash)}
+             sub={cfoCash?.status === "INCOMPLETE" ? "BANK BALANCE NOT CONFIGURED — certifica il saldo nel Control Tower" : `al ${cfoCash?.as_of} · ${cfoCash?.accounts_not_configured || 0} conti non certificati`}/>
         <KPI label="Fondi virtuali" testId="kpi-funds-total"
              value={fmt(treasury?.funds?.total)}
              sub={`IVA ${fmt(treasury?.funds?.iva)}`}/>
@@ -134,7 +137,8 @@ export default function TreasuryCFOPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex flex-wrap h-auto">
-          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="tower" data-testid="tab-tower">Control Tower</TabsTrigger>
+          <TabsTrigger value="overview" data-testid="tab-overview">Tesoreria (legacy)</TabsTrigger>
           <TabsTrigger value="banks" data-testid="tab-banks">Conti</TabsTrigger>
           <TabsTrigger value="funds" data-testid="tab-funds">Fondi</TabsTrigger>
           <TabsTrigger value="vat" data-testid="tab-vat">IVA/F24</TabsTrigger>
@@ -150,6 +154,7 @@ export default function TreasuryCFOPage() {
           <TabsTrigger value="alerts" data-testid="tab-alerts">Alert</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="tower"><CfoControlTower legalEntityId={legalEntityFilter} /></TabsContent>
         <TabsContent value="overview" className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="p-5">

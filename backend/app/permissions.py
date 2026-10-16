@@ -94,6 +94,8 @@ PERMISSION_CATALOG = [
     ("quotes.edit_prices", "Preventivi", "edit", "Modifica prezzi manualmente"),
     ("quotes.apply_discount", "Preventivi", "edit", "Applica sconti"),
     ("quotes.override_discount", "Preventivi", "approve", "Sconto oltre soglia (bypass approvazione)"),
+    ("quotes.override_discount_cap", "Preventivi", "approve", "Sconto oltre il 30% (fino al massimo sostenibile, floor 15% invariato)"),
+    ("quotes.vat_validate", "Preventivi", "approve", "Valida eligibility IVA agevolata (Fiscal Dossier)"),
     ("quotes.convert_contract", "Preventivi", "approve", "Converte preventivo in contratto"),
     # Pricelists
     ("pricelists.view", "Listini", "view", "Visualizza listini"),

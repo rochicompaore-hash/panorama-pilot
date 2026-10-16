@@ -16,6 +16,7 @@ import {
   EnvelopeSimple, PaperPlaneTilt, ShieldCheck, Warning, CheckCircle,
   XCircle, Wrench, ArrowClockwise, Copy,
 } from "@phosphor-icons/react";
+import { TenantSenderCard } from "@/components/email/TenantSenderCard";
 
 const TEMPLATE_CODES = [
   "USER_INVITATION", "PASSWORD_RESET", "QUOTE_SENT",
@@ -52,12 +53,12 @@ export default function EmailSettingsPage() {
   return (
     <div className="space-y-8" data-testid="email-settings-page">
       <div>
-        <div className="overline text-muted-foreground">Sistema email SMTP</div>
+        <div className="overline text-muted-foreground">Sistema email · provider Resend</div>
         <h1 className="mt-2 font-display text-3xl sm:text-4xl font-black tracking-tight">
           Impostazioni email
         </h1>
         <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-          Configurazione SMTP SiteGround, template personalizzabili, verifica DNS
+          Provider Resend (delivery tracking via webhook), mittente per tenant, template personalizzabili, verifica DNS
           (SPF/DKIM/DMARC) e invio di test. La password è caricata solo dai Production Secrets
           e non è mai esposta.
         </p>
@@ -66,6 +67,7 @@ export default function EmailSettingsPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="rounded-sm">
           <TabsTrigger value="config" data-testid="tab-config">Configurazione</TabsTrigger>
+          <TabsTrigger value="sender" data-testid="tab-sender">Mittente tenant</TabsTrigger>
           <TabsTrigger value="test" data-testid="tab-test">Invio di test</TabsTrigger>
           <TabsTrigger value="dns" data-testid="tab-dns">Verifica DNS</TabsTrigger>
           <TabsTrigger value="templates" data-testid="tab-templates">Template</TabsTrigger>
@@ -75,6 +77,8 @@ export default function EmailSettingsPage() {
         <TabsContent value="config" className="space-y-4">
           <ConfigCard cfg={cfg.data} isLoading={cfg.isLoading} />
         </TabsContent>
+
+        <TabsContent value="sender"><TenantSenderCard /></TabsContent>
 
         {/* -------- TEST -------- */}
         <TabsContent value="test">

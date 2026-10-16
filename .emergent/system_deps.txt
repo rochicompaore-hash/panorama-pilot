@@ -1,9 +1,5 @@
-libpango-1.0-0
-libpangoft2-1.0-0
-libpangocairo-1.0-0
-libgdk-pixbuf-2.0-0
-libcairo2
-libglib2.0-0
-libffi8
-shared-mime-info
-fonts-dejavu-core
+fonts-dejavu-core=2.37-6
+libgdk-pixbuf-2.0-0=2.42.10+dfsg-1+deb12u4
+libpangocairo-1.0-0=1.50.12+ds-1
+libpangoft2-1.0-0=1.50.12+ds-1
+shared-mime-info=2.2-1

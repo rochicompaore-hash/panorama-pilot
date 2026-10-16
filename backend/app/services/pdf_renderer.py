@@ -8,6 +8,7 @@ Design:
 - Deterministic: same snapshot → same PDF bytes (approximately — timestamps in metadata excluded)
 """
 from __future__ import annotations
+from app.services.vat_engine import VAT_MODE_LABELS
 import hashlib
 import io
 import json
@@ -274,7 +275,11 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "dismantling_mode": quote.get("dismantling_mode"),
         "vat_amount": quote.get("vat_amount"),
         "total": quote.get("total"),
-        "vat_breakdown": _compute_vat_breakdown(quote.get("lines") or [], float(quote.get("subtotal") or 0)),
+        "vat_breakdown": quote.get("vat_breakdown") or _compute_vat_breakdown(quote.get("lines") or [], float(quote.get("subtotal") or 0)),
+        "vat_regime": quote.get("vat_regime_applied") or quote.get("vat_regime") or "VAT_ORDINARY",
+        "vat_mode_label": VAT_MODE_LABELS.get(quote.get("vat_regime") or "VAT_ORDINARY", "IVA 22% ordinaria"),
+        "delivery_lead_time_days": quote.get("delivery_lead_time_days"),
+        "delivery_lead_time_mixed": bool(quote.get("delivery_lead_time_mixed")),
         "notes": quote.get("notes"),
         "version": quote.get("version"),
         "visual_schemes": _build_visual_schemes(quote),

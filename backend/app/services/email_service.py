@@ -15,7 +15,6 @@ import asyncio
 import hashlib
 import logging
 import ssl
-import time
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 from email.utils import make_msgid
@@ -33,12 +32,17 @@ from app.models_email import (
     EmailLogV2, EmailTemplateDoc,
     EMAIL_STATUS_QUEUED, EMAIL_STATUS_SENDING, EMAIL_STATUS_SENT,
     EMAIL_STATUS_FAILED, EMAIL_STATUS_RETRYING, EMAIL_STATUS_CONFIG_REQUIRED,
-    EMAIL_STATUS_TEST_INTERCEPTED, DELIVERY_MODE_TEST, DELIVERY_MODE_LIVE,
-    EMAIL_TEMPLATE_CODES,
+    EMAIL_STATUS_TEST_INTERCEPTED, DELIVERY_MODE_TEST, EMAIL_TEMPLATE_CODES,
 )
 from app.services.email_config import get_mail_config
+from app.services import resend_provider
+from app.services.tenant_email import resolve_sender
 
 logger = logging.getLogger("email_service")
+
+# Stati delivery (PO §E/§10): provider_accepted (SENT) ≠ delivered
+DELIVERY_QUEUED, DELIVERY_SENT, DELIVERY_DELIVERED, DELIVERY_DEFERRED = "queued", "provider_accepted", "delivered", "deferred"
+DELIVERY_BOUNCED, DELIVERY_FAILED, DELIVERY_COMPLAINED = "bounced", "failed", "complained"
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "email"
 _jinja_env = Environment(
@@ -157,6 +161,36 @@ async def _smtp_deliver(cfg, to: str, subject: str, html: str, text: str,
 
 
 # ---------------------------------------------------------------------------
+# Resend delivery
+# ---------------------------------------------------------------------------
+async def _load_attachments(log_doc: Dict[str, Any]) -> List[Dict[str, Any]]:
+    from app.routers.pdf_router import _fetch_pdf_bytes
+    db = get_db()
+    out = []
+    for a in log_doc.get("attachments") or []:
+        if not a.get("pdf_id"):
+            continue
+        d = await db.quote_pdfs.find_one({"_id": a["pdf_id"], "tenant_id": log_doc.get("tenant_id")})
+        if not d:
+            raise resend_provider.ResendError(400, f"Allegato {a.get('filename')} non trovato", "attachment_missing")
+        out.append({"filename": a.get("filename") or d.get("filename") or "documento.pdf", "content": await _fetch_pdf_bytes(d)})
+    return out
+
+
+async def _resend_deliver(log_doc: Dict[str, Any]) -> Tuple[str, str]:
+    from_email = log_doc.get("from_email")
+    if not from_email:
+        raise resend_provider.ResendError(400, "Mittente non risolvibile: PANORAMA_MANAGED_DOMAIN non configurato", "sender_unresolved")
+    mid = await resend_provider.send_email(
+        from_email=from_email, from_name=log_doc.get("from_name") or "", to=log_doc["to"], subject=log_doc["subject"],
+        html=log_doc.get("stored_html") or "", text=log_doc.get("stored_text") or "", reply_to=log_doc.get("reply_to"),
+        attachments=await _load_attachments(log_doc), idempotency_key=f"panorama:{log_doc['id']}",
+        tags={"tenant_id": log_doc.get("tenant_id") or "platform", "event_type": log_doc.get("event_type") or log_doc.get("template") or "email"},
+    )
+    return "resend_accepted", mid
+
+
+# ---------------------------------------------------------------------------
 # Main send API
 # ---------------------------------------------------------------------------
 async def enqueue_email(
@@ -172,8 +206,14 @@ async def enqueue_email(
     reply_to: Optional[str] = None,
     attempt_send_now: bool = True,
     event_type: Optional[str] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+    customer_id: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Enqueue an email + attempt immediate send.
+
+    attachments: [{"filename": str, "pdf_id": str}] — i byte vengono risolti al momento dell'invio (mai nel log).
 
     Two modes:
       1. Template-based: pass `template` (code) + `context`. subject/html/text ignored.
@@ -188,7 +228,8 @@ async def enqueue_email(
     cfg = get_mail_config()
     ctx = dict(context or {})
     ctx.setdefault("app_base_url", cfg.app_base_url)
-    ctx.setdefault("brand_name", cfg.mail_from_name or "Infissi Express Cloud")
+    sender = await resolve_sender(db, tenant_id) if tenant_id else {"from_name": cfg.mail_from_name, "from_email": cfg.mail_from, "reply_to": cfg.reply_to, "sender_mode": "PLATFORM"}
+    ctx.setdefault("brand_name", sender.get("from_name") or cfg.mail_from_name or "Panorama Pilot")
 
     # --- Idempotency check ---
     if idempotency_key:
@@ -247,12 +288,15 @@ async def enqueue_email(
         payload_hash=payload_hash,
         stored_html=html,
         stored_text=text,
-        reply_to=reply_to or cfg.reply_to,
+        reply_to=reply_to or sender.get("reply_to") or cfg.reply_to,
         created_at=now,
         updated_at=now,
     )
     doc = to_mongo(log.model_dump(by_alias=True))
     doc["event_type"] = event_type or template
+    doc.update({"delivery_status": DELIVERY_QUEUED, "from_email": sender.get("from_email"), "from_name": sender.get("from_name"),
+                "sender_mode": sender.get("sender_mode"), "attachments": [{"filename": a.get("filename"), "pdf_id": a.get("pdf_id")} for a in (attachments or [])],
+                "customer_id": customer_id, "entity_type": entity_type, "entity_id": entity_id, "delivery_events": []})
     await db.email_logs.insert_one(doc)
 
     if not attempt_send_now:
@@ -271,17 +315,18 @@ async def _attempt_send(log_id: str) -> Dict[str, Any]:
         return {"ok": False, "error": "log_not_found"}
     log_doc = from_mongo(doc)
 
-    # SMTP not configured => park in configuration_required, no send attempt
+    # Nessun provider configurato => configuration_required, visibile all'Admin (mai fallback silenzioso a mock)
     if not cfg.is_configured:
         await db.email_logs.update_one(
             {"_id": log_id},
             {"$set": {
                 "status": EMAIL_STATUS_CONFIG_REQUIRED,
-                "error": "SMTP_NOT_CONFIGURED: MAIL_PASSWORD non impostata nei Production Secrets",
+                "delivery_status": DELIVERY_FAILED,
+                "error": "RESEND_CONFIGURATION=BLOCKED_BY_SECRET: RESEND_API_KEY non impostata",
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }},
         )
-        logger.warning("email SMTP_NOT_CONFIGURED — log id=%s parked", log_id)
+        logger.warning("email provider not configured — log id=%s parked", log_id)
         d2 = await db.email_logs.find_one({"_id": log_id})
         return from_mongo(d2)
 
@@ -296,15 +341,19 @@ async def _attempt_send(log_id: str) -> Dict[str, Any]:
             "updated_at": now.isoformat(),
         }},
     )
+    permanent = False
     try:
-        srv_resp, provider_message_id = await _smtp_deliver(
-            cfg,
-            to=log_doc["to"],
-            subject=log_doc["subject"],
-            html=log_doc.get("stored_html") or "",
-            text=log_doc.get("stored_text") or "",
-            reply_to=log_doc.get("reply_to"),
-        )
+        if cfg.provider_name == "resend":
+            srv_resp, provider_message_id = await _resend_deliver(log_doc)
+        else:
+            srv_resp, provider_message_id = await _smtp_deliver(
+                cfg,
+                to=log_doc["to"],
+                subject=log_doc["subject"],
+                html=log_doc.get("stored_html") or "",
+                text=log_doc.get("stored_text") or "",
+                reply_to=log_doc.get("reply_to"),
+            )
         final_status = EMAIL_STATUS_TEST_INTERCEPTED if (
             log_doc.get("delivery_mode") == DELIVERY_MODE_TEST and log_doc.get("to") != log_doc.get("original_to")
         ) else EMAIL_STATUS_SENT
@@ -312,19 +361,21 @@ async def _attempt_send(log_id: str) -> Dict[str, Any]:
             {"_id": log_id},
             {"$set": {
                 "status": final_status,
-                "delivery_status": "provider_accepted",  # SMTP 250 = accettato dal provider, NON delivered
+                "delivery_status": DELIVERY_SENT,  # accettato dal provider, NON delivered (webhook)
+                "provider": cfg.provider_name,
                 "provider_message_id": provider_message_id,
                 "smtp_response": srv_resp,
                 "sent_at": datetime.now(timezone.utc).isoformat(),
                 "next_retry_at": None,
                 "error": None,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
-            }},
+            }, "$push": {"delivery_events": {"type": "provider_accepted", "at": datetime.now(timezone.utc).isoformat(), "provider_message_id": provider_message_id}}},
         )
         logger.info("email sent id=%s to=%s status=%s", log_id, log_doc["to"], final_status)
     except Exception as e:  # noqa: BLE001
+        permanent = isinstance(e, resend_provider.ResendError) and not e.is_temporary
         max_attempts = int(log_doc.get("max_attempts") or 3)
-        will_retry = attempt < max_attempts
+        will_retry = attempt < max_attempts and not permanent
         next_retry = None
         if will_retry:
             backoff = RETRY_BACKOFF_SECONDS[min(attempt - 1, len(RETRY_BACKOFF_SECONDS) - 1)]

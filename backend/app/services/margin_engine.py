@@ -29,6 +29,7 @@ LOW_MARGIN_THRESHOLD_PERCENT = 20.0  # 15 < POST < 20 → LOW_MARGIN (consentito
 FLOOR_EPSILON = 0.0001               # 0.01 punti % — garantisce POST strettamente > floor
 DIRECTOR_APPROVAL_DISCOUNT_PERCENT = 30.0
 COMMERCIAL_DISCOUNT_DROPDOWN_MAX = 30    # PO Fase A §5 — dropdown 0..30% step 1%
+ADMIN_MASTER_MAX_DISCOUNT_PERCENT = 40   # PO Email/Discount directive §A — tetto rigido Admin Master (sempre soggetto a floor >15%)
 # (sconto massimo della fascia incluso, cap commissione) — msg 796
 DISCOUNT_COMMISSION_BANDS = [(5.0, 0.15), (10.0, 0.12), (15.0, 0.10), (20.0, 0.08), (25.0, 0.05), (30.0, 0.03)]
 WITHHOLDING_POLICY_VERSION = "withholding_policy_v1_2026_02"
@@ -376,6 +377,9 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
         "max_discount_available_percent": max_disc_floor,
         "max_discount_without_approval_percent": max_disc_no_approval,
         "max_commercial_discount_step_percent": max_commercial_step,
+        "max_admin_discount_step_percent": None if max_disc_floor is None else int(max(0, min(ADMIN_MASTER_MAX_DISCOUNT_PERCENT, math.floor((1.0 - (1.0 - max_disc_floor / 100.0) / max(1e-9, 1.0 - pay_pct / 100.0)) * 100.0 + 1e-9)))),
+        "admin_master_max_discount_percent": ADMIN_MASTER_MAX_DISCOUNT_PERCENT,
+        "minimum_sustainable_net_price": None if max_disc_floor is None else round(commercial_subtotal * (1.0 - max_disc_floor / 100.0), 2),
         "final_company_contribution": final_company_contribution,
         "final_company_margin": final_company_margin,
         # Tachometer authoritative value (msg 396 §4/§13)

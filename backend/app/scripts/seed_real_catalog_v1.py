@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 from app.db import get_db, close_db
+from app.services.delivery_lead_time import color_delivery_class
 from app.models import new_id
 
 
@@ -85,6 +86,7 @@ async def seed_colors(db, tenant_id: str, dry: bool) -> int:
             "name": name, "ral_reference": ral, "pvc_color_category": pcat,
             "cassonetti_price_family": cass_fam, "finish_type": finish,
             "mass_color": mass, "foil": foil, "visual_hex": hex_,
+            "delivery_class": color_delivery_class(code),
             "display_order": i * 10, "active": True, "updated_at": _iso(),
         }
         if existing:

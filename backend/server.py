@@ -69,6 +69,11 @@ from app.routers.dashboards_crm import router as dashboards_crm_router
 
 # Quoting & Contracts
 from app.routers.quotes import router as quotes_router
+from app.routers.quote_economic_control import router as quote_econ_router
+from app.routers.quote_email import router as quote_email_router
+from app.routers.cfo import router as cfo_router
+from app.routers.tenant_email import router as tenant_email_router
+from app.routers.email_webhooks import router as email_webhooks_router
 from app.routers.contracts import router as contracts_router
 from app.routers.pricing import router as pricing_router
 from app.routers.pricing_hub import router as pricing_hub_router
@@ -238,6 +243,7 @@ CRM_ROUTERS = [
     goals_router, commissions_router, dashboards_crm_router,
 ]
 QUOTING_ROUTERS = [
+    quote_econ_router, quote_email_router, cfo_router, tenant_email_router, email_webhooks_router,
     quotes_router, contracts_router, pricing_router, pricing_hub_router,
     quote_structure_router, geometry_router, parametric_router, importer_router,
     pdf_router,

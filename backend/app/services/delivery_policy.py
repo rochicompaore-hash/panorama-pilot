@@ -1,6 +1,6 @@
 """Delivery policy (PO msg 402 Lotto 9) — tempi automatici + maggiorazione EXPRESS +20%.
 
-STANDARD: oltre 90 giorni (salvo policy prodotto/pacchetto specifica configurata).
+STANDARD: entro 60/90 giorni per classe colore canonica (delivery_lead_time.py); commessa = lead time maggiore.
 EXPRESS: +20% sulla base commerciale (righe prodotto/servizi, esclusi ENEA); giorni = NEEDS_PO_CONFIRMATION.
 """
 from __future__ import annotations
@@ -12,8 +12,8 @@ EXPRESS_SURCHARGE_PERCENT = 20.0
 DELIVERY_MODES: Dict[str, Dict[str, Any]] = {
     "STANDARD": {
         "label": "Consegna standard",
-        "estimated_delivery_min_days": 90, "estimated_delivery_max_days": None,
-        "customer_text": "Oltre 90 giorni dall'ordine e dal rilievo tecnico definitivo, salvo diversa tempistica indicata per prodotto o pacchetto.",
+        "estimated_delivery_min_days": 60, "estimated_delivery_max_days": 90,
+        "customer_text": "Entro 60 o 90 giorni dall'ordine e dal rilievo tecnico definitivo, in base alle finiture configurate (policy tempi di consegna).",
         "surcharge_percent": 0.0, "express_days_status": None,
     },
     "EXPRESS": {

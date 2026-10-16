@@ -135,6 +135,7 @@
   {% for b in economics.vat_breakdown %}<div class="row"><span>IVA {{ '%g' % (b.rate * 100) }}% su {{ '%.2f' % b.taxable }} €</span><span class="money">{{ '%.2f' % b.tax }} €</span></div>{% endfor %}
   <div class="row total"><span>TOTALE OFFERTA (IVA inclusa)</span><span class="money">{{ '%.2f' % (totals.total or 0) }} €</span></div>
 </div>
+{% if economics.delivery_lead_time_days %}<div class="row"><span>Tempi di consegna</span><span>ENTRO {{ economics.delivery_lead_time_days }} GIORNI{% if economics.delivery_lead_time_mixed %} (configurazione con lead time maggiore){% endif %}</span></div>{% endif %}
 <div class="muted">Regime IVA accettato: <b>{{ economics.vat_regime.code }}%</b>{% if economics.vat_regime.declaration_required %} — dichiarazione di responsabilità IVA agevolata in allegato{% endif %}.</div>
 
 <h2>Modalità di pagamento (Sezione 4)</h2>

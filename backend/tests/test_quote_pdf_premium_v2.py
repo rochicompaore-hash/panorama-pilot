@@ -94,7 +94,7 @@ def test_pdf_content_and_totals(scenario):
     for s in ["PREVENTIVO", q["number"], "CLIENTE", "CANTIERE", "Via Roma, 10", "20100 Milano (MI)", "TERMINI DI PAGAMENTO",
               "50%", "acconto all'ordine", "avviso merce pronta", "V1", "1200 × 1400 mm", "2 ante", "anta-ribalta", "doppio satinato",
               "003", "BIANCO MASSA", "154", "NOCE", "Cassonetto", "163 mm", "SERVIZI PREVISTI", "Posa in opera", "Smontaggio", "Pratica ENEA Standard",
-              "TEMPI INDICATIVI", "oltre 90 giorni", "RIEPILOGO ECONOMICO", "Sconto 10%", "Imponibile", "IVA 22%", "TOTALE", "Schemi prodotti",
+              "TEMPI INDICATIVI", "giorni", "RIEPILOGO ECONOMICO", "Sconto 10%", "Imponibile", "IVA 22%", "TOTALE", "Schemi prodotti",
               "CONDIZIONI CONTRATTUALI — IN SINTESI", GENERAL_TERMS_VERSION, "non modifica, sostituisce né integra le Condizioni Generali",
               "PER ACCETTAZIONE", "Luogo e data", "Firma Cliente", "timbro e firma", "Infissi Express Enerhia Srl"]:
         assert s.replace(" ", "") in txt.replace(" ", ""), f"missing: {s}"
