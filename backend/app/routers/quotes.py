@@ -362,7 +362,7 @@ async def update_quote(
             now_iso = datetime.now(timezone.utc).isoformat()
             payload["discount_approval"] = {"requested_discount": pct, "previous_discount_percent": float(cur_q.get("global_discount_value") or 0), "requested_by": user["id"], "requested_by_email": user.get("email"),
                                             "requested_at": now_iso, "margin_before": fs_before.get("post_margin_percent"), "margin_after": fs_after.get("post_margin_percent"), "reason": reason,
-                                            "status": "APPROVED" if is_master else "DISCOUNT_APPROVAL_REQUIRED", "approved_by": user["id"] if is_master else None, "approved_at": now_iso if is_master else None,
+                                            "status": "APPROVED" if is_master else "DISCOUNT_APPROVAL_REQUIRED", "approved_by": user["id"] if is_master else None, "approved_by_email": user.get("email") if is_master else None, "approved_at": now_iso if is_master else None,
                                             "auto_approved_admin_master": is_master}
             payload["discount_approval_status"] = "APPROVED" if is_master else "DISCOUNT_APPROVAL_REQUIRED"
         else:

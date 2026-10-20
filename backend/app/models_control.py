@@ -13,9 +13,10 @@ FixedCostCategory = Literal[
     "rent", "utilities", "insurance", "software", "licenses",
     "vehicles", "leasing", "consulting", "marketing", "training",
     "banking", "office_supplies", "cleaning", "security", "other",
+    "logistics", "tax", "energy", "telephony", "admin", "financing", "fuel", "maintenance",
 ]
 
-FixedCostRecurrence = Literal["monthly", "quarterly", "yearly", "one_off"]
+FixedCostRecurrence = Literal["monthly", "bimonthly", "quarterly", "semiannual", "annual", "yearly", "one_off"]
 
 
 class FixedCost(BaseDoc):
@@ -42,10 +43,10 @@ class FixedCost(BaseDoc):
 
 class FixedCostCreate(BaseModel):
     label: str
-    category: str = "other"
+    category: FixedCostCategory = "other"
     supplier: Optional[str] = None
     amount_raw: float
-    recurrence: str = "monthly"
+    recurrence: FixedCostRecurrence = "monthly"
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     vat_rate: float = 22.0

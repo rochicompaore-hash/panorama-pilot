@@ -143,7 +143,7 @@ export default function QuoteEditorPage() {
     onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
   });
   const [promoInput, setPromoInput] = React.useState("");
-  React.useEffect(() => { if (q) { setDiscountPct(q.global_discount_source === "MANUAL" ? q.global_discount_value || 0 : 0); setPromoInput(q.promo_code || ""); } }, [q?.global_discount_value, q?.promo_code, q?.global_discount_source]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (q) { setDiscountPct(q.global_discount_source === "MANUAL" ? q.global_discount_value || 0 : 0); setPromoInput(q.promo_code || ""); setDiscountReason(q.discount_approval?.reason || ""); } }, [q?.global_discount_value, q?.promo_code, q?.global_discount_source]); // eslint-disable-line react-hooks/exhaustive-deps
   const patchQuote = useMutation({
     mutationFn: async (fields) => (await api.patch(`/quotes/${id}`, fields)).data,
     onSuccess: () => { toast.success("Preventivo aggiornato e ricalcolato"); reload(); },
@@ -399,7 +399,7 @@ export default function QuoteEditorPage() {
                   <Label className="text-[10px] uppercase font-bold">Sconto / Codice promo (intero preventivo)</Label>
                   <div className="flex gap-2 items-end">
                     <div className="flex-1">
-                      <Label className="text-[10px] uppercase">Sconto % (max consentito {maxAllowedStep ?? "—"}%{isAdminMaster ? ` · Admin Master fino a ${adminHardCap}%` : ""})</Label>
+                      <Label className="text-[10px] uppercase">Sconto % (max consentito {maxAllowedStep ?? dropdownMax}%{isAdminMaster ? ` · Admin Master fino a ${adminHardCap}%` : ""})</Label>
                       <Select disabled={!editable} value={String(Math.round(Number(discountPct) || 0))} onValueChange={(v) => setDiscountPct(Number(v))}>
                         <SelectTrigger className="rounded-sm h-9" data-testid="quote-discount-pct-select"><SelectValue /></SelectTrigger>
                         <SelectContent className="max-h-64">
@@ -413,7 +413,7 @@ export default function QuoteEditorPage() {
                     </div>
                     <Button type="button" size="sm" variant="outline" className="rounded-sm h-9" disabled={!editable || (Number(discountPct) > 30 && !discountReason)} onClick={() => patchQuote.mutate({ global_discount_percent: Number(discountPct || 0), ...(Number(discountPct) > 30 ? { discount_reason: discountReason } : {}) })} data-testid="quote-discount-apply-btn">Applica</Button>
                   </div>
-                  {Number(discountPct) > 30 && (
+                  {Number(discountPct) > 30 && !(q.discount_approval_status === "APPROVED" && Number(discountPct) === Number(q.global_discount_value)) && (
                     <div className="border border-amber-300 bg-amber-50 rounded-sm p-2 space-y-1" data-testid="discount-over-30-box">
                       <div className="text-[10px] font-bold text-amber-800">⚠ {isAdminMaster ? "SCONTO OLTRE 30% — MOTIVAZIONE OBBLIGATORIA" : "APPROVAZIONE DIREZIONE RICHIESTA — il preventivo resta salvabile ma non finalizzabile"}</div>
                       <select className="h-8 w-full rounded-sm border px-2 text-xs" value={discountReason} onChange={(e) => setDiscountReason(e.target.value)} data-testid="discount-reason-select"><option value="">Motivazione…</option>{["trattativa strategica", "competitor", "volume commessa", "recupero cliente", "promozione autorizzata", "altro"].map((r) => <option key={r}>{r}</option>)}</select>

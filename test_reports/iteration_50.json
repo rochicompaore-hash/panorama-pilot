@@ -1,0 +1,54 @@
+{
+  "summary": "Frontend-only E2E (Playwright, 1920x1080) for Cash Command Center, Fixed Cost Data Gate, Discount 0-40% with approval flow, VAT Questionnaire V2 and QuoteCashBox. 6 features tested: 5 PASS, 1 FAIL (Fixed cost add with recurrence 'annual' → 500).",
+  "per_feature_results": {
+    "1_cash_command_center": "PASS - default tab renders; ccc-kpi-cash/in30/out30/proj30/gap/lowest present with values; ccc-receivables-banner 'CREDITI NON SIGNIFICA CASSA DISPONIBILE.'; sections ccc-timeline/collect/pay/jobs/actions present, D and E expand on click; no page errors",
+    "2_fixed_costs_tab": "FAIL (partial) - fc-po-ref 506.627,60 €, fc-real 0,00 €, fc-diff -506.627,60 €, fc-pct 0%, fc-reconciliation-status INCOMPLETE, fc-demo-list expands (48 rows) = PASS. Adding 'Test assicurazione' 5280 recurrence 'annual' month 3 day 15 → POST /api/control/fixed-costs 500, generic toast 'Si è verificato un errore. Riprova.', nothing added. Workaround with 'quarterly' added the row (fc-real 21.120,00 €, pct 4.17%) and fc-delete-* removed it (fc-real back to 0) = add/delete wiring PASS",
+    "3_discount_admin_35": "PASS - options 0..40 (discount-opt-40 exists, opt-41 absent); 35 → discount-over-30-box shown, Applica disabled until reason, 'competitor' + Applica → toast success, discount-approval-bar APPROVED (Admin Master diretto); reset to 10 OK, bar disappears",
+    "4_discount_commercial_33_then_admin_approve": "PASS - commercial: 33% + reason → DISCOUNT_APPROVAL_REQUIRED, no APPROVA button, waiting message shown; admin: discount-approve-btn + reject visible, APPROVA → toast 'Sconto approvato', status APPROVED",
+    "5_vat_questionnaire": "PASS - picking vat-opt-VAT_ELIGIBLE_10 opens vat-questionnaire-modal automatically, first question vat-q-customer_tax_profile; answers PRIVATE/YES/EXTRAORDINARY_MAINTENANCE/CILA/YES → 'DOCUMENTAZIONE DA COMPLETARE', vat-missing lists 'dichiarazione cliente · documento identità · dati catastali · CILA'; totals stay IVA 22% with 'Completa dossier IVA' button; vat-decl-generate → vat-decl-text; sign 'Mario Rossi'; docs IDENTITY_DOCUMENT/CADASTRAL_DATA/CILA added → outcome IVA MISTA 10%/22%; vat-validate → vat-validated; after closing modal totals-vat-regime 'IVA mista 10% / 22% (beni significativi)', totals-vat-10 and totals-vat-22 rows present",
+    "6_quote_cash_box": "PASS - qcb-margin 43.6%, qcb-sustainability ORANGE PROVISIONAL, qcb-exposure '0 € · LOW'; qcb-toggle-details shows simulator; 30/70 + Simula → qcb-sim-output Acconto 329 €, peak 179 € MEDIUM, cash positive 2026-12-19 (merce pronta)"
+  },
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/control/fixed-costs", "issue": "Returns 500 (pydantic ValidationError, not a 4xx) when recurrence is 'annual', 'semiannual' or 'bimonthly', or category is 'logistics', 'tax', 'energy', 'telephony' or 'admin'. Root cause: models_control.FixedCostRecurrence = Literal['monthly','quarterly','yearly','one_off'] and FixedCostCategory has no logistics/tax/energy/telephony/admin, but FixedCostReconciliation.jsx REC=['monthly','bimonthly','quarterly','semiannual','annual'] and CATS include those values. FixedCostCreate accepts any str, so the error only appears at FixedCost(**d) in management_control.create_fixed (line 69) and becomes a 500. _monthly_amount also does not handle annual/semiannual/bimonthly (it falls back to the raw amount).", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "FixedCostReconciliation add form", "issue": "Recurrence/category options don't match what the backend accepts (see backend issue). The PO-requested 'annual' recurrence can't be saved. A failed save only shows the generic 'Si è verificato un errore. Riprova.'", "selector": "[data-testid='fc-add-recurrence'], [data-testid='fc-add-category']", "priority": "HIGH"},
+      {"component": "DiscountApprovalBar", "issue": "When Admin Master saves 31-40% directly, 'Approvato da' shows the raw user UUID instead of the email (approved_by_email is not set on the auto-approve path; the commercial→admin approve path shows the email correctly)", "selector": "[data-testid='discount-approval-bar']", "priority": "LOW"},
+      {"component": "Quote discount section", "issue": "After a >30% discount is saved or approved, reloading the page still shows discount-over-30-box with an empty reason, 'MOTIVAZIONE OBBLIGATORIA', and Applica disabled. discountReason is not loaded from quote.discount_approval.reason. The margin panel also still shows 'Sconto massimo disponibile 30,00 %' and 'SCONTO > 30% — AUTORIZZAZIONE DIREZIONE RICHIESTA' after approval", "selector": "[data-testid='discount-over-30-box']", "priority": "LOW"},
+      {"component": "Quote discount label (commercial)", "issue": "For the commercial user the label reads 'Sconto % (max consentito —%)' because maxAllowedStep is null", "selector": "[data-testid='quote-discount-section']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Quote editor totals (VAT mixed)", "issues": ["On a quote with only goods (1 window line), the validated MIXED result shows 'IVA 10% su 0,00 €' plus 22% on everything. That is correct for the beni significativi rule but confusing: the regime label says 'IVA mista' while the effective rate is 22%. Show a note when taxable_10 == 0. The VAT select still reads 'IVA 10% AGEVOLATA' while the applied regime is mixed"]},
+      {"screen": "QuoteCashBox details", "issues": ["'Condizioni' shows the raw code DEPOSIT_50_BALANCE_50, which overflows into the next cell; use the Italian label and wrap the text"]},
+      {"screen": "DiscountApprovalBar", "issues": ["Margin before→after shows unrounded values (e.g. 38.4615%, 40.2985%)"]},
+      {"screen": "VatQuestionnaireModal", "issues": ["The intro paragraph is clipped under the dialog header when content scrolls; DialogContent is missing a Description (Radix a11y warning)"]},
+      {"screen": "Quote editor", "issues": ["'Valido fino al' uses the browser's native date input instead of the shadcn Calendar"]}
+    ]
+  },
+  "test_report_links": ["/app/tests/seed_iter50_quotes.py"],
+  "action_items": [
+    "Align fixed-cost recurrence values between frontend and backend: either add annual/semiannual/bimonthly to FixedCostRecurrence and _monthly_amount (annual=/12, semiannual=/6, bimonthly=/2), or map the UI 'annual' to 'yearly'. Do the same for categories (add logistics/tax/energy/telephony/admin to FixedCostCategory or remove them from CATS)",
+    "Validate recurrence/category in FixedCostCreate (Literal) so bad input returns 422/400 instead of 500; show the real error message in the toast",
+    "Set approved_by_email on the Admin Master direct-approve path",
+    "Initialise discountReason from quote.discount_approval.reason and hide the 'motivazione obbligatoria' warning once status is APPROVED; sync the MarginPanel 'Sconto massimo disponibile' with the 40% cap",
+    "Polish: QuoteCashBox payment terms label/overflow, rounding of margin %, a note when VAT 10% taxable is 0"
+  ],
+  "critical_code_review_comments": [
+    "FixedCostReconciliation.jsx REC/CATS constants are out of sync with models_control.py Literals: an easy contract drift. Expose the allowed values from the backend",
+    "management_control.create_fixed builds FixedCost(**d) without a try/except, so pydantic errors leak as 500",
+    "QuoteEditorPage.jsx is 994 lines (>700): split the discount section and the totals/VAT section into components",
+    "CashCommandCenter.jsx packs very long JSX lines (table rows on single lines): hard to maintain"
+  ],
+  "updated_files": ["/app/tests/seed_iter50_quotes.py"],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "83% (5/6 features PASS; fixed-cost add with 'annual' FAIL)"},
+  "seed_data_creation": "3 TEST_ draft quotes created via API (admin): disc_admin 4fb3dd82-17ea-4500-84e9-09a72af56e8f (final discount 10%), disc_comm a38702b9-3a04-4116-8114-dc5f1fa8d445 (33% APPROVED), vat 1fa25ed1-0236-4812-a42f-790f4a485bbf (fiscal dossier VALIDATED, mixed). Customers named TEST_UI It50*. The test fixed cost was deleted.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login selectors: login-email-input/login-password-input/login-submit-button. The CFO page is /cfo. Commercial can open admin-created quotes. Re-run the fc-add flow with recurrence 'annual' after the fix. The VAT questionnaire keys are customer_tax_profile, residential_use, intervention_type, building_permit, supply_and_install (vat-opt-{key}-{value}). Use /app/tests/seed_iter50_quotes.py to seed fresh draft quotes.",
+  "rca of the issue": "Repro: /cfo → Costi fissi → fill label, amount 5280, Ricorrenza 'annual' → Aggiungi reale → toast error. Backend log: pydantic ValidationError FixedCost.recurrence 'annual' not in ('monthly','quarterly','yearly','one_off') at management_control.py:69. Mitigation: unify the enums (see action items)."
+}

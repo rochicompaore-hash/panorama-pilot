@@ -27,8 +27,10 @@ router = APIRouter(prefix="/control", tags=["Management Control"])
 
 def _monthly_amount(amount: float, recurrence: str) -> float:
     if recurrence == "monthly": return amount
+    if recurrence == "bimonthly": return amount / 2.0
     if recurrence == "quarterly": return amount / 3.0
-    if recurrence == "yearly": return amount / 12.0
+    if recurrence == "semiannual": return amount / 6.0
+    if recurrence in ("yearly", "annual"): return amount / 12.0
     if recurrence == "one_off": return 0.0
     return amount
 

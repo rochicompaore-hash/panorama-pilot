@@ -101,8 +101,9 @@ class TestDiscountAuthority:
         assert fa["can_override_discount_cap"] is True and fa["financial_snapshot"]["max_admin_discount_step_percent"] == 40
         fc = comm.get(f"{BASE}/quotes/{qid}/financial-snapshot", timeout=15).json()
         assert fc["can_override_discount_cap"] is False and "max_admin_discount_step_percent" not in fc["financial_snapshot"]
-        assert comm.patch(f"{BASE}/quotes/{qid}", json={"global_discount_percent": 34}, timeout=15).status_code == 403
-        assert admin.patch(f"{BASE}/quotes/{qid}", json={"global_discount_percent": 34}, timeout=15).status_code == 200
+        r = comm.patch(f"{BASE}/quotes/{qid}", json={"global_discount_percent": 34, "discount_reason": "competitor"}, timeout=15)  # PO estensione: commerciale 31-40 salvabile + APPROVAL_REQUIRED
+        assert r.status_code == 200 and r.json()["discount_approval_status"] == "DISCOUNT_APPROVAL_REQUIRED"
+        assert admin.patch(f"{BASE}/quotes/{qid}", json={"global_discount_percent": 34, "discount_reason": "competitor"}, timeout=15).status_code == 200
         r = admin.patch(f"{BASE}/quotes/{qid}", json={"global_discount_percent": 41}, timeout=15)  # oltre tetto 40% → bloccato anche per admin
         assert r.status_code == 403 and r.json()["detail"]["code"] == "ADMIN_DISCOUNT_CAP_EXCEEDED"
 

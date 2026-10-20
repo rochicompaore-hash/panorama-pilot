@@ -103,8 +103,9 @@ async def _reevaluate(db, doc: dict, dossier: dict, user: dict, request: Request
     requested = dossier.get("requested_regime") or "VAT_ORDINARY"
     ev = fe.evaluate(requested, dossier.get("answers") or {}, doc.get("lines") or [], float(doc.get("subtotal") or 0), dossier, rule)
     dossier["evaluation"] = ev
-    dossier["documentation_status"] = "COMPLETE" if (requested == "VAT_ORDINARY" or not ev["missing_requirements"]) else ("PARTIAL" if (dossier.get("documents") or (dossier.get("declaration") or {}).get("status") in ("SIGNED", "VALIDATED")) else "MISSING")
-    dossier["customer_declaration"] = (dossier.get("declaration") or {}).get("status") in ("SIGNED", "VALIDATED")
+    if dossier.get("answers"):  # questionario guidato → stato documentazione/dichiarazione derivati dal Fiscal Engine (altrimenti: percorso fiscale manuale legacy con permesso vat_validate)
+        dossier["documentation_status"] = "COMPLETE" if (requested == "VAT_ORDINARY" or not ev["missing_requirements"]) else ("PARTIAL" if (dossier.get("documents") or (dossier.get("declaration") or {}).get("status") in ("SIGNED", "VALIDATED")) else "MISSING")
+        dossier["customer_declaration"] = (dossier.get("declaration") or {}).get("status") in ("SIGNED", "VALIDATED")
     if requested != "VAT_ORDINARY" and dossier.get("vat_eligibility_status") not in ("VALIDATED", "REJECTED"):
         dossier["vat_eligibility_status"] = "PENDING"
     dossier["audit_trail"] = (dossier.get("audit_trail") or [])[-49:] + [{"at": datetime.now(timezone.utc).isoformat(), "by": user["id"], "action": action, "requested_vat": requested, "eligibility_result": ev["outcome"],
