@@ -53,6 +53,9 @@ class TestPlanning:
     def test_data_quality_incomplete(self):
         p = eng.planning_model(dict(eng.DEFAULT_SETTINGS), {"annual_total": None}, {"secured_ytd": 0, "secured_by_month": {}}, TODAY)
         assert p["data_quality"] == "INCOMPLETE" and "fixed_costs" in p["missing"]
+        # DATA GATE: registro reale non riconciliato → base provvisoria PO reference, KPI PROVISIONAL
+        p = eng.planning_model(dict(eng.DEFAULT_SETTINGS), {"annual_total": 0, "reconciliation_status": "INCOMPLETE"}, {"secured_ytd": 0, "secured_by_month": {}}, TODAY)
+        assert p["provisional"] is True and p["kpi_status"] == "PROVISIONAL / DATA_INCOMPLETE" and p["annual_fixed_cost_target"] == eng.PO_REFERENCE_ANNUAL_FIXED_COST
 
 
 class TestQuoteEvaluation:
@@ -143,4 +146,4 @@ class TestCostClassification:
         reg = admin.get(f"{BASE}/sustainability/fixed-costs", timeout=15).json()
         assert set(reg["monthly_by_class"]) == set(eng.COST_CLASSES)
         assert all(i.get("cost_class") in eng.COST_CLASSES for i in reg["items"])
-        assert reg["monthly_total"] == round(sum(i["structural_monthly"] for i in reg["items"] if i["status"] == "active"), 2)
+        assert reg["monthly_total"] == round(sum(i["structural_monthly"] for i in reg["items"] if i["status"] == "active" and not i["demo_data"]), 2)  # DEMO esclusi

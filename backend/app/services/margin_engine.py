@@ -28,7 +28,7 @@ MARGIN_FLOOR_PERCENT = 15.0          # msg 802 — POST_MARGIN > 15.00% ALLOWED,
 LOW_MARGIN_THRESHOLD_PERCENT = 20.0  # 15 < POST < 20 → LOW_MARGIN (consentito, nessuna approvazione)
 FLOOR_EPSILON = 0.0001               # 0.01 punti % — garantisce POST strettamente > floor
 DIRECTOR_APPROVAL_DISCOUNT_PERCENT = 30.0
-COMMERCIAL_DISCOUNT_DROPDOWN_MAX = 30    # PO Fase A §5 — dropdown 0..30% step 1%
+COMMERCIAL_DISCOUNT_DROPDOWN_MAX = 40    # PO Estensione sconti — dropdown 0..40% step 1% (31–40 commerciale = DISCOUNT_APPROVAL_REQUIRED)
 ADMIN_MASTER_MAX_DISCOUNT_PERCENT = 40   # PO Email/Discount directive §A — tetto rigido Admin Master (sempre soggetto a floor >15%)
 # (sconto massimo della fascia incluso, cap commissione) — msg 796
 DISCOUNT_COMMISSION_BANDS = [(5.0, 0.15), (10.0, 0.12), (15.0, 0.10), (20.0, 0.08), (25.0, 0.05), (30.0, 0.03)]

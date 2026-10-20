@@ -57,12 +57,14 @@ def _r2(v):
 
 # ---------------- 1. FIXED COST SOURCE OF TRUTH ----------------
 async def fixed_cost_registry(db, tenant_id: str, le: Optional[str] = None) -> Dict[str, Any]:
+    """FIXED COST DATA GATE: DEMO (is_demo) sempre separato dal REALE. Totali/pricing/break-even/coverage usano SOLO i costi reali."""
     docs = await db.fixed_costs.find({"tenant_id": tenant_id, "deleted_at": None}).to_list(2000)
-    items, monthly, by_class = [], 0.0, {c: 0.0 for c in COST_CLASSES}
+    items, monthly, demo_monthly, by_class = [], 0.0, 0.0, {c: 0.0 for c in COST_CLASSES}
     for f in docs:
         if le and (f.get("legal_entity_id") or None) not in (le, None):
             continue
         active = f.get("active", True) and f.get("status", "active") != "inactive"
+        demo = bool(f.get("is_demo"))
         m = float(f.get("amount_monthly") or 0)
         if not m and f.get("amount_raw"):
             m = float(f["amount_raw"]) / _RECURRENCE_MONTHS.get(str(f.get("recurrence") or "monthly").lower(), 1)
@@ -70,25 +72,37 @@ async def fixed_cost_registry(db, tenant_id: str, le: Optional[str] = None) -> D
         sm = structural_monthly(f, m)
         items.append({"id": f["_id"], "label": f.get("label"), "category": f.get("category"), "cost_class": cls, "legal_entity_id": f.get("legal_entity_id"), "supplier": f.get("supplier"), "amount_raw": f.get("amount_raw"),
                       "recurrence": f.get("recurrence"), "monthly_equivalent": _r2(m), "structural_monthly": _r2(sm), "annual_equivalent": _r2(m * 12), "start_date": f.get("start_date"), "end_date": f.get("end_date"),
-                      "source": "fixed_costs" if not f.get("is_demo") else "fixed_costs(demo)", "budget": f.get("budget"), "actual": f.get("actual"), "notes": f.get("notes"), "status": "active" if active else "inactive"})
-        if active:
-            by_class[cls] = by_class.get(cls, 0.0) + m
-            monthly += sm
+                      "source": "fixed_costs", "demo_data": demo, "cash_schedule": f.get("cash_schedule"), "budget": f.get("budget"), "actual": f.get("actual"), "notes": f.get("notes"), "status": "active" if active else "inactive"})
+        if not active:
+            continue
+        if demo:
+            demo_monthly += sm
+            continue
+        by_class[cls] = by_class.get(cls, 0.0) + m
+        monthly += sm
     # STRUCTURAL COSTS include il personale di struttura (registry personnel_costs) — stessa fonte usata dal CFO (no doppio conteggio: payroll non è in fixed_costs)
     for p in await db.personnel_costs.find({"tenant_id": tenant_id, "deleted_at": None, "active": {"$ne": False}}).to_list(2000):
         if le and (p.get("legal_entity_id") or None) not in (le, None):
             continue
         pc = personnel_company_cost(p)
         m = pc["monthly_company_cost"]
+        demo = bool(p.get("is_demo"))
         items.append({"id": p["_id"], "label": p.get("role") or p.get("label") or p.get("full_name") or "Personale struttura", "category": "PERSONALE_STRUTTURA", "cost_class": "FIXED_STRUCTURE_COST", "employee_cost_mode": pc["mode"],
-                      "legal_entity_id": p.get("legal_entity_id"), "supplier": None, "amount_raw": m, "recurrence": "monthly", "monthly_equivalent": _r2(m), "structural_monthly": _r2(m), "annual_equivalent": _r2(m * 12), "source": "personnel_costs", "status": "active"})
+                      "legal_entity_id": p.get("legal_entity_id"), "supplier": None, "amount_raw": m, "recurrence": "monthly", "monthly_equivalent": _r2(m), "structural_monthly": _r2(m), "annual_equivalent": _r2(m * 12), "source": "personnel_costs",
+                      "demo_data": demo, "cash_components": p.get("cash_components"), "status": "active"})
+        if demo:
+            demo_monthly += m
+            continue
         by_class["FIXED_STRUCTURE_COST"] += m
         monthly += m
     annual = _r2(monthly * 12)
     diff = _r2(annual - PO_REFERENCE_ANNUAL_FIXED_COST)
-    return {"items": items, "count": len(items), "monthly_total": _r2(monthly), "annual_total": annual, "po_reference_annual": PO_REFERENCE_ANNUAL_FIXED_COST,
-            "monthly_by_class": {k: _r2(v) for k, v in by_class.items()}, "structural_basis": "FIXED_STRUCTURE_COST + fixed_component dei SEMI_VARIABLE; DIRECT_JOB_COST → Margin Engine commessa; CASH_ONLY → solo cash flow",
-            "reconciliation_diff": diff, "reconciliation_status": "COMPLETE" if abs(diff) < 1.0 else "INCOMPLETE", "demo_items": sum(1 for f in docs if f.get("is_demo"))}
+    status = "COMPLETE" if abs(diff) < 1.0 else "INCOMPLETE"
+    return {"items": items, "count": len(items), "monthly_total": _r2(monthly), "annual_total": annual, "real_annual_total": annual, "po_reference_annual": PO_REFERENCE_ANNUAL_FIXED_COST,
+            "demo_annual_total": _r2(demo_monthly * 12), "demo_items": sum(1 for i in items if i["demo_data"]), "real_items": sum(1 for i in items if not i["demo_data"]),
+            "monthly_by_class": {k: _r2(v) for k, v in by_class.items()}, "structural_basis": "SOLO costi REALI (demo_data=false): FIXED_STRUCTURE_COST + fixed_component dei SEMI_VARIABLE; DIRECT_JOB_COST → Margin Engine; CASH_ONLY → solo cash flow",
+            "reconciliation_diff": diff, "reconciliation_percent": _r2(min(100.0, annual / PO_REFERENCE_ANNUAL_FIXED_COST * 100)), "reconciliation_status": status,
+            "kpi_status": "VALID" if status == "COMPLETE" else "PROVISIONAL / DATA_INCOMPLETE", "demo_note": "I costi DEMO non entrano in totali, pricing, break-even e copertura struttura. Eliminabili/sostituibili dall'Admin."}
 
 
 # ---------------- settings ----------------
@@ -151,7 +165,16 @@ async def secured_contribution(db, tenant_id: str, le: Optional[str], year: int)
 
 # ---------------- 3. PLANNING MODEL ----------------
 def planning_model(settings: Dict[str, Any], registry: Dict[str, Any], secured: Dict[str, Any], today: date) -> Dict[str, Any]:
-    annual_target = settings.get("annual_fixed_cost_target") or registry["annual_total"] or None
+    reconciled = registry.get("reconciliation_status", "COMPLETE") == "COMPLETE"
+    if settings.get("annual_fixed_cost_target"):
+        annual_target, basis = float(settings["annual_fixed_cost_target"]), "ADMIN_OVERRIDE"
+    elif reconciled and registry.get("annual_total"):
+        annual_target, basis = registry["annual_total"], "REGISTRY_RECONCILED"
+    elif reconciled:
+        annual_target, basis = None, "FIXED_COSTS_MISSING"
+    else:  # DATA GATE: registro reale non riconciliato → base provvisoria = PO REFERENCE, KPI marcati PROVISIONAL
+        annual_target, basis = PO_REFERENCE_ANNUAL_FIXED_COST, "PO_REFERENCE_PROVISIONAL"
+    kpi_status = "VALID" if (reconciled or basis == "ADMIN_OVERRIDE") else "PROVISIONAL / DATA_INCOMPLETE"
     profit = float(settings.get("target_profit") or 0)
     secured_ytd = float(secured.get("secured_ytd") or 0)
     cover_by = None
@@ -184,7 +207,8 @@ def planning_model(settings: Dict[str, Any], registry: Dict[str, Any], secured: 
     elif residual == 0:
         forecast_cov = "COVERED"
     missing = [k for k, v in (("fixed_costs", annual_target), ("expected_monthly_jobs", jobs), ("expected_monthly_revenue", rev)) if not v]
-    return {"planning_mode": settings.get("planning_mode") or "HYBRID_MODE", "annual_fixed_cost_target": _r2(annual_target), "annual_target_profit": _r2(profit), "total_contribution_target": _r2((annual_target or 0) + profit) if annual_target else None,
+    return {"planning_mode": settings.get("planning_mode") or "HYBRID_MODE", "annual_fixed_cost_target": _r2(annual_target), "fixed_cost_basis": basis, "kpi_status": kpi_status, "provisional": kpi_status != "VALID",
+            "fixed_cost_reconciliation": registry.get("reconciliation_status"), "annual_target_profit": _r2(profit), "total_contribution_target": _r2((annual_target or 0) + profit) if annual_target else None,
             "secured_contribution_ytd": _r2(secured_ytd), "structure_coverage_percent": coverage_pct, "structure_residual": _r2(residual), "profit_target_remaining": _r2(max(0.0, (annual_target or 0) + profit - secured_ytd)) if annual_target else None,
             "phase": phase, "coverage_target_date": horizon_end.isoformat(), "months_remaining": months_remaining, "monthly_structure_coverage_target": monthly_target,
             "expected_monthly_jobs": jobs, "expected_monthly_revenue": rev, "required_structure_contribution_per_job": per_job, "required_structure_margin_rate_percent": rate,
@@ -227,7 +251,8 @@ def evaluate_quote(quote: dict, plan: Dict[str, Any]) -> Dict[str, Any]:
             "expected_monthly_jobs": plan.get("expected_monthly_jobs"), "expected_monthly_revenue": plan.get("expected_monthly_revenue"), "structure_coverage_percent": plan.get("structure_coverage_percent"),
             "if_accepted": {"monthly_contribution_target": target_m, "already_secured": _r2(secured_m), "this_job_contribution": contrib, "new_total": _r2(secured_m + (contrib or 0)),
                             "remaining": _r2(target_m - secured_m - (contrib or 0)) if target_m is not None else None, "annual_coverage_after_percent": _r2(min(100.0, (float(plan.get("secured_contribution_ytd") or 0) + (contrib or 0)) / float(plan["annual_fixed_cost_target"]) * 100)) if plan.get("annual_fixed_cost_target") else None},
-            "data_quality": plan.get("data_quality"), "missing": plan.get("missing")}
+            "data_quality": plan.get("data_quality"), "missing": plan.get("missing"), "structural_kpi_status": plan.get("kpi_status"), "provisional": plan.get("provisional"),
+            "fixed_cost_basis": plan.get("fixed_cost_basis")}
 
 
 def discount_impact(quote: dict, plan: Dict[str, Any], candidate_pct: float) -> Dict[str, Any]:

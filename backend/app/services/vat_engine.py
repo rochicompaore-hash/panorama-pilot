@@ -31,11 +31,16 @@ def resolve_vat_regime(dossier: Dict[str, Any] | None) -> Dict[str, Any]:
         return {"vat_regime": "VAT_ORDINARY", "vat_regime_reason": "DEFAULT_22"}
     if requested == "VAT_REVIEW_REQUIRED":
         return {"vat_regime": "VAT_REVIEW_REQUIRED", "vat_regime_reason": "REQUESTED_REVIEW", "applied_fallback": "VAT_ORDINARY"}
+    ev = d.get("evaluation") or {}
+    if ev.get("outcome") == "NOT_ELIGIBLE":
+        return {"vat_regime": "VAT_ORDINARY", "vat_regime_reason": "FISCAL_ENGINE_NOT_ELIGIBLE", "applied_fallback": "VAT_ORDINARY"}
     if d.get("documentation_status") != "COMPLETE" or not d.get("customer_declaration"):
         return {"vat_regime": "VAT_DOCUMENTATION_INCOMPLETE", "vat_regime_reason": "DOCUMENTATION_OR_DECLARATION_MISSING", "applied_fallback": "VAT_ORDINARY"}
     if d.get("vat_eligibility_status") != "VALIDATED":
         return {"vat_regime": "VAT_REVIEW_REQUIRED", "vat_regime_reason": "ELIGIBILITY_NOT_VALIDATED", "applied_fallback": "VAT_ORDINARY"}
-    return {"vat_regime": requested, "vat_regime_reason": d.get("vat_reason") or "VALIDATED"}
+    # Fiscal Engine V2: l'aliquota finale è l'ESITO del motore (es. richiesta 10% → MISTA 10/22 per beni significativi), mai scelta libera
+    final = ev.get("regime") if ev.get("eligible_outcome") in ("ELIGIBLE_10_FULL", "ELIGIBLE_MIXED_10_22", "ELIGIBLE_4") else requested
+    return {"vat_regime": final, "vat_regime_reason": d.get("vat_reason") or ev.get("legal_basis") or "VALIDATED"}
 
 
 def line_vat_rate(line: Dict[str, Any], regime: str) -> float:
@@ -47,13 +52,19 @@ def line_vat_rate(line: Dict[str, Any], regime: str) -> float:
     return 0.22
 
 
-def apply_vat(totals: Dict[str, Any], lines: List[Dict[str, Any]], regime: str) -> Dict[str, Any]:
-    """Ricalcola IVA per aliquota sull'imponibile finale (dopo sconti), ripartendo gli sconti pro-quota. Backend = source of truth."""
+def apply_vat(totals: Dict[str, Any], lines: List[Dict[str, Any]], regime: str, mixed_split: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """Ricalcola IVA per aliquota sull'imponibile finale (dopo sconti), ripartendo gli sconti pro-quota. Backend = source of truth.
+    VAT_MIXED_10_22 con mixed_split (Significant Goods Engine, DM 29/12/1999) → ripartizione 10/22 calcolata dal Fiscal Engine."""
     effective = regime if regime in REGIME_RATES or regime == "VAT_MIXED_10_22" else "VAT_ORDINARY"
     gross_base = sum(float(l.get("subtotal_line") or 0) for l in lines)
     net = float(totals.get("subtotal") or 0)
     factor = (net / gross_base) if gross_base > 0 else 0.0
     by_rate: Dict[float, float] = {}
+    if effective == "VAT_MIXED_10_22" and mixed_split and mixed_split.get("taxable_10") is not None:
+        ref = float(mixed_split.get("taxable_10") or 0) + float(mixed_split.get("taxable_22") or 0)
+        k = (net / ref) if ref > 0 else 0.0
+        by_rate = {0.10: float(mixed_split["taxable_10"]) * k, 0.22: float(mixed_split["taxable_22"]) * k}
+        lines = []
     for l in lines:
         r = line_vat_rate(l, effective)
         by_rate[r] = by_rate.get(r, 0.0) + float(l.get("subtotal_line") or 0) * factor

@@ -217,6 +217,7 @@ class QuoteUpdate(BaseModel):
     title: Optional[str] = None
     delivery_mode: Optional[str] = None
     global_discount_percent: Optional[float] = None
+    discount_reason: Optional[str] = None
     promo_code: Optional[str] = None
     intervention_type: Optional[str] = None
     tax_practice: Optional[str] = None

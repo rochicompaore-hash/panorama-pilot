@@ -37,6 +37,7 @@ class FixedCost(BaseDoc):
     cost_class: Optional[str] = None  # FIXED_STRUCTURE_COST | DIRECT_JOB_COST | SEMI_VARIABLE_COST | CASH_ONLY_FINANCIAL_COST
     fixed_component: Optional[float] = None
     fixed_component_pct: Optional[float] = None
+    cash_schedule: Optional[Dict[str, Any]] = None  # {"recurrence": "annual", "due_month": 3, "due_day": 15} → cash profile ≠ economic monthly
 
 
 class FixedCostCreate(BaseModel):
@@ -53,6 +54,8 @@ class FixedCostCreate(BaseModel):
     cost_class: Optional[str] = None  # FIXED_STRUCTURE_COST | DIRECT_JOB_COST | SEMI_VARIABLE_COST | CASH_ONLY_FINANCIAL_COST
     fixed_component: Optional[float] = None
     fixed_component_pct: Optional[float] = None
+    is_demo: bool = False
+    cash_schedule: Optional[Dict[str, Any]] = None
 
 
 class FixedCostUpdate(BaseModel):
@@ -69,6 +72,8 @@ class FixedCostUpdate(BaseModel):
     cost_class: Optional[str] = None  # FIXED_STRUCTURE_COST | DIRECT_JOB_COST | SEMI_VARIABLE_COST | CASH_ONLY_FINANCIAL_COST
     fixed_component: Optional[float] = None
     fixed_component_pct: Optional[float] = None
+    is_demo: Optional[bool] = None
+    cash_schedule: Optional[Dict[str, Any]] = None
 
 
 # =============================================================
@@ -115,6 +120,7 @@ class PersonnelCostCreate(BaseModel):
     cost_center: Optional[str] = None
     employee_cost_mode: Optional[str] = "ALL_IN_COMPANY_COST"  # ALL_IN_COMPANY_COST | PAYROLL_ONLY | MANUAL_BREAKDOWN
     employer_charges_monthly: Optional[float] = None
+    cash_components: Optional[List[Dict[str, Any]]] = None  # [{"label":"NET_SALARY","amount":..,"due_day":27,"month_offset":0}] — SUM == costo ALL-IN
 
 
 class PersonnelCostUpdate(BaseModel):
@@ -127,6 +133,8 @@ class PersonnelCostUpdate(BaseModel):
     active: Optional[bool] = None
     employee_cost_mode: Optional[str] = "ALL_IN_COMPANY_COST"  # ALL_IN_COMPANY_COST | PAYROLL_ONLY | MANUAL_BREAKDOWN
     employer_charges_monthly: Optional[float] = None
+    is_demo: Optional[bool] = None
+    cash_components: Optional[List[Dict[str, Any]]] = None
 
 
 # =============================================================
@@ -177,6 +185,10 @@ class Payable(BaseDoc):
     payable_status: PayableStatus = "planned"
     linked_intercompany_pair_id: Optional[str] = None
     notes: Optional[str] = None
+    category: Optional[str] = None  # STIPENDI|F24|FORNITORI|AFFITTI|LEASING|FINANZIAMENTI|ASSICURAZIONI|IMPOSTE|ALTRO
+    priority: Optional[str] = None  # CRITICAL|IMPORTANT|DEFERRABLE|DISCRETIONARY
+    job_ref: Optional[str] = None  # contract_id / sales_order_id → JOB CASH POSITION
+    paid_at: Optional[datetime] = None
 
 
 class PayableCreate(BaseModel):
@@ -191,6 +203,21 @@ class PayableCreate(BaseModel):
     vat_rate: float = 22.0
     legal_entity_id: Optional[str] = None
     cost_center: Optional[str] = None
+    notes: Optional[str] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    job_ref: Optional[str] = None
+
+
+class PayableUpdate(BaseModel):
+    label: Optional[str] = None
+    due_date: Optional[date] = None
+    amount_gross: Optional[float] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    job_ref: Optional[str] = None
+    legal_entity_id: Optional[str] = None
+    payable_status: Optional[str] = None
     notes: Optional[str] = None
 
 

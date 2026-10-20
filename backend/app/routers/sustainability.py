@@ -103,3 +103,22 @@ async def simulate(body: SimulateBody, user: dict = Depends(require_permission("
                         average_contribution_pct=body.average_contribution_pct if body.average_contribution_pct is not None else (s.get("average_contribution_pct") or 27.0),
                         close_rate=body.close_rate if body.close_rate is not None else s.get("current_close_rate"), target_profit=float(body.target_profit if body.target_profit is not None else (s.get("target_profit") or 0)),
                         secured_ytd=float(ov["secured"]["secured_ytd"] or 0))
+
+
+class DemoBody(BaseModel):
+    is_demo: bool = True
+    ids: Optional[list] = None  # None → tutti i costi fissi + personale della tenant
+
+
+@router.post("/fixed-costs/mark-demo")
+async def mark_demo(body: DemoBody, request: Request, user: dict = Depends(require_permission("treasury.manage"))):
+    """FIXED COST DATA GATE: marca demo_data=true/false (mai cancellazione automatica). Senza ids → tutta la tenant."""
+    db = get_db()
+    flt = {"tenant_id": user["tenant_id"], "deleted_at": None}
+    if body.ids:
+        flt["_id"] = {"$in": body.ids}
+    upd = {"$set": {"is_demo": body.is_demo, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    r1 = await db.fixed_costs.update_many(flt, upd)
+    r2 = await db.personnel_costs.update_many(flt, upd)
+    await record_audit(action="sustainability.mark_demo", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="fixed_costs", entity_id="bulk", after={"is_demo": body.is_demo, "ids": body.ids, "fixed": r1.modified_count, "personnel": r2.modified_count})
+    return {"fixed_costs_updated": r1.modified_count, "personnel_costs_updated": r2.modified_count, "registry": {k: v for k, v in (await eng.fixed_cost_registry(db, user["tenant_id"], None)).items() if k != "items"}}

@@ -76,7 +76,7 @@ def get_public_config() -> dict:
         "is_configured": c.is_configured,
         "resend_configured": c.provider_name == "resend",
         "resend_webhook_configured": bool(os.environ.get("RESEND_WEBHOOK_SECRET", "").strip()),
-        "resend_configuration": "OK" if c.provider_name == "resend" else "BLOCKED_BY_SECRET",
+        "resend_configuration": "OK" if c.provider_name == "resend" else "BLOCKED_BY_CONFIGURATION",
         "mock_mode": c.provider_name == "mock",
         "managed_domain": os.environ.get("PANORAMA_MANAGED_DOMAIN", "").strip() or None,
     }

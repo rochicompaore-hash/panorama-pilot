@@ -15,7 +15,7 @@ from app.services.consolidation import compute_consolidation
 from app.models_control import (
     FixedCost, FixedCostCreate, FixedCostUpdate,
     PersonnelCost, PersonnelCostCreate, PersonnelCostUpdate,
-    ManagementAccount, Payable, PayableCreate, Receivable,
+    ManagementAccount, Payable, PayableCreate, PayableUpdate, Receivable,
     BudgetScenario, BudgetScenarioCreate, BudgetInputs, BudgetOutputs,
     BudgetSimulationRequest, Investment,
 )
@@ -134,6 +134,12 @@ async def update_personnel(pid: str, payload: PersonnelCostUpdate,
                              user=user, entity_type="personnel_cost", ip="")
 
 
+@router.delete("/personnel-costs/{pid}")
+async def delete_personnel(pid: str, user: dict = Depends(require_module("management_control", write=True))):
+    return await soft_delete_doc(collection="personnel_costs", doc_id=pid, user=user,
+                                  entity_type="personnel_cost", ip="")
+
+
 # ============================================================
 # MANAGEMENT CHART OF ACCOUNTS
 # ============================================================
@@ -173,6 +179,18 @@ async def create_payable(payload: PayableCreate,
                              user=user, entity_type="payable", ip="")
 
 
+@router.patch("/payables/{pid}")
+async def update_payable(pid: str, payload: PayableUpdate,
+                          user: dict = Depends(require_module("management_control", write=True))):
+    updates = payload.model_dump(exclude_unset=True)
+    if updates.get("priority") and updates["priority"] not in ("CRITICAL", "IMPORTANT", "DEFERRABLE", "DISCRETIONARY"):
+        raise HTTPException(400, {"code": "PRIORITY_INVALID"})
+    if "due_date" in updates and updates["due_date"]:
+        updates["due_date"] = updates["due_date"].isoformat()
+    return await update_doc(collection="payables", doc_id=pid, updates=updates,
+                             user=user, entity_type="payable", ip="")
+
+
 @router.post("/payables/{pid}/pay")
 async def pay_payable(pid: str, payload: dict,
                        user: dict = Depends(require_module("management_control", write=True))):
@@ -185,7 +203,7 @@ async def pay_payable(pid: str, payload: dict,
     residual = max(0.0, float(prev.get("amount_gross") or 0) - paid_new)
     status = "partially_paid" if residual > 0 else "paid"
     await db.payables.update_one({"_id": pid},
-        {"$set": {"amount_paid": paid_new, "residual": residual,
+        {"$set": {"amount_paid": paid_new, "residual": residual, "paid_at": utcnow().isoformat(),
                    "payable_status": status, "updated_at": utcnow().isoformat()}})
     return from_mongo(await db.payables.find_one({"_id": pid}))
 

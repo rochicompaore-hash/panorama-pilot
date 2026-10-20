@@ -30,7 +30,7 @@ export function TenantSenderCard() {
     <div className="space-y-4" data-testid="tenant-sender-card">
       <Card className="rounded-sm border-border p-5 space-y-3">
         <div className="overline">Mittente del tenant · provider {s.provider}</div>
-        {!s.provider_configured && <div className="text-xs font-bold text-destructive" data-testid="tenant-provider-blocked">RESEND_CONFIGURATION = BLOCKED_BY_SECRET — nessuna email può essere inviata (nessun fallback mock silenzioso).</div>}
+        {!s.provider_configured && <div className="text-xs font-bold text-destructive" data-testid="tenant-provider-blocked">RESEND_CONFIGURATION = BLOCKED_BY_CONFIGURATION — nessuna email può essere inviata (nessun fallback mock silenzioso).</div>}
         {s.provider_configured && !s.webhook_configured && <div className="text-xs font-bold text-amber-700" data-testid="tenant-webhook-missing">Webhook Resend non configurato: gli stati CONSEGNATA/BOUNCE non verranno aggiornati.</div>}
         <div className="text-sm" data-testid="tenant-effective-sender">Mittente effettivo: <b>{eff.from_name}</b> &lt;{eff.from_email || "non risolvibile"}&gt; · Reply-To {eff.reply_to || "—"} <Badge variant="outline" className="rounded-sm ml-1 text-[10px]">{eff.sender_mode}</Badge>{eff.fallback_applied && <span className="ml-2 text-[10px] text-amber-700">fallback Panorama attivo (dominio custom non verificato)</span>}</div>
         <div className="grid grid-cols-2 gap-3">

@@ -20,6 +20,7 @@ from app.services.timeline import record_activity
 from app.services.pricing import compute_line, compute_quote_totals
 from app.services.margin_engine import (
     ADMIN_MASTER_MAX_DISCOUNT_PERCENT,
+    DIRECTOR_APPROVAL_DISCOUNT_PERCENT,
     compute_financial_snapshot,
     redact_financial_snapshot_for_role,
     is_admin_master,
@@ -122,7 +123,7 @@ def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
     totals = apply_automatic_discount(totals, existing_quote.get("automatic_discount_percent") or 0)
     totals["total_discount_amount"] = round(float(totals.get("global_discount_amount") or 0) + float(totals.get("payment_discount_amount") or 0), 2)
     # VAT Engine V2 — breakdown reale per aliquota, regime dal Fiscal Dossier (backend source of truth)
-    totals = apply_vat(totals, lines_all, existing_quote.get("vat_regime") or "VAT_ORDINARY")
+    totals = apply_vat(totals, lines_all, existing_quote.get("vat_regime") or "VAT_ORDINARY", ((existing_quote.get("fiscal_dossier") or {}).get("evaluation") or {}).get("mixed_split"))
     totals["discounted_net_revenue"] = totals["subtotal"]
     totals["discount_policy_version"] = DISCOUNT_POLICY_VERSION
     # Policy tempi di consegna PO: classe canonica per codice colore, commessa = lead time maggiore (solo STANDARD; EXPRESS resta da confermare)
@@ -345,12 +346,28 @@ async def update_quote(
         if pct < 0 or pct > 100 or abs(pct - round(pct)) > 1e-9:
             raise HTTPException(status_code=400, detail={"code": "GLOBAL_DISCOUNT_INVALID", "message": "Sconto commerciale selezionabile solo a step interi di 1%"})
         if pct > ADMIN_MASTER_MAX_DISCOUNT_PERCENT:
-            raise HTTPException(status_code=403, detail={"code": "ADMIN_DISCOUNT_CAP_EXCEEDED", "message": f"Sconto oltre {ADMIN_MASTER_MAX_DISCOUNT_PERCENT}%: non consentito a nessun ruolo"})
-        if pct > 30 and not user_has_permission(user, await _get_perms(user), "quotes.override_discount_cap"):
-            raise HTTPException(status_code=403, detail={"code": "ADMIN_APPROVAL_REQUIRED", "message": "Sconto oltre 30%: richiede autorizzazione amministrativa"})
+            raise HTTPException(status_code=403, detail={"code": "ADMIN_DISCOUNT_CAP_EXCEEDED", "message": f"Sconto oltre {ADMIN_MASTER_MAX_DISCOUNT_PERCENT}%: non consentito a nessun ruolo (HARD_CAP_40)"})
         pct = float(int(round(pct)))
+        reason = (payload.pop("discount_reason", None) or "").strip()
         payload.update({"promo_code": None, "promo_code_description": None, "global_discount_source": "MANUAL" if pct > 0 else None,
                         "global_discount_type": "PERCENT" if pct > 0 else None, "global_discount_value": pct})
+        # PO ESTENSIONE SCONTI >30%: commerciale 31–40 → salvabile ma DISCOUNT_APPROVAL_REQUIRED (motivazione obbligatoria); Admin Master → diretto (motivazione tracciata)
+        if pct > DIRECTOR_APPROVAL_DISCOUNT_PERCENT:
+            if not reason:
+                raise HTTPException(status_code=400, detail={"code": "DISCOUNT_REASON_REQUIRED", "message": "Sconto oltre 30%: motivazione obbligatoria", "allowed_reasons": DISCOUNT_REASONS})
+            cur_q = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None}) or {}
+            fs_before = (cur_q.get("financial_snapshot") or {})
+            fs_after = _financial_totals_patch(cur_q.get("lines") or [], {**cur_q, **payload}).get("financial_snapshot") or {}
+            is_master = user_has_permission(user, await _get_perms(user), "quotes.override_discount_cap")
+            now_iso = datetime.now(timezone.utc).isoformat()
+            payload["discount_approval"] = {"requested_discount": pct, "previous_discount_percent": float(cur_q.get("global_discount_value") or 0), "requested_by": user["id"], "requested_by_email": user.get("email"),
+                                            "requested_at": now_iso, "margin_before": fs_before.get("post_margin_percent"), "margin_after": fs_after.get("post_margin_percent"), "reason": reason,
+                                            "status": "APPROVED" if is_master else "DISCOUNT_APPROVAL_REQUIRED", "approved_by": user["id"] if is_master else None, "approved_at": now_iso if is_master else None,
+                                            "auto_approved_admin_master": is_master}
+            payload["discount_approval_status"] = "APPROVED" if is_master else "DISCOUNT_APPROVAL_REQUIRED"
+        else:
+            payload["discount_approval_status"] = None
+            payload["discount_approval"] = None
     if "delivery_mode" in payload and payload["delivery_mode"]:
         try:
             payload.update(resolve_delivery(payload["delivery_mode"]))
@@ -864,6 +881,39 @@ async def delete_line(qid: str, lid: str, user: dict = Depends(require_permissio
 
 
 # ----- Status transitions -----
+DISCOUNT_REASONS = ["trattativa strategica", "competitor", "volume commessa", "recupero cliente", "promozione autorizzata", "altro"]
+
+
+@router.post("/{qid}/discount-approval/{decision}")
+async def decide_discount_approval(qid: str, decision: str, body: dict, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+    """[APPROVA]/[RIFIUTA] sconto 31–40% richiesto dal commerciale — solo Admin Master. Rifiuto → sconto riportato al valore precedente."""
+    db = get_db()
+    if decision not in ("approve", "reject"):
+        raise HTTPException(status_code=404, detail="Decisione non valida")
+    if not user_has_permission(user, await _get_perms(user), "quotes.override_discount_cap"):
+        raise HTTPException(status_code=403, detail={"code": "ADMIN_MASTER_ONLY", "message": "Solo Admin Master può approvare o rifiutare"})
+    doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Preventivo non trovato")
+    da = doc.get("discount_approval") or {}
+    if doc.get("discount_approval_status") != "DISCOUNT_APPROVAL_REQUIRED":
+        raise HTTPException(status_code=400, detail={"code": "NO_PENDING_DISCOUNT_APPROVAL"})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if decision == "approve":
+        _raise_if_price_blocked(doc.get("financial_snapshot") or {})
+        da.update({"status": "APPROVED", "approved_by": user["id"], "approved_by_email": user.get("email"), "approved_at": now_iso, "decision_note": (body or {}).get("note")})
+        set_fields = {"discount_approval": da, "discount_approval_status": "APPROVED"}
+    else:
+        prev = float(da.get("previous_discount_percent") or 0)
+        da.update({"status": "REJECTED", "rejected_by": user["id"], "rejected_by_email": user.get("email"), "rejected_at": now_iso, "decision_note": (body or {}).get("note")})
+        set_fields = {"discount_approval": da, "discount_approval_status": "REJECTED", "global_discount_value": prev, "global_discount_type": "PERCENT" if prev > 0 else None, "global_discount_source": "MANUAL" if prev > 0 else None}
+        set_fields.update(_financial_totals_patch(doc.get("lines") or [], {**doc, **set_fields}))
+    await db.quotes.update_one({"_id": qid}, {"$set": {**set_fields, "updated_at": now_iso, "updated_by": user["id"]}})
+    await record_audit(action=f"quote.discount_{decision}", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=qid, before={"discount_approval": doc.get("discount_approval")}, after=da)
+    fresh = await db.quotes.find_one({"_id": qid})
+    return _strip_costs_if_needed(from_mongo(fresh), await _get_perms(user))
+
+
 @router.post("/{qid}/status")
 async def change_status(qid: str, body: QuoteStatusChange, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
     db = get_db()
@@ -875,6 +925,8 @@ async def change_status(qid: str, body: QuoteStatusChange, request: Request, use
         raise HTTPException(status_code=400, detail=f"Transizione non consentita: {current} → {new}")
     if new == "sent" and doc.get("approval", {}).get("status") == "pending":
         raise HTTPException(status_code=400, detail="Preventivo in attesa di approvazione")
+    if new in ("sent", "accepted", "approved", "signed") and doc.get("discount_approval_status") == "DISCOUNT_APPROVAL_REQUIRED":
+        raise HTTPException(status_code=400, detail={"code": "DISCOUNT_APPROVAL_PENDING", "message": "Sconto oltre 30% in attesa di approvazione direzione: il preventivo non può essere finalizzato"})
 
     # BUG-01 FIX (audit v1) — Blocca invio se ci sono errori bloccanti sulle line del preventivo.
     # La versione precedente leggeva da `opening_products` (collezione inesistente per questo schema)
@@ -1115,10 +1167,21 @@ async def revision_history(qid: str, user: dict = Depends(require_permission("qu
 
 # ----- Convert to contract -----
 @router.post("/{qid}/convert-to-contract")
-async def convert_to_contract(qid: str, request: Request, user: dict = Depends(require_permission("quotes.convert_contract"))):
+async def convert_to_contract(qid: str, request: Request, proceed_with_ordinary_vat: bool = False, user: dict = Depends(require_permission("quotes.convert_contract"))):
     db = get_db()
     doc = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
     if not doc: raise HTTPException(status_code=404, detail="Preventivo non trovato")
+    # Fiscal Engine V2 §26: IVA agevolata richiesta ma dossier non validato → mai contratto silenzioso
+    fd = doc.get("fiscal_dossier") or {}
+    if (fd.get("requested_regime") or "VAT_ORDINARY") != "VAT_ORDINARY" and doc.get("vat_regime") in ("VAT_DOCUMENTATION_INCOMPLETE", "VAT_REVIEW_REQUIRED") and not doc.get("contract_id"):
+        if not proceed_with_ordinary_vat:
+            raise HTTPException(status_code=409, detail={"code": "REDUCED_VAT_NOT_VALIDATED", "message": "IVA agevolata non ancora validata.", "actions": ["COMPLETA_DOSSIER", "PROCEDI_CON_IVA_22"],
+                                                         "missing_requirements": (fd.get("evaluation") or {}).get("missing_requirements", [])})
+        fd = {**fd, "requested_regime": "VAT_ORDINARY", "downgraded_to_ordinary_at": datetime.now(timezone.utc).isoformat(), "downgraded_by": user["id"], "previous_requested_regime": fd.get("requested_regime")}
+        reg = resolve_vat_regime(fd)
+        patch = _financial_totals_patch(doc.get("lines") or [], {**doc, "fiscal_dossier": fd, "vat_regime": reg["vat_regime"]})
+        await db.quotes.update_one({"_id": qid}, {"$set": {"fiscal_dossier": fd, **reg, **patch}})
+        doc = await db.quotes.find_one({"_id": qid})
     # M3.3.6 — Idempotency: if already converted, return existing contract
     if doc.get("contract_id"):
         existing = await db.contracts.find_one({"_id": doc["contract_id"], "tenant_id": user["tenant_id"]})
@@ -1132,6 +1195,8 @@ async def convert_to_contract(qid: str, request: Request, user: dict = Depends(r
             detail=f"Il preventivo deve avere quote_status in {sorted(allowed_source_status)} (attuale: {doc.get('quote_status')})")
     if not doc.get("is_current", True):
         raise HTTPException(status_code=400, detail="Revisione superata: non convertibile")
+    if doc.get("discount_approval_status") == "DISCOUNT_APPROVAL_REQUIRED":
+        raise HTTPException(status_code=400, detail={"code": "DISCOUNT_APPROVAL_PENDING", "message": "Sconto oltre 30% in attesa di approvazione direzione"})
     # Gate fiscale — MISSING_CUSTOMER_TAX_CODE (Milestone 1 Part 2)
     if doc.get("customer_id"):
         cust = await db.customers.find_one({"_id": doc["customer_id"], "tenant_id": user["tenant_id"], "deleted_at": None})

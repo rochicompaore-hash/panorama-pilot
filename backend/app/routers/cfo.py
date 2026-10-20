@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.db import get_db
 from app.deps import require_permission, get_client_ip
 from app.services import cfo_engine as eng
+from app.services import cash_engine as cash
 from app.services.audit import record_audit
 
 router = APIRouter(prefix="/cfo", tags=["cfo"])
@@ -28,6 +29,12 @@ class BankBalanceBody(BaseModel):
     balance: float
     as_of_date: str
     legal_entity_id: Optional[str] = None
+
+
+class TermsBody(BaseModel):
+    preset: Optional[str] = None  # 50/50 | 40/60 | 30/70 | 50/40/10 | CUSTOM
+    splits: Optional[List[Dict[str, Any]]] = None  # [{"step": "ORDER", "percent": 30}, ...] somma 100
+    lead_days: Optional[int] = Field(None, ge=0, le=365)
 
 
 class SimulateBody(BaseModel):
@@ -88,3 +95,43 @@ async def cfo_simulate(body: SimulateBody, user: dict = Depends(require_permissi
     return eng.simulate(revenue=body.revenue, collection_pct=body.collection_pct, margin_pct=margin_pct, collection_days=body.collection_days,
                         monthly_structure=ov["kpi_row3"]["monthly_structure_costs"], available_cash=ov["kpi_row1"]["available_cash"],
                         scheduled_outflows=ov["cash_calendar"]["30d"]["outflows"], reserve=ov["kpi_row3"]["minimum_cash_reserve"] or 0)
+
+
+@router.get("/cash-command-center")
+async def cash_command_center(legal_entity_id: Optional[str] = None, user: dict = Depends(require_permission("treasury.view"))):
+    return await cash.command_center(get_db(), user["tenant_id"], legal_entity_id)
+
+
+async def _admin_quote(qid: str, user: dict) -> dict:
+    from app.routers.quotes import _get_perms, ADMIN_MASTER_MARKER
+    db = get_db()
+    q = await db.quotes.find_one({"_id": qid, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not q:
+        raise HTTPException(404, "Preventivo non trovato")
+    if ADMIN_MASTER_MARKER not in await _get_perms(user):
+        raise HTTPException(403, {"code": "ADMIN_MASTER_ONLY", "message": "Esposizione cash visibile solo ad Admin Master"})
+    return q
+
+
+@router.get("/quote/{qid}/cash-exposure")
+async def quote_cash_exposure(qid: str, user: dict = Depends(require_permission("quotes.view"))):
+    q = await _admin_quote(qid, user)
+    return {**cash.quote_cash_exposure(q), "presets": list(cash.TERMS_PRESETS.keys()) + ["CUSTOM"]}
+
+
+@router.post("/quote/{qid}/cash-terms-simulate")
+async def quote_cash_terms_simulate(qid: str, body: TermsBody, user: dict = Depends(require_permission("quotes.view"))):
+    from app.services.sustainability_engine import quote_contribution
+    q = await _admin_quote(qid, user)
+    if body.preset and body.preset != "CUSTOM":
+        if body.preset not in cash.TERMS_PRESETS:
+            raise HTTPException(400, {"code": "PRESET_INVALID", "allowed": list(cash.TERMS_PRESETS.keys()) + ["CUSTOM"]})
+        splits = cash.TERMS_PRESETS[body.preset]
+    else:
+        splits = [(str(s.get("step") or "ORDER").upper(), float(s.get("percent") or 0)) for s in (body.splits or [])]
+        if not splits or abs(sum(p for _, p in splits) - 100) > 0.01:
+            raise HTTPException(400, {"code": "SPLITS_INVALID", "message": "La somma delle percentuali deve essere 100"})
+    qc = quote_contribution(q)
+    gross = eng._f(q.get("total")) or round(eng._f(qc["net_revenue_ex_vat"]) * 1.22, 2)
+    return {**cash.simulate_terms(gross_total=gross, net_total=qc["net_revenue_ex_vat"], direct_costs=qc["direct_costs"] if qc["complete"] else None, splits=splits,
+                                  lead_days=body.lead_days if body.lead_days is not None else q.get("delivery_lead_time_days")), "preset": body.preset or "CUSTOM"}

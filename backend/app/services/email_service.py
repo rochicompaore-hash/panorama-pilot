@@ -322,7 +322,7 @@ async def _attempt_send(log_id: str) -> Dict[str, Any]:
             {"$set": {
                 "status": EMAIL_STATUS_CONFIG_REQUIRED,
                 "delivery_status": DELIVERY_FAILED,
-                "error": "RESEND_CONFIGURATION=BLOCKED_BY_SECRET: RESEND_API_KEY non impostata",
+                "error": "RESEND_CONFIGURATION=BLOCKED_BY_CONFIGURATION: RESEND_API_KEY non impostata",
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }},
         )

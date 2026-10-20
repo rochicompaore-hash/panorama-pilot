@@ -68,9 +68,12 @@ class TestDiscountDropdown:
         r = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"global_discount_percent": bad}, timeout=15)
         assert r.status_code == 400 and r.json()["detail"]["code"] == "GLOBAL_DISCOUNT_INVALID", r.text
 
-    def test_over_30_requires_admin_cap_permission(self, commercial, qid):
+    def test_over_30_requires_reason_then_approval_required(self, commercial, admin, qid):
         r = commercial.patch(f"{BASE_URL}/api/quotes/{qid}", json={"global_discount_percent": 31}, timeout=15)
-        assert r.status_code == 403 and r.json()["detail"]["code"] == "ADMIN_APPROVAL_REQUIRED", r.text
+        assert r.status_code == 400 and r.json()["detail"]["code"] == "DISCOUNT_REASON_REQUIRED", r.text
+        r = commercial.patch(f"{BASE_URL}/api/quotes/{qid}", json={"global_discount_percent": 31, "discount_reason": "competitor"}, timeout=15)
+        assert r.status_code == 200 and r.json()["discount_approval_status"] == "DISCOUNT_APPROVAL_REQUIRED", r.text
+        admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"global_discount_percent": 0}, timeout=15)
 
     def test_integer_step_accepted(self, admin, qid):
         r = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"global_discount_percent": 12}, timeout=15)
@@ -81,10 +84,10 @@ class TestDiscountDropdown:
     def test_max_step_is_integer_floor_and_commercial_visible(self, admin, commercial, qid):
         fs = _fs(admin, qid)
         m = fs["max_commercial_discount_step_percent"]
-        assert isinstance(m, int) and 0 <= m <= 30
+        assert isinstance(m, int) and 0 <= m <= 40
         assert m <= math.floor(fs["max_discount_available_percent"] + 1e-9)  # mai arrotondato verso l'alto
-        # 1000 ricavo, 400 costo: max effettivo = floor((1-400/(0.8499*1000))*100)=52.93 → step 30 (cap dropdown)
-        assert m == 30
+        # 1000 ricavo, 400 costo: max effettivo = floor((1-400/(0.8499*1000))*100)=52.93 → step 40 (cap dropdown esteso PO)
+        assert m == 40
         cfs = _fs(commercial, qid)
         assert cfs["max_commercial_discount_step_percent"] == m
         assert "supply_cost" not in cfs and "post_margin_percent" not in cfs

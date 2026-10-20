@@ -17,6 +17,8 @@ import {
 import { toast } from "sonner";
 import { Warning, TrendUp, Money, Wallet, Buildings, Info } from "@phosphor-icons/react";
 import { CfoControlTower } from "@/components/cfo/CfoControlTower";
+import { CashCommandCenter } from "@/components/cfo/CashCommandCenter";
+import { FixedCostReconciliation } from "@/components/cfo/FixedCostReconciliation";
 
 const COLORS = ["#D42027", "#0F1720", "#4B5563", "#94A3B8", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6"];
 
@@ -33,7 +35,7 @@ function KPI({ label, value, sub, testId, danger }) {
 const fmt = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
 
 export default function TreasuryCFOPage() {
-  const [tab, setTab] = useState("tower");
+  const [tab, setTab] = useState("cash");
   const [cfoCash, setCfoCash] = useState(null);
   const [entities, setEntities] = useState([]);
   const [legalEntityFilter, setLegalEntityFilter] = useState("all");
@@ -137,6 +139,7 @@ export default function TreasuryCFOPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex flex-wrap h-auto">
+          <TabsTrigger value="cash" data-testid="tab-cash">Cash Command Center</TabsTrigger>
           <TabsTrigger value="tower" data-testid="tab-tower">Control Tower</TabsTrigger>
           <TabsTrigger value="overview" data-testid="tab-overview">Tesoreria (legacy)</TabsTrigger>
           <TabsTrigger value="banks" data-testid="tab-banks">Conti</TabsTrigger>
@@ -154,6 +157,7 @@ export default function TreasuryCFOPage() {
           <TabsTrigger value="alerts" data-testid="tab-alerts">Alert</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="cash"><CashCommandCenter legalEntityId={legalEntityFilter} /></TabsContent>
         <TabsContent value="tower"><CfoControlTower legalEntityId={legalEntityFilter} /></TabsContent>
         <TabsContent value="overview" className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
@@ -282,7 +286,8 @@ export default function TreasuryCFOPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="fixed">
+        <TabsContent value="fixed" className="space-y-4">
+          <FixedCostReconciliation legalEntityId={legalEntityFilter} />
           <Card className="p-5">
             <Table>
               <TableHeader><TableRow>

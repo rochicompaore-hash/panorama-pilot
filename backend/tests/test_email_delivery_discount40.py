@@ -106,7 +106,7 @@ class TestQuoteEmail:
             assert r.status_code == 200 and r.json()["ok"] and items[0]["delivery_status"] == "provider_accepted"
             assert _get(admin, qid)["quote_status"] == "sent"
         else:
-            assert r.status_code == 503 and r.json()["detail"]["status"] == "BLOCKED_BY_SECRET"
+            assert r.status_code == 503 and r.json()["detail"]["status"] == "BLOCKED_BY_CONFIGURATION"
             assert items[0]["status"] == "configuration_required"
             assert _get(admin, qid)["quote_status"] == "draft"  # nessun "inviato" fittizio
 

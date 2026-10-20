@@ -17,6 +17,7 @@ from app.services.audit import record_audit
 from app.services.concurrency import user_has_permission
 from app.services.margin_engine import MARGIN_FLOOR_PERCENT, redact_financial_snapshot_for_role
 from app.services.vat_engine import resolve_vat_regime, REQUESTABLE
+from app.services import fiscal_engine as fe
 
 router = APIRouter(prefix="/quotes", tags=["quote-economic-control"])
 COMMERCIAL_CAP = 30.0
@@ -65,14 +66,176 @@ async def patch_fiscal_dossier(qid: str, body: FiscalDossierPatch, request: Requ
     if "requested_regime" in upd and upd["requested_regime"] != dossier.get("requested_regime") and "vat_eligibility_status" not in upd:
         dossier["vat_eligibility_status"] = "PENDING"  # cambio richiesta → nuova review
     dossier.update(upd)
-    dossier["updated_at"] = datetime.now(timezone.utc).isoformat()
-    dossier["updated_by"] = user["id"]
+    return await _reevaluate(db, doc, dossier, user, request, "dossier_patch")
+
+
+# ---------------------------------------------------------------------------
+# Fiscal Engine V2 — questionario guidato IVA agevolata
+# ---------------------------------------------------------------------------
+class AnswersBody(BaseModel):
+    answers: Dict[str, Any] = Field(default_factory=dict)
+    requested_regime: Optional[str] = None
+
+
+class DocumentBody(BaseModel):
+    doc_type: str
+    attachment_id: Optional[str] = None
+    file_name: Optional[str] = None
+    note: Optional[str] = None
+
+
+class SignBody(BaseModel):
+    signer_name: str
+    accepted: bool = True
+    channel: str = "IN_PRESENCE"  # IN_PRESENCE | CUSTOMER_PORTAL
+
+
+async def _rule(db, tenant_id: str) -> dict:
+    r = await db.vat_rule_versions.find_one({"status": "ACTIVE", "$or": [{"tenant_id": tenant_id}, {"tenant_id": None}]}, sort=[("effective_from", -1)])
+    if not r:
+        r = {**fe.DEFAULT_RULE_VERSION, "tenant_id": None, "created_at": datetime.now(timezone.utc).isoformat()}
+        await db.vat_rule_versions.update_one({"_id": r["_id"]}, {"$setOnInsert": r}, upsert=True)
+    return r
+
+
+async def _reevaluate(db, doc: dict, dossier: dict, user: dict, request: Request, action: str) -> dict:
+    rule = await _rule(db, user["tenant_id"])
+    requested = dossier.get("requested_regime") or "VAT_ORDINARY"
+    ev = fe.evaluate(requested, dossier.get("answers") or {}, doc.get("lines") or [], float(doc.get("subtotal") or 0), dossier, rule)
+    dossier["evaluation"] = ev
+    dossier["documentation_status"] = "COMPLETE" if (requested == "VAT_ORDINARY" or not ev["missing_requirements"]) else ("PARTIAL" if (dossier.get("documents") or (dossier.get("declaration") or {}).get("status") in ("SIGNED", "VALIDATED")) else "MISSING")
+    dossier["customer_declaration"] = (dossier.get("declaration") or {}).get("status") in ("SIGNED", "VALIDATED")
+    if requested != "VAT_ORDINARY" and dossier.get("vat_eligibility_status") not in ("VALIDATED", "REJECTED"):
+        dossier["vat_eligibility_status"] = "PENDING"
+    dossier["audit_trail"] = (dossier.get("audit_trail") or [])[-49:] + [{"at": datetime.now(timezone.utc).isoformat(), "by": user["id"], "action": action, "requested_vat": requested, "eligibility_result": ev["outcome"],
+                                                                           "rule_version": ev.get("rule_version"), "legal_basis": ev.get("legal_basis"), "declaration_id": (dossier.get("declaration") or {}).get("id"),
+                                                                           "document_ids": [d.get("attachment_id") or d.get("id") for d in (dossier.get("documents") or [])]}]
+    dossier["updated_at"], dossier["updated_by"] = datetime.now(timezone.utc).isoformat(), user["id"]
     reg = resolve_vat_regime(dossier)
     patch = _financial_totals_patch(doc.get("lines") or [], {**doc, "fiscal_dossier": dossier, "vat_regime": reg["vat_regime"]})
-    await db.quotes.update_one({"_id": qid}, {"$set": {"fiscal_dossier": dossier, **reg, **patch, "updated_at": datetime.now(timezone.utc).isoformat()}, "$inc": {"version": 1}})
-    await record_audit(action="quotes.fiscal_dossier.update", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"],
-                       ip=get_client_ip(request), entity_type="quote", entity_id=qid, before={"vat_regime": doc.get("vat_regime")}, after=reg)
-    return {"fiscal_dossier": dossier, **reg, "vat_breakdown": patch.get("vat_breakdown"), "vat_amount": patch.get("vat_amount"), "total": patch.get("total")}
+    await db.quotes.update_one({"_id": doc["_id"]}, {"$set": {"fiscal_dossier": dossier, **reg, **patch, "updated_at": dossier["updated_at"]}, "$inc": {"version": 1}})
+    await record_audit(action=f"quotes.fiscal.{action}", tenant_id=user["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request), entity_type="quote", entity_id=doc["_id"],
+                       before={"vat_regime": doc.get("vat_regime")}, after={**reg, "eligibility_result": ev["outcome"], "requested_vat": requested, "applied_vat": patch.get("vat_regime_applied")})
+    return {"fiscal_dossier": dossier, **reg, "vat_breakdown": patch.get("vat_breakdown"), "vat_amount": patch.get("vat_amount"), "total": patch.get("total"), "applied_vat": patch.get("vat_regime_applied")}
+
+
+def _questionnaire_view(dossier: dict, is_fiscal: bool, rule: dict) -> dict:
+    requested = dossier.get("requested_regime") or "VAT_ORDINARY"
+    answers = dossier.get("answers") or {}
+    seq = fe.next_questions(requested, answers) if requested != "VAT_ORDINARY" else []
+    qs = [{"key": k, **{kk: vv for kk, vv in fe.QUESTIONS[k].items() if kk != "options"}, "options": [{"value": v, "label": l} for v, l in fe.QUESTIONS[k]["options"]], "answer": answers.get(k)} for k in seq]
+    out = {"requested_regime": requested, "questionnaire_required": requested != "VAT_ORDINARY", "questions": qs, "pending_questions": fe.pending_questions(requested, answers) if requested != "VAT_ORDINARY" else [],
+           "answers": answers, "evaluation": dossier.get("evaluation"), "declaration": dossier.get("declaration") or {"status": "NOT_GENERATED"}, "documents": dossier.get("documents") or [],
+           "vat_eligibility_status": dossier.get("vat_eligibility_status"), "documentation_status": dossier.get("documentation_status"), "applied_vat_until_validation": "22%", "rule_version": rule.get("code")}
+    if is_fiscal:
+        out["legal_references"] = rule.get("legal_references")
+    return out
+
+
+@router.get("/{qid}/fiscal-questionnaire")
+async def get_fiscal_questionnaire(qid: str, user: dict = Depends(require_permission("quotes.view"))):
+    db = get_db()
+    doc = await _load(db, qid, user)
+    perms = await _get_perms(user)
+    return _questionnaire_view(doc.get("fiscal_dossier") or {}, user_has_permission(user, perms, "quotes.vat_validate"), await _rule(db, user["tenant_id"]))
+
+
+@router.post("/{qid}/fiscal-questionnaire/answers")
+async def post_fiscal_answers(qid: str, body: AnswersBody, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+    db = get_db()
+    doc = await _load(db, qid, user)
+    if _is_frozen(doc):
+        raise HTTPException(409, "Preventivo accettato: regime IVA congelato")
+    dossier = dict(doc.get("fiscal_dossier") or {})
+    if body.requested_regime:
+        if body.requested_regime not in REQUESTABLE:
+            raise HTTPException(400, {"code": "VAT_REGIME_INVALID", "allowed": list(REQUESTABLE)})
+        if body.requested_regime != dossier.get("requested_regime"):
+            dossier["vat_eligibility_status"] = "PENDING" if body.requested_regime != "VAT_ORDINARY" else None
+        dossier["requested_regime"] = body.requested_regime
+    allowed = set(fe.QUESTIONS) | {"property_address", "cadastral_data", "property_type", "condominium_name"}
+    bad = [k for k in body.answers if k not in allowed]
+    if bad:
+        raise HTTPException(400, {"code": "ANSWER_KEY_INVALID", "keys": bad})
+    for k, v in body.answers.items():
+        if k in fe.QUESTIONS and v not in (None, "") and v not in {o for o, _ in fe.QUESTIONS[k]["options"]}:
+            raise HTTPException(400, {"code": "ANSWER_VALUE_INVALID", "key": k})
+    dossier["answers"] = {**(dossier.get("answers") or {}), **body.answers}
+    if "customer_tax_profile" in body.answers:
+        dossier["customer_tax_profile"] = body.answers["customer_tax_profile"]
+    out = await _reevaluate(db, doc, dossier, user, request, "answers")
+    perms = await _get_perms(user)
+    return {**out, "questionnaire": _questionnaire_view(dossier, user_has_permission(user, perms, "quotes.vat_validate"), await _rule(db, user["tenant_id"]))}
+
+
+@router.post("/{qid}/fiscal-dossier/documents")
+async def add_fiscal_document(qid: str, body: DocumentBody, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+    db = get_db()
+    doc = await _load(db, qid, user)
+    dossier = dict(doc.get("fiscal_dossier") or {})
+    entry = {"id": new_id(), "doc_type": body.doc_type.upper(), "attachment_id": body.attachment_id, "file_name": body.file_name, "note": body.note, "uploaded_by": user["id"], "uploaded_at": datetime.now(timezone.utc).isoformat()}
+    dossier["documents"] = (dossier.get("documents") or []) + [entry]
+    return await _reevaluate(db, doc, dossier, user, request, "document_added")
+
+
+@router.post("/{qid}/fiscal-dossier/declaration/generate")
+async def generate_declaration(qid: str, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+    db = get_db()
+    doc = await _load(db, qid, user)
+    dossier = dict(doc.get("fiscal_dossier") or {})
+    if (dossier.get("requested_regime") or "VAT_ORDINARY") == "VAT_ORDINARY":
+        raise HTTPException(400, {"code": "DECLARATION_NOT_NEEDED"})
+    if fe.pending_questions(dossier["requested_regime"], dossier.get("answers") or {}):
+        raise HTTPException(400, {"code": "QUESTIONNAIRE_INCOMPLETE", "pending": fe.pending_questions(dossier["requested_regime"], dossier.get("answers") or {})})
+    customer = await db.customers.find_one({"_id": doc.get("customer_id")}) or {}
+    text = fe.declaration_text(customer, dossier.get("answers") or {}, dossier["requested_regime"], dossier.get("evaluation") or {}, doc.get("number"))
+    dossier["declaration"] = {"id": new_id(), "status": "WAITING_CUSTOMER", "text": text, "generated_at": datetime.now(timezone.utc).isoformat(), "generated_by": user["id"], "rule_version": (dossier.get("evaluation") or {}).get("rule_version")}
+    return await _reevaluate(db, doc, dossier, user, request, "declaration_generated")
+
+
+@router.post("/{qid}/fiscal-dossier/declaration/sign")
+async def sign_declaration(qid: str, body: SignBody, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+    db = get_db()
+    doc = await _load(db, qid, user)
+    dossier = dict(doc.get("fiscal_dossier") or {})
+    decl = dossier.get("declaration") or {}
+    if decl.get("status") != "WAITING_CUSTOMER":
+        raise HTTPException(400, {"code": "DECLARATION_NOT_WAITING", "status": decl.get("status", "NOT_GENERATED")})
+    if not body.accepted or not body.signer_name.strip():
+        raise HTTPException(400, {"code": "SIGNATURE_INVALID"})
+    decl.update({"status": "SIGNED", "signed_at": datetime.now(timezone.utc).isoformat(), "signer_name": body.signer_name.strip(), "channel": body.channel, "ip": get_client_ip(request), "collected_by": user["id"]})
+    dossier["declaration"] = decl
+    return await _reevaluate(db, doc, dossier, user, request, "declaration_signed")
+
+
+@router.post("/{qid}/fiscal-dossier/validate")
+async def validate_dossier(qid: str, body: dict, request: Request, user: dict = Depends(require_permission("quotes.edit"))):
+    """Fiscal/Admin: VALIDATED | REJECTED. Solo da qui l'aliquota agevolata diventa APPLICATA (esito del Fiscal Engine)."""
+    db = get_db()
+    doc = await _load(db, qid, user)
+    perms = await _get_perms(user)
+    if not user_has_permission(user, perms, "quotes.vat_validate"):
+        raise HTTPException(403, {"code": "VAT_VALIDATION_FORBIDDEN"})
+    decision = str((body or {}).get("decision") or "").upper()
+    if decision not in ("VALIDATED", "REJECTED"):
+        raise HTTPException(400, {"code": "DECISION_INVALID", "allowed": ["VALIDATED", "REJECTED"]})
+    dossier = dict(doc.get("fiscal_dossier") or {})
+    ev = dossier.get("evaluation") or {}
+    if decision == "VALIDATED" and ev.get("outcome") not in ("ELIGIBLE_10_FULL", "ELIGIBLE_MIXED_10_22", "ELIGIBLE_4"):
+        raise HTTPException(400, {"code": "NOT_VALIDATABLE", "outcome": ev.get("outcome"), "missing_requirements": ev.get("missing_requirements")})
+    dossier.update({"vat_eligibility_status": decision, "validated_by": user["id"], "validated_at": datetime.now(timezone.utc).isoformat(), "validation_reason": (body or {}).get("reason")})
+    if dossier.get("declaration"):
+        dossier["declaration"]["status"] = "VALIDATED" if decision == "VALIDATED" else "REJECTED"
+    return await _reevaluate(db, doc, dossier, user, request, f"validation_{decision.lower()}")
+
+
+@router.get("/vat-rules/active")
+async def active_vat_rule(user: dict = Depends(require_permission("quotes.view"))):
+    r = await _rule(get_db(), user["tenant_id"])
+    perms = await _get_perms(user)
+    if not user_has_permission(user, perms, "quotes.vat_validate"):
+        return {"code": r["code"], "effective_from": r["effective_from"], "status": r["status"]}
+    return from_mongo(r)
 
 
 # ---------------------------------------------------------------------------

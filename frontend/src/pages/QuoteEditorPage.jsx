@@ -27,7 +27,9 @@ import { FilePdf, Download, Eye, CaretDown, Link, Copy, XCircle } from "@phospho
 import { CompetitorAnalyzerCard } from "@/components/quotes/CompetitorAnalyzerCard";
 import { QuoteEmailDialog, QuoteEmailHistory } from "@/components/quotes/QuoteEmailDialog";
 import { LogisticsServicesCard } from "@/components/quotes/LogisticsServicesCard";
-import { SustainabilityBox } from "@/components/quotes/SustainabilityBox";
+import { QuoteCashBox } from "@/components/quotes/QuoteCashBox";
+import { VatQuestionnaireModal } from "@/components/quotes/VatQuestionnaireModal";
+import { DiscountApprovalBar } from "@/components/quotes/DiscountApprovalBar";
 
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0); } catch { return "€ 0,00"; } }
 function fmtPct(n) { return typeof n === "number" ? `${n.toFixed(2).replace(".", ",")} %` : "—"; }
@@ -129,13 +131,15 @@ export default function QuoteEditorPage() {
   const isAdminMaster = !!financial?.is_admin_master_view;
   const maxAdminStep = financial?.financial_snapshot?.max_admin_discount_step_percent ?? null;
   const adminHardCap = financial?.financial_snapshot?.admin_master_max_discount_percent ?? 40;
-  const dropdownMax = isAdminMaster ? adminHardCap : 30;
+  const dropdownMax = adminHardCap;
   const maxAllowedStep = isAdminMaster ? maxAdminStep : maxCommercialStep;
   const [emailOpen, setEmailOpen] = React.useState(false);
   const { data: vatOptions } = useQuery({ queryKey: ["vat-options"], queryFn: async () => (await api.get(`/quotes/vat-options`)).data, staleTime: 600000 });
+  const [vatModal, setVatModal] = React.useState(false);
+  const [discountReason, setDiscountReason] = React.useState("");
   const patchFiscal = useMutation({
     mutationFn: async (fields) => (await api.patch(`/quotes/${id}/fiscal-dossier`, fields)).data,
-    onSuccess: (d) => { toast.success(`Regime IVA: ${vatOptions?.labels?.[d.vat_regime] || d.vat_regime}`); reload(); },
+    onSuccess: (d) => { toast.success(`Regime IVA: ${vatOptions?.labels?.[d.vat_regime] || d.vat_regime}`); reload(); if (d.fiscal_dossier?.requested_regime && d.fiscal_dossier.requested_regime !== "VAT_ORDINARY") setVatModal(true); },
     onError: (e) => toast.error(formatApiError(e.response?.data?.detail) || e.message),
   });
   const [promoInput, setPromoInput] = React.useState("");
@@ -401,14 +405,21 @@ export default function QuoteEditorPage() {
                         <SelectContent className="max-h-64">
                           {Array.from({ length: dropdownMax + 1 }, (_, i) => i).map((i) => (
                             <SelectItem key={i} value={String(i)} disabled={maxAllowedStep != null && i > maxAllowedStep} data-testid={`discount-opt-${i}`}>
-                              {i}%{maxAllowedStep != null && i > maxAllowedStep ? " — non consentito (margine minimo)" : (i > 30 ? " — autorizzazione Admin Master" : "")}
+                              {i}%{maxAllowedStep != null && i > maxAllowedStep ? " — non consentito (margine minimo)" : (i > 30 ? (isAdminMaster ? " — Admin Master (motivazione)" : " — ⚠ approvazione direzione") : "")}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button type="button" size="sm" variant="outline" className="rounded-sm h-9" disabled={!editable} onClick={() => patchQuote.mutate({ global_discount_percent: Number(discountPct || 0) })} data-testid="quote-discount-apply-btn">Applica</Button>
+                    <Button type="button" size="sm" variant="outline" className="rounded-sm h-9" disabled={!editable || (Number(discountPct) > 30 && !discountReason)} onClick={() => patchQuote.mutate({ global_discount_percent: Number(discountPct || 0), ...(Number(discountPct) > 30 ? { discount_reason: discountReason } : {}) })} data-testid="quote-discount-apply-btn">Applica</Button>
                   </div>
+                  {Number(discountPct) > 30 && (
+                    <div className="border border-amber-300 bg-amber-50 rounded-sm p-2 space-y-1" data-testid="discount-over-30-box">
+                      <div className="text-[10px] font-bold text-amber-800">⚠ {isAdminMaster ? "SCONTO OLTRE 30% — MOTIVAZIONE OBBLIGATORIA" : "APPROVAZIONE DIREZIONE RICHIESTA — il preventivo resta salvabile ma non finalizzabile"}</div>
+                      <select className="h-8 w-full rounded-sm border px-2 text-xs" value={discountReason} onChange={(e) => setDiscountReason(e.target.value)} data-testid="discount-reason-select"><option value="">Motivazione…</option>{["trattativa strategica", "competitor", "volume commessa", "recupero cliente", "promozione autorizzata", "altro"].map((r) => <option key={r}>{r}</option>)}</select>
+                    </div>
+                  )}
+                  <DiscountApprovalBar quote={q} isAdmin={isAdminMaster} onChanged={reload} />
                   <div className="flex gap-2 items-end">
                     <div className="flex-1">
                       <Label className="text-[10px] uppercase">Codice sconto</Label>
@@ -575,6 +586,8 @@ export default function QuoteEditorPage() {
                     {(vatOptions?.options || []).map((o) => <SelectItem key={o.value} value={o.value} data-testid={`vat-opt-${o.value}`}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {(q.fiscal_dossier?.requested_regime || "VAT_ORDINARY") !== "VAT_ORDINARY" && <div className="mt-1 flex items-center gap-2"><Button type="button" size="sm" variant="outline" className="rounded-sm h-7 text-[10px]" onClick={() => setVatModal(true)} data-testid="quote-vat-open-questionnaire">{q.vat_regime === "VAT_DOCUMENTATION_INCOMPLETE" || q.vat_regime === "VAT_REVIEW_REQUIRED" ? "Completa dossier IVA" : "Dossier IVA"}</Button>{q.fiscal_dossier?.evaluation?.missing_requirements?.length > 0 && <span className="text-[10px] text-amber-800" data-testid="quote-vat-missing">Mancano: {q.fiscal_dossier.evaluation.missing_requirements.join(", ")}</span>}</div>}
+                <VatQuestionnaireModal quoteId={id} open={vatModal} onClose={() => { setVatModal(false); reload(); }} requestedRegime={q.fiscal_dossier?.requested_regime} canValidate={isAdminMaster} />
                 {["VAT_DOCUMENTATION_INCOMPLETE", "VAT_REVIEW_REQUIRED"].includes(q.vat_regime) && <div className="mt-1 text-[10px] font-bold text-amber-700" data-testid="quote-vat-warning">IVA AGEVOLATA — DOCUMENTAZIONE DA COMPLETARE: applicata IVA 22% ordinaria finché il dossier fiscale non è validato{q.fiscal_dossier?.documentation_status ? ` (documenti: ${q.fiscal_dossier.documentation_status}${q.fiscal_dossier.customer_declaration ? ", dichiarazione cliente ✓" : ", dichiarazione cliente mancante"})` : ""}.</div>}
               </div>
               <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground"><span>Regime IVA applicato: <b data-testid="totals-vat-regime">{vatOptions?.labels?.[q.vat_regime] || q.vat_regime || "IVA 22% ordinaria"}</b></span>{q.fiscal_dossier?.vat_eligibility_status && <Badge variant="outline" className="rounded-sm text-[10px]" data-testid="totals-fiscal-status">Dossier fiscale: {q.fiscal_dossier.vat_eligibility_status}</Badge>}</div>
@@ -583,7 +596,7 @@ export default function QuoteEditorPage() {
 
           {/* --- Marginalità (Margin Tachometer V1 — msg 392) --- */}
           <MarginPanel financial={financial} isAdmin={!!financial?.is_admin_master_view} />
-          <SustainabilityBox quoteId={id} isAdmin={isAdminMaster} refreshKey={`${q.subtotal}-${q.global_discount_value}-${q.version}`} />
+          <QuoteCashBox quoteId={id} isAdmin={isAdminMaster} financial={financial?.financial_snapshot || financial} refreshKey={`${q.subtotal}-${q.global_discount_value}-${q.version}`} />
           <CompetitorAnalyzerCard quoteId={id} editable={editable} isAdmin={isAdminMaster} />
           <Card className="rounded-sm border-border p-4" data-testid="quote-emails-card">
             <div className="overline mb-3">Email preventivo — stato consegna</div>

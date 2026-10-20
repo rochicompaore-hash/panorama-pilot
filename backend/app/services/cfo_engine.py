@@ -16,11 +16,34 @@ UNASSIGNED = "UNASSIGNED"
 OUTFLOW_CATEGORIES = ("FORNITORI", "STIPENDI", "AFFITTI", "LEASING", "MARKETING", "ENERGIA", "IMPOSTE", "ASSICURAZIONI", "SOFTWARE", "LOGISTICA", "POSA", "PRODUZIONE", "ALTRO")
 _FIXED_CAT = {"rent": "AFFITTI", "insurance": "ASSICURAZIONI", "software": "SOFTWARE", "utilities": "ENERGIA", "consulting": "ALTRO", "marketing": "MARKETING",
               "leasing": "LEASING", "logistics": "LOGISTICA", "tax": "IMPOSTE", "energy": "ENERGIA"}
-_PAYABLE_CAT = {"invoice": "FORNITORI", "supplier_invoice": "FORNITORI", "f24": "IMPOSTE", "tax": "IMPOSTE", "payroll": "STIPENDI", "rent": "AFFITTI", "leasing": "LEASING"}
+_PAYABLE_CAT = {"invoice": "FORNITORI", "supplier_invoice": "FORNITORI", "f24": "IMPOSTE", "tax_f24": "IMPOSTE", "tax": "IMPOSTE", "payroll": "STIPENDI", "salary": "STIPENDI", "rent": "AFFITTI", "leasing": "LEASING", "loan": "FINANZIAMENTI"}
 AGING_BUCKETS = (("1-7", 1, 7), ("8-30", 8, 30), ("31-60", 31, 60), ("61-90", 61, 90), (">90", 91, 10 ** 6))
 VF_CLASS = {"vat": "RESERVED_CASH", "contingency": "RESERVED_CASH", "investments": "VIRTUAL_ALLOCATION"}
 GOODS_READY_STATUSES = {"completed", "ready_for_installation", "installed", "closed"}
 INSTALLED_STATUSES = {"installed", "closed"}
+# COLLECTION STATES (PO): ACTUAL | DUE | SCHEDULED | TRIGGER_EXPECTED | UNSCHEDULED | OVERDUE | DISPUTED. Solo CERTAIN entra nel cash forecast (NO FALSE LIQUIDITY).
+CERTAIN_STATUSES = ("DUE", "SCHEDULED", "OVERDUE")
+EVENT_GRACE_DAYS = 7
+PRIORITIES = ("CRITICAL", "IMPORTANT", "DEFERRABLE", "DISCRETIONARY")
+_PRIORITY_BY_CAT = {"STIPENDI": "CRITICAL", "IMPOSTE": "CRITICAL", "F24": "CRITICAL", "AFFITTI": "CRITICAL", "FORNITORI": "IMPORTANT", "LEASING": "IMPORTANT", "FINANZIAMENTI": "IMPORTANT",
+                    "ASSICURAZIONI": "IMPORTANT", "ENERGIA": "IMPORTANT", "SOFTWARE": "IMPORTANT", "LOGISTICA": "IMPORTANT", "POSA": "IMPORTANT", "PRODUZIONE": "IMPORTANT", "MARKETING": "DEFERRABLE", "ALTRO": "IMPORTANT"}
+_CASH_MONTHS = {"monthly": 1, "bimonthly": 2, "quarterly": 3, "semiannual": 6, "annual": 12, "yearly": 12}
+
+
+def priority_of(item: dict) -> str:
+    return item["priority"] if item.get("priority") in PRIORITIES else _PRIORITY_BY_CAT.get(item.get("category") or "", "IMPORTANT")
+
+
+def confidence_of(status: str, days_overdue: int = 0) -> str:
+    if status == "ACTUAL":
+        return "CONFIRMED"
+    if status in ("DUE", "SCHEDULED"):
+        return "HIGH"
+    if status == "OVERDUE":
+        return "MEDIUM" if days_overdue <= 30 else "LOW"
+    if status == "TRIGGER_EXPECTED":
+        return "MEDIUM"
+    return "LOW"
 
 
 # ---------------------------------------------------------------------------
@@ -126,47 +149,64 @@ async def cash_receipts_canonical(db, tenant_id: str, contracts: Dict[str, dict]
 
 
 async def expected_collections(db, tenant_id: str, contracts: Dict[str, dict], plans: List[dict], today: date) -> List[dict]:
-    """Rate aperte dei payment_plans. Stato: SCHEDULED | OVERDUE | TRIGGER_PENDING | UNSCHEDULED (mai date fittizie)."""
-    orders = {o["_id"]: o for o in await db.sales_orders.find({"tenant_id": tenant_id, "deleted_at": None}, {"order_status": 1, "contract_id": 1, "updated_at": 1}).to_list(5000)}
+    """ORDER TO CASH: rate aperte dei payment_plans classificate DUE | SCHEDULED | OVERDUE | TRIGGER_EXPECTED | UNSCHEDULED | DISPUTED.
+    Eventi commessa (firma, merce pronta, posa) attivano le rate; expected_ready_date → TRIGGER_EXPECTED (mai due_date: fuori dal cash certo)."""
+    orders = {o["_id"]: o for o in await db.sales_orders.find({"tenant_id": tenant_id, "deleted_at": None}, {"order_status": 1, "contract_id": 1, "updated_at": 1, "expected_ready_date": 1, "expected_installation_date": 1, "goods_ready_at": 1, "installed_at": 1}).to_list(5000)}
     order_by_contract = {o.get("contract_id"): o for o in orders.values() if o.get("contract_id")}
     out = []
+
+    def _event(due: Optional[date]):
+        due = due or today
+        if due > today:
+            return "SCHEDULED"
+        return "OVERDUE" if (today - due).days > EVENT_GRACE_DAYS else "DUE"
+
     for p in plans:
         contract = contracts.get(p.get("contract_id") or "") or {}
         order = orders.get(p.get("sales_order_id") or "") or order_by_contract.get(p.get("contract_id") or "") or {}
         le = p.get("legal_entity_id") or contract.get("legal_entity_id")
         linked = bool(p.get("contract_id") or p.get("sales_order_id"))
         for inst in p.get("installments") or []:
-            if (inst.get("installment_status") or "pending") == "paid":
+            ist = inst.get("installment_status") or "pending"
+            if ist in ("paid", "cancelled"):
                 continue
             residual = round(_f(inst.get("amount")) - _f(inst.get("paid_amount")), 2)
             if residual <= 0:
                 continue
             trig = str(inst.get("trigger") or "").lower()
             due = _d(inst.get("due_date"))
-            status, basis = "UNSCHEDULED", None
-            if due:
-                status, basis = ("OVERDUE" if due < today else "SCHEDULED"), "DUE_DATE_KNOWN"
+            expected = None
+            status, basis = "UNSCHEDULED", "NO_RELIABLE_DATE"
+            if ist == "disputed" or inst.get("disputed"):
+                status, basis = "DISPUTED", "CUSTOMER_DISPUTE"
+            elif due:
+                status, basis = ("OVERDUE" if due < today else ("DUE" if due == today else "SCHEDULED")), "DUE_DATE_KNOWN"
             elif trig in ("signature", "order", "contract_signed") and contract.get("signed_at"):
                 due, basis = _d(contract["signed_at"]), "EVENT_CONTRACT_SIGNED"
-                status = "OVERDUE" if due < today else "SCHEDULED"
-            elif trig in ("goods_ready", "apm"):
+                status = _event(due)
+            elif trig in ("goods_ready", "apm", "before_installation"):
                 if order.get("order_status") in GOODS_READY_STATUSES:
-                    due, basis, status = _d(order.get("updated_at")) or today, "EVENT_GOODS_READY", "SCHEDULED"
-                    status = "OVERDUE" if due < today else "SCHEDULED"
+                    due, basis = _d(order.get("goods_ready_at") or order.get("updated_at")) or today, "EVENT_GOODS_READY"
+                    status = _event(due)
+                elif _d(order.get("expected_ready_date")):
+                    expected, status, basis = _d(order["expected_ready_date"]), "TRIGGER_EXPECTED", "GOODS_EXPECTED_DATE"
                 else:
-                    status, basis = "TRIGGER_PENDING", "GOODS_READY_NOT_OCCURRED"
-            elif trig in ("installation", "installation_completed", "installed"):
+                    basis = "GOODS_READY_NOT_OCCURRED"
+            elif trig in ("installation", "installation_completed", "installed", "on_completion"):
                 if order.get("order_status") in INSTALLED_STATUSES:
-                    due, basis = _d(order.get("updated_at")) or today, "EVENT_INSTALLATION_COMPLETED"
-                    status = "OVERDUE" if due < today else "SCHEDULED"
+                    due, basis = _d(order.get("installed_at") or order.get("updated_at")) or today, "EVENT_INSTALLATION_COMPLETED"
+                    status = _event(due)
+                elif _d(order.get("expected_installation_date")):
+                    expected, status, basis = _d(order["expected_installation_date"]), "TRIGGER_EXPECTED", "INSTALLATION_EXPECTED_DATE"
                 else:
-                    status, basis = "TRIGGER_PENDING", "INSTALLATION_NOT_OCCURRED"
+                    basis = "INSTALLATION_NOT_OCCURRED"
             elif trig:
-                status, basis = "TRIGGER_PENDING", f"TRIGGER_{trig.upper()}_PENDING"
-            out.append({"payment_plan_id": p["_id"], "contract_id": p.get("contract_id"), "sales_order_id": p.get("sales_order_id"), "customer_id": p.get("customer_id"),
+                basis = f"TRIGGER_{trig.upper()}_PENDING"
+            days_over = (today - due).days if (due and due < today) else 0
+            out.append({"payment_plan_id": p["_id"], "contract_id": p.get("contract_id"), "sales_order_id": p.get("sales_order_id") or order.get("_id"), "customer_id": p.get("customer_id"),
                         "installment_ref": inst.get("ref"), "label": inst.get("label"), "trigger": trig or None, "amount": residual, "due_date": due.isoformat() if due else None,
-                        "days_overdue": (today - due).days if (due and due < today) else 0, "status": status, "date_basis": basis, "legal_entity_id": le, "linked": linked,
-                        "contract_number": contract.get("number")})
+                        "expected_date": expected.isoformat() if expected else None, "days_overdue": days_over, "status": status, "confidence": confidence_of(status, days_over), "date_basis": basis,
+                        "legal_entity_id": le, "linked": linked, "contract_number": contract.get("number"), "order_status": order.get("order_status"), "certain": status in CERTAIN_STATUSES})
     return out
 
 
@@ -187,7 +227,8 @@ async def expected_outflows(db, tenant_id: str, today: date, horizon_days: int =
         due = _d(pb.get("due_date"))
         item = {"id": pb["_id"], "source": "payable", "label": pb.get("label"), "supplier": pb.get("creditor"), "category": cat, "amount": residual, "due_date": due.isoformat() if due else None,
                 "status": ("OVERDUE" if due and due < today else ("SCHEDULED" if due else "UNSCHEDULED")), "days_overdue": (today - due).days if (due and due < today) else 0,
-                "legal_entity_id": pb.get("legal_entity_id"), "intercompany_pair_id": pb.get("linked_intercompany_pair_id"), "doc_ref": pb.get("doc_ref")}
+                "legal_entity_id": pb.get("legal_entity_id"), "intercompany_pair_id": pb.get("linked_intercompany_pair_id"), "doc_ref": pb.get("doc_ref"), "job_ref": pb.get("job_ref"), "priority": pb.get("priority")}
+        item["priority"] = priority_of(item)
         (out if due else unscheduled).append(item)
         if due:
             pay_index[(str(pb.get("label") or "").strip().lower(), due.year, due.month)] += residual
@@ -195,46 +236,80 @@ async def expected_outflows(db, tenant_id: str, today: date, horizon_days: int =
         due = _d(f24.get("due_date"))
         item = {"id": f24["_id"], "source": "f24", "label": f24.get("label") or "F24", "supplier": "Erario", "category": "IMPOSTE", "amount": _f(f24.get("amount") or f24.get("total")),
                 "due_date": due.isoformat() if due else None, "status": ("OVERDUE" if due and due < today else ("SCHEDULED" if due else "UNSCHEDULED")),
-                "days_overdue": (today - due).days if (due and due < today) else 0, "legal_entity_id": f24.get("legal_entity_id"), "intercompany_pair_id": None}
+                "days_overdue": (today - due).days if (due and due < today) else 0, "legal_entity_id": f24.get("legal_entity_id"), "intercompany_pair_id": None, "priority": "CRITICAL"}
         if item["amount"] > 0:
             (out if due else unscheduled).append(item)
-    fixed = await db.fixed_costs.find({"tenant_id": tenant_id, "deleted_at": None, "active": {"$ne": False}}).to_list(2000)
-    personnel = await db.personnel_costs.find({"tenant_id": tenant_id, "deleted_at": None, "active": {"$ne": False}}).to_list(2000)
+    fixed = await db.fixed_costs.find({"tenant_id": tenant_id, "deleted_at": None, "active": {"$ne": False}, "is_demo": {"$ne": True}}).to_list(2000)
+    personnel = await db.personnel_costs.find({"tenant_id": tenant_id, "deleted_at": None, "active": {"$ne": False}, "is_demo": {"$ne": True}}).to_list(2000)
     monthly_fixed = round(sum(_f(f.get("amount_monthly")) for f in fixed), 2)
     monthly_personnel = round(sum(_f(p.get("monthly_total_cost")) for p in personnel), 2)
+    payroll_mismatch = []
     cur = today.replace(day=1)
     while cur <= end:
         for f in fixed:
             amt = _f(f.get("amount_monthly"))
             if amt <= 0 or (f.get("start_date") and _d(f["start_date"]) and _d(f["start_date"]) > cur) or (f.get("end_date") and _d(f["end_date"]) and _d(f["end_date"]) < cur):
                 continue
-            due = cur.replace(day=min(5, 28))
+            cs = f.get("cash_schedule") or {}
+            months = _CASH_MONTHS.get(str(cs.get("recurrence") or "monthly").lower(), 1)
+            if months > 1:  # CASH PROFILE ≠ ECONOMIC: es. assicurazione 440 €/mese economico → 5.280 € cash a marzo
+                due_month = int(cs.get("due_month") or 1)
+                if (cur.month - due_month) % months != 0:
+                    continue
+                amt_cash = round(amt * months, 2)
+            else:
+                amt_cash = amt
+            due = cur.replace(day=min(int(cs.get("due_day") or 5), 28))
             if due < today:
                 continue
             key = (str(f.get("label") or "").strip().lower(), due.year, due.month)
             if pay_index.get(key):
                 reconciled += 1
                 continue  # già rappresentato da un payable reale → nessun doppio conteggio
-            out.append({"id": f"fixed:{f['_id']}:{due.isoformat()}", "source": "fixed_cost", "label": f.get("label"), "supplier": f.get("supplier"), "category": _FIXED_CAT.get(str(f.get("category") or "").lower(), "ALTRO"),
-                        "amount": amt, "due_date": due.isoformat(), "status": "SCHEDULED", "days_overdue": 0, "legal_entity_id": f.get("legal_entity_id"), "intercompany_pair_id": None, "recurring": True})
-        pay_day = cur.replace(day=27)
-        if monthly_personnel > 0 and pay_day >= today:
+            cat = _FIXED_CAT.get(str(f.get("category") or "").lower(), "ALTRO")
+            out.append({"id": f"fixed:{f['_id']}:{due.isoformat()}", "source": "fixed_cost", "label": f.get("label"), "supplier": f.get("supplier"), "category": cat, "amount": amt_cash, "economic_monthly": amt,
+                        "due_date": due.isoformat(), "status": "SCHEDULED", "days_overdue": 0, "legal_entity_id": f.get("legal_entity_id"), "intercompany_pair_id": None, "recurring": True, "priority": priority_of({"category": cat, "priority": f.get("priority")})})
+        if monthly_personnel > 0:
             by_le = defaultdict(float)
+            comps = []  # componenti cash esplicite (netto / F24 / altro) — SUM deve == costo ALL-IN, mai aggiunte sopra
             for p in personnel:
-                by_le[p.get("legal_entity_id")] += _f(p.get("monthly_total_cost"))
+                total = _f(p.get("monthly_total_cost"))
+                cc = p.get("cash_components") or []
+                if cc and abs(sum(_f(c.get("amount")) for c in cc) - total) < 0.01:
+                    for c in cc:
+                        comps.append((p.get("legal_entity_id"), c))
+                else:
+                    if cc:
+                        payroll_mismatch.append(p["_id"])
+                    by_le[p.get("legal_entity_id")] += total
+            pay_day = cur.replace(day=27)
             for le, amt in by_le.items():
+                if pay_day < today:
+                    continue
                 if pay_index.get(("stipendi", pay_day.year, pay_day.month)):
                     reconciled += 1
                     continue
-                out.append({"id": f"payroll:{le or UNASSIGNED}:{pay_day.isoformat()}", "source": "personnel_cost", "label": "Stipendi e oneri", "supplier": None, "category": "STIPENDI",
-                            "amount": round(amt, 2), "due_date": pay_day.isoformat(), "status": "SCHEDULED", "days_overdue": 0, "legal_entity_id": le, "intercompany_pair_id": None, "recurring": True})
+                out.append({"id": f"payroll:{le or UNASSIGNED}:{pay_day.isoformat()}", "source": "personnel_cost", "label": "Stipendi (costo azienda ALL-IN)", "supplier": None, "category": "STIPENDI",
+                            "amount": round(amt, 2), "due_date": pay_day.isoformat(), "status": "SCHEDULED", "days_overdue": 0, "legal_entity_id": le, "intercompany_pair_id": None, "recurring": True, "priority": "CRITICAL"})
+            for le, c in comps:
+                off = int(c.get("month_offset") or 0)
+                m0 = (cur + timedelta(days=32 * off)).replace(day=1) if off else cur
+                due = m0.replace(day=min(int(c.get("due_day") or 27), 28))
+                if due < today or due > end:
+                    continue
+                lab = str(c.get("label") or "ALTRO").upper()
+                cat = "IMPOSTE" if lab in ("F24", "CONTRIBUTI", "CONTRIBUTION") else "STIPENDI"
+                out.append({"id": f"payroll:{lab}:{le or UNASSIGNED}:{due.isoformat()}", "source": "personnel_cost", "label": f"Personale · {lab}", "supplier": None, "category": cat, "amount": _f(c.get("amount")),
+                            "due_date": due.isoformat(), "status": "SCHEDULED", "days_overdue": 0, "legal_entity_id": le, "intercompany_pair_id": None, "recurring": True, "priority": "CRITICAL"})
         cur = (cur + timedelta(days=32)).replace(day=1)
     committed = []
     for po in await db.purchase_orders.find({"tenant_id": tenant_id, "deleted_at": None, "po_status": {"$nin": ["cancelled", "closed", "paid"]}}).to_list(2000):
         committed.append({"id": po["_id"], "number": po.get("number"), "supplier": po.get("supplier_name"), "amount": _f(po.get("total")), "status": "PURCHASE_COMMITTED",
                           "due_date": po.get("payment_due_date"), "forecastable": bool(po.get("payment_due_date") and po.get("payment_terms"))})
+    for it in unscheduled:
+        it.setdefault("priority", priority_of(it))
     return {"items": out, "unscheduled": unscheduled, "purchase_committed": committed, "uncategorized_payables": uncategorized, "reconciled_recurring": reconciled,
-            "monthly_fixed_costs": monthly_fixed, "monthly_personnel_costs": monthly_personnel}
+            "monthly_fixed_costs": monthly_fixed, "monthly_personnel_costs": monthly_personnel, "payroll_cash_components_mismatch": payroll_mismatch}
 
 
 async def cash_position(db, tenant_id: str, le: Optional[str]) -> Dict[str, Any]:
@@ -352,13 +427,13 @@ def build_calendar(opening: Optional[float], as_of: Optional[date], today: date,
     horizons = {}
     for lab, days in (("today", 0), ("7d", 7), ("14d", 14), ("30d", 30), ("60d", 60), ("90d", 90)):
         upto = today + timedelta(days=days)
-        inflow = round(sum(c["amount"] for c in coll if c["status"] in ("SCHEDULED", "OVERDUE") and within(c["due_date"], upto)), 2)
+        inflow = round(sum(c["amount"] for c in coll if c["status"] in CERTAIN_STATUSES and within(c["due_date"], upto)), 2)
         outflow = round(sum(o["amount"] for o in outf if within(o["due_date"], upto)), 2)
         horizons[lab] = {"inflows": inflow, "outflows": outflow, "net": round(inflow - outflow, 2), "forecast_closing_cash": round(base + inflow - outflow, 2) if base is not None else None}
     weeks, run, gap_week = [], base, None
     for w in range(13):
         ws, we = today + timedelta(days=7 * w), today + timedelta(days=7 * w + 6)
-        inflow = round(sum(c["amount"] for c in coll if c["status"] in ("SCHEDULED", "OVERDUE") and _d(c["due_date"]) and ws <= _d(c["due_date"]) <= we), 2)
+        inflow = round(sum(c["amount"] for c in coll if c["status"] in CERTAIN_STATUSES and _d(c["due_date"]) and ws <= _d(c["due_date"]) <= we), 2)
         outflow = round(sum(o["amount"] for o in outf if _d(o["due_date"]) and ws <= _d(o["due_date"]) <= we), 2)
         closing = round(run + inflow - outflow, 2) if run is not None else None
         if closing is not None and closing < 0 and gap_week is None:
@@ -391,11 +466,11 @@ def receivables_by_customer(coll: List[dict], receipts: List[dict], customers: D
         b = by[c.get("customer_id")]
         if c["status"] == "OVERDUE":
             b["overdue"] += c["amount"]; b["due"] += c["amount"]; b["max_days_overdue"] = max(b["max_days_overdue"], c["days_overdue"])
-        elif c["status"] == "SCHEDULED":
+        elif c["status"] in ("SCHEDULED", "DUE"):
             b["due"] += c["amount"]
             if b["next_due"] is None or c["due_date"] < b["next_due"]:
                 b["next_due"] = c["due_date"]
-        elif c["status"] == "TRIGGER_PENDING":
+        elif c["status"] == "TRIGGER_EXPECTED":
             b["pending"] += c["amount"]
         else:
             b["unscheduled"] += c["amount"]
@@ -464,7 +539,7 @@ async def overview(db, tenant_id: str, le: Optional[str] = None, today: Optional
     ar_aging = aging([c for c in coll_all if c["status"] == "OVERDUE"], today)
     ap_aging = aging([o for o in outf_items if o["status"] == "OVERDUE"], today)
     def _due_within(items, days):
-        return round(sum(i["amount"] for i in items if i["status"] in ("SCHEDULED", "OVERDUE") and _d(i["due_date"]) and _d(i["due_date"]) <= today + timedelta(days=days)), 2)
+        return round(sum(i["amount"] for i in items if i["status"] in CERTAIN_STATUSES and _d(i["due_date"]) and _d(i["due_date"]) <= today + timedelta(days=days)), 2)
     supplier_due = {"overdue": ap_aging["total_overdue"], "7d": _due_within([o for o in outf_items if o["source"] in ("payable", "f24")], 7), "30d": _due_within([o for o in outf_items if o["source"] in ("payable", "f24")], 30), "60d": _due_within([o for o in outf_items if o["source"] in ("payable", "f24")], 60)}
     inv_total = revenue["invoiced"]["ytd"]
     conversion = round(collected_ytd / inv_total * 100, 1) if inv_total > 0 else None
@@ -473,16 +548,16 @@ async def overview(db, tenant_id: str, le: Optional[str] = None, today: Optional
         ar_open = sum(r["due_scheduled"] for r in ar_rows)
         dso = round(ar_open / inv_total * (today - today.replace(month=1, day=1)).days, 0) if ar_open else 0
     outf_month = round(sum(o["amount"] for o in outf_items if _d(o["due_date"]) and ms <= _d(o["due_date"]) <= me), 2)
-    coll_month_sched = round(sum(c["amount"] for c in coll_all if c["status"] in ("SCHEDULED", "OVERDUE") and _d(c["due_date"]) and _d(c["due_date"]) <= me), 2)
-    unsched_in = round(sum(c["amount"] for c in coll_all if c["status"] in ("UNSCHEDULED", "TRIGGER_PENDING")), 2)
+    coll_month_sched = round(sum(c["amount"] for c in coll_all if c["status"] in CERTAIN_STATUSES and _d(c["due_date"]) and _d(c["due_date"]) <= me), 2)
+    unsched_in = round(sum(c["amount"] for c in coll_all if c["status"] in ("UNSCHEDULED", "TRIGGER_EXPECTED", "DISPUTED")), 2)
     forecast_month = {"revenue": revenue["forecast_month"], "collections": {"actual": collected_month, "scheduled_to_month_end": coll_month_sched, "total_forecast": round(collected_month + coll_month_sched, 2), "kind": "FORECAST"},
                       "outflows": {"actual_paid": paid_month, "scheduled_to_month_end": outf_month, "total_forecast": round(paid_month + outf_month, 2), "kind": "FORECAST"},
                       "cash": {"forecast_month_end": round(avail + coll_month_sched - outf_month, 2) if avail is not None else None, "kind": "FORECAST", "status": calendar["status"]}}
     dq = [
         {"area": "FATTURATO", "ok": revenue["invoiced"]["invoice_count"] > 0, "message": "OK" if revenue["invoiced"]["invoice_count"] else "NO INVOICE DATA AVAILABLE"},
         {"area": "CASSA", "ok": cash["status"] == "COMPLETE", "message": "OK" if cash["status"] == "COMPLETE" else f"BANK BALANCE NOT CONFIGURED ({cash['accounts_not_configured']} conti)"},
-        {"area": "EXPECTED COLLECTIONS", "ok": not any(c["status"] in ("UNSCHEDULED", "TRIGGER_PENDING") for c in coll_all),
-         "message": f"{sum(1 for c in coll_all if c['status']=='UNSCHEDULED')} INSTALLMENTS UNSCHEDULED · {sum(1 for c in coll_all if c['status']=='TRIGGER_PENDING')} TRIGGER PENDING · {sum(1 for c in coll_all if not c['linked'])} piani non collegati a contratto/ordine"},
+        {"area": "EXPECTED COLLECTIONS", "ok": not any(c["status"] in ("UNSCHEDULED", "TRIGGER_EXPECTED") for c in coll_all),
+         "message": f"{sum(1 for c in coll_all if c['status']=='UNSCHEDULED')} INSTALLMENTS UNSCHEDULED · {sum(1 for c in coll_all if c['status']=='TRIGGER_EXPECTED')} TRIGGER EXPECTED · {sum(1 for c in coll_all if not c['linked'])} piani non collegati a contratto/ordine"},
         {"area": "MARGINE", "ok": margin["status"] == "OK", "message": f"{margin['margin_sample_size']} COMPLETE ORDERS"},
         {"area": "USCITE", "ok": outf_raw["uncategorized_payables"] == 0 and not unsched_out, "message": f"{outf_raw['uncategorized_payables']} PAYABLES UNCATEGORIZED · {len(unsched_out)} senza scadenza · {outf_raw['reconciled_recurring']} ricorrenti riconciliati con payable"},
         {"area": "VENDUTO", "ok": revenue["sold"]["contracts_legacy_excluded"] == 0, "message": f"{revenue['sold']['contracts_legacy_excluded']} contratti LEGACY_ECONOMIC_DATA_INCOMPLETE esclusi"},
@@ -494,7 +569,7 @@ async def overview(db, tenant_id: str, le: Optional[str] = None, today: Optional
     from app.services import sustainability_engine as sus  # stessa verità: registry costi fissi + contribution engine + settings
     structure = await sus.overview(db, tenant_id, le, today)
     dq.append({"area": "COSTI FISSI", "ok": structure["fixed_cost_registry"]["reconciliation_status"] == "COMPLETE",
-               "message": f"registry {structure['fixed_cost_registry']['annual_total']} € vs PO reference {sus.PO_REFERENCE_ANNUAL_FIXED_COST} € → FIXED_COST_RECONCILIATION = {structure['fixed_cost_registry']['reconciliation_status']}"})
+               "message": f"registry REALE {structure['fixed_cost_registry']['annual_total']} € (demo esclusi {structure['fixed_cost_registry']['demo_annual_total']} €) vs PO reference {sus.PO_REFERENCE_ANNUAL_FIXED_COST} € → FIXED_COST_RECONCILIATION = {structure['fixed_cost_registry']['reconciliation_status']}"})
     dq.append({"area": "PRICING SUSTAINABILITY", "ok": structure["plan"]["data_quality"] == "COMPLETE", "message": f"{structure['plan']['data_quality']}" + (f" (mancano: {', '.join(structure['plan']['missing'])})" if structure["plan"]["missing"] else "")})
     return {"engine_version": CFO_ENGINE_VERSION, "today": today.isoformat(), "legal_entity_id": le or GROUP, "settings": settings,
             "kpi_row1": {"invoiced_month": revenue["invoiced"]["month"], "invoiced_status": revenue["invoiced"]["data_status"], "collected_month": collected_month, "paid_month": paid_month,
@@ -510,11 +585,11 @@ async def overview(db, tenant_id: str, le: Optional[str] = None, today: Optional
             "receivables": {"rows": ar_rows[:50], "total_residual": round(sum(r["residual"] for r in ar_rows), 2), "total_due_scheduled": round(sum(r["due_scheduled"] for r in ar_rows), 2), "aging": ar_aging},
             "payables": {"supplier_due": supplier_due, "aging": ap_aging, "items_30d": sorted([o for o in outf_items if _d(o["due_date"]) and _d(o["due_date"]) <= today + timedelta(days=30)], key=lambda o: o["due_date"])[:50],
                          "unscheduled": unsched_out[:50], "purchase_committed": outf_raw["purchase_committed"][:50], "intercompany_eliminated": ic_elim_out},
-            "collections_30d": sorted([c for c in coll_all if c["status"] in ("SCHEDULED", "OVERDUE") and _d(c["due_date"]) and _d(c["due_date"]) <= today + timedelta(days=30)], key=lambda c: c["due_date"])[:50],
-            "collections_pending": [c for c in coll_all if c["status"] in ("TRIGGER_PENDING", "UNSCHEDULED")][:50],
+            "collections_30d": sorted([c for c in coll_all if c["status"] in CERTAIN_STATUSES and _d(c["due_date"]) and _d(c["due_date"]) <= today + timedelta(days=30)], key=lambda c: c["due_date"])[:50],
+            "collections_pending": [c for c in coll_all if c["status"] in ("TRIGGER_EXPECTED", "UNSCHEDULED", "DISPUTED")][:50],
             "revenue": revenue, "collected_ytd": collected_ytd, "cash_conversion_percent": conversion, "dso": dso if dso is not None else "NOT_AVAILABLE",
             "forecast_month_end": forecast_month, "data_quality": dq, "alerts": alerts, "next_actions": actions, "structure_coverage": structure["plan"], "fixed_cost_registry": structure["fixed_cost_registry"],
-            "email_go_live": "BLOCKED_BY_SECRET"}
+            "email_go_live": "BLOCKED_BY_CONFIGURATION"}
 
 
 def _alerts_actions(today, calendar, gap_30, reserve, ar_rows, outf_items, revenue, forecast_month, cash):

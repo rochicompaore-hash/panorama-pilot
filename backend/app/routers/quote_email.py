@@ -77,7 +77,7 @@ async def preview_quote_email(qid: str, pdf_id: Optional[str] = None, message: O
     pdf = await _resolve_pdf(db, quote, pdf_id)
     c = await _compose(db, quote, user, message, pdf)
     c.pop("text", None)
-    c["blockers"] = ([] if c["to_valid"] else ["CUSTOMER_EMAIL_MISSING_OR_INVALID"]) + ([] if pdf else ["DEFINITIVE_PDF_MISSING"]) + ([] if c["provider_configured"] else ["RESEND_CONFIGURATION=BLOCKED_BY_SECRET"])
+    c["blockers"] = ([] if c["to_valid"] else ["CUSTOMER_EMAIL_MISSING_OR_INVALID"]) + ([] if pdf else ["DEFINITIVE_PDF_MISSING"]) + ([] if c["provider_configured"] else ["RESEND_CONFIGURATION=BLOCKED_BY_CONFIGURATION"])
     return c
 
 
@@ -87,6 +87,8 @@ async def send_quote_email(qid: str, body: SendBody, request: Request, user: dic
     quote = await _load(db, qid, user)
     if quote.get("quote_status") in ("cancelled", "superseded", "expired", "rejected"):
         raise HTTPException(409, {"code": "QUOTE_NOT_SENDABLE", "message": f"Stato {quote.get('quote_status')}: invio non consentito"})
+    if quote.get("discount_approval_status") == "DISCOUNT_APPROVAL_REQUIRED":
+        raise HTTPException(409, {"code": "DISCOUNT_APPROVAL_PENDING", "message": "Sconto oltre 30% in attesa di approvazione direzione: invio definitivo non consentito"})
     pdf = await _resolve_pdf(db, quote, body.pdf_id)
     if not pdf:
         raise HTTPException(400, {"code": "DEFINITIVE_PDF_MISSING", "message": "Genera il PDF definitivo prima dell'invio"})
@@ -119,7 +121,7 @@ async def send_quote_email(qid: str, body: SendBody, request: Request, user: dic
     await record_audit(action="quotes.email_send", tenant_id=quote["tenant_id"], user_id=user["id"], user_email=user["email"], ip=get_client_ip(request),
                        entity_type="quote", entity_id=qid, after={"email_log_id": log["id"], "to": c["to"], "status": log.get("status"), "delivery_status": log.get("delivery_status"), "pdf_id": pdf["_id"]})
     if log.get("status") == "configuration_required":
-        raise HTTPException(503, {"code": "RESEND_CONFIGURATION", "status": "BLOCKED_BY_SECRET", "message": "Provider email non configurato: nessuna email inviata", "email_log_id": log["id"]})
+        raise HTTPException(503, {"code": "RESEND_CONFIGURATION", "status": "BLOCKED_BY_CONFIGURATION", "message": "Provider email non configurato: nessuna email inviata", "email_log_id": log["id"]})
     return {"ok": accepted, "email": _public(log, True), "quote_status_changed": status_changed, "event": ev}
 
 

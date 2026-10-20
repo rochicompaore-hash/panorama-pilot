@@ -78,7 +78,7 @@ async def create_custom_domain(body: DomainCreate, request: Request, user: dict 
     if other:
         raise HTTPException(409, {"code": "DOMAIN_ALREADY_CLAIMED", "message": "Dominio già registrato da un altro tenant"})
     if not resend_provider.is_configured():
-        raise HTTPException(503, {"code": "RESEND_CONFIGURATION", "status": "BLOCKED_BY_SECRET"})
+        raise HTTPException(503, {"code": "RESEND_CONFIGURATION", "status": "BLOCKED_BY_CONFIGURATION"})
     s = await get_settings(db, user["tenant_id"])
     try:
         d = await resend_provider.create_domain(domain)
@@ -100,7 +100,7 @@ async def verify_custom_domain(request: Request, user: dict = Depends(require_pe
     if not s.get("provider_domain_id"):
         raise HTTPException(400, {"code": "DOMAIN_NOT_CONFIGURED"})
     if not resend_provider.is_configured():
-        raise HTTPException(503, {"code": "RESEND_CONFIGURATION", "status": "BLOCKED_BY_SECRET"})
+        raise HTTPException(503, {"code": "RESEND_CONFIGURATION", "status": "BLOCKED_BY_CONFIGURATION"})
     try:
         await resend_provider.verify_domain(s["provider_domain_id"])
         d = await resend_provider.get_domain(s["provider_domain_id"])

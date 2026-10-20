@@ -97,7 +97,7 @@ def test_test_send_smtp_not_configured_and_redirect():
     assert data["actual_to"] == "pilot@panoramapilot.com"
     # If not configured, error must clearly say SMTP_NOT_CONFIGURED
     if data["status"] == "configuration_required":
-        assert ("BLOCKED_BY_SECRET" in (data.get("error") or "")) or ("SMTP_NOT_CONFIGURED" in (data.get("error") or ""))
+        assert ("BLOCKED_BY_CONFIGURATION" in (data.get("error") or "")) or ("SMTP_NOT_CONFIGURED" in (data.get("error") or ""))
 
 
 # --------------------------------------------------------------------
