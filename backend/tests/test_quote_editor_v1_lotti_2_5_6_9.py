@@ -92,7 +92,7 @@ class TestDeliveryPolicy:
     def test_standard_default_and_express_fail_closed(self, admin, cid):
         qid = _quote_10000(admin, cid)
         q = admin.get(f"{BASE_URL}/api/quotes/{qid}", timeout=20).json()
-        assert q["delivery_mode"] == "STANDARD" and q["estimated_delivery_min_days"] == 90 and q["delivery_surcharge_amount"] == 0
+        assert q["delivery_mode"] == "STANDARD" and q["estimated_delivery_min_days"] == 60 and q["estimated_delivery_max_days"] == 90 and q["delivery_surcharge_amount"] == 0
         assert "90 giorni" in q["delivery_customer_text"]
         # PO msg 403 §6: EXPRESS non acquistabile finché i giorni non sono definiti
         r = admin.patch(f"{BASE_URL}/api/quotes/{qid}", json={"delivery_mode": "EXPRESS"}, timeout=20)

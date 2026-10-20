@@ -383,6 +383,7 @@
   <div class="card econ">
     <div class="card-title"><span class="ico">€</span> Riepilogo economico</div>
     <table>
+      {% for ls in (q.logistics_services or []) if ls.customer_price is not none %}<tr><td class="k">{{ ls.label | upper }}</td><td class="v">{% if ls.customer_price == 0 %}OMAGGIO{% else %}{{ ls.customer_price | cur }}{% endif %}</td></tr>{% endfor %}
       {% if q.delivery_surcharge_amount and q.delivery_surcharge_amount > 0 %}<tr><td class="k">Maggiorazione consegna accelerata (+{{ q.delivery_surcharge_percent | num(0) }}%)</td><td class="v">{{ q.delivery_surcharge_amount | cur }}</td></tr>{% endif %}
       {% if q.global_discount_amount and q.global_discount_amount > 0 %}
         <tr><td class="k">Subtotale</td><td class="v">{{ q.commercial_subtotal | cur }}</td></tr>

@@ -255,6 +255,9 @@ def build_snapshot(*, quote: dict, company: dict, template: dict, clauses: List[
         "openings": quote.get("openings") or [],
         "environments": quote.get("environments") or [],
         "lines": [_strip_line(l) for l in (quote.get("lines") or [])],
+        # PO logistica §11: servizi logistici customer-safe (azzerato → OMAGGIO), mai costo interno
+        "logistics_services": [{"code": i.get("code"), "label": i.get("label"), "customer_price": i.get("customer_price"), "standard_price": i.get("standard_price")} for i in (quote.get("logistics_services") or [])],
+        "logistics_services_sale_total": quote.get("logistics_services_sale_total"),
         "subtotal": quote.get("subtotal"),
         # msg 402 — payment terms / delivery policy / sconto pagamento (solo dati cliente, nessun dato interno)
         "commercial_subtotal": quote.get("commercial_subtotal") or 0,

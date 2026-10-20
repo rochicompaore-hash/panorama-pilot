@@ -127,6 +127,7 @@
 
 <h2>Importi e IVA</h2>
 <div class="subtotal-block">
+  {% for ls in (economics.logistics_services or []) if ls.customer_price is not none %}<div class="row"><span>{{ ls.label | upper }}</span><span class="money">{% if ls.is_free %}OMAGGIO{% else %}{{ '%.2f' % ls.customer_price }} €{% endif %}</span></div>{% endfor %}
   {% if economics.commercial_subtotal %}<div class="row"><span>Imponibile lordo</span><span class="money">{{ '%.2f' % economics.commercial_subtotal }} €</span></div>{% endif %}
   {% if economics.global_discount_amount %}<div class="row"><span>Sconto {{ '%g' % (economics.global_discount_value or 0) }}%</span><span class="money">-{{ '%.2f' % economics.global_discount_amount }} €</span></div>{% endif %}
   {% if economics.payment_discount_amount %}<div class="row"><span>Sconto pagamento</span><span class="money">-{{ '%.2f' % economics.payment_discount_amount }} €</span></div>{% endif %}

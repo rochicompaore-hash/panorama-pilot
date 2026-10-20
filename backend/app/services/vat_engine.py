@@ -17,7 +17,7 @@ VAT_SELECTOR_OPTIONS = [
 VAT_MODE_LABELS = {"VAT_ORDINARY": "IVA 22% ordinaria", "VAT_ELIGIBLE_10": "IVA 10% agevolata", "VAT_ELIGIBLE_4": "IVA 4% agevolata",
                    "VAT_MIXED_10_22": "IVA mista 10% / 22% (beni significativi)", "VAT_REVIEW_REQUIRED": "IVA da verificare — applicata 22% ordinaria",
                    "VAT_DOCUMENTATION_INCOMPLETE": "IVA agevolata — documentazione da completare — applicata 22% ordinaria"}
-SERVICE_CATEGORIES = {"installation", "service", "services", "servizi", "posa", "smontaggio", "enea", "dismantling", "disposal"}
+SERVICE_CATEGORIES = {"installation", "service", "services", "servizi", "posa", "smontaggio", "enea", "dismantling", "disposal", "logistics"}
 VAT_POLICY_VERSION = "vat_engine_v2_2026_09"
 
 

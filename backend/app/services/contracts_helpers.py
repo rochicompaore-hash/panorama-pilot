@@ -108,6 +108,9 @@ def build_economic_snapshot(quote: dict) -> Dict[str, Any]:
         "vat_reason": quote.get("vat_regime_reason"),
         "fiscal_validation_status": (quote.get("fiscal_dossier") or {}).get("vat_eligibility_status") or ("NOT_REQUIRED" if (quote.get("vat_regime") or "VAT_ORDINARY") == "VAT_ORDINARY" else "PENDING"),
         "fiscal_dossier": {k: (quote.get("fiscal_dossier") or {}).get(k) for k in ("requested_regime", "documentation_status", "customer_declaration", "vat_eligibility_status")},
+        "logistics_services": [{"code": i.get("code"), "label": i.get("label"), "customer_price": i.get("customer_price"), "standard_price": i.get("standard_price"),
+                                "is_free": (i.get("customer_price") is not None and float(i.get("customer_price") or 0) == 0), "required": i.get("required")}
+                               for i in (quote.get("logistics_services") or [])],
         "delivery_lead_time_days": quote.get("delivery_lead_time_days"),
         "delivery_lead_time_class": quote.get("delivery_lead_time_class"),
         "delivery_lead_time_mixed": bool(quote.get("delivery_lead_time_mixed")),

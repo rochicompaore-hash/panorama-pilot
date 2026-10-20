@@ -40,7 +40,7 @@ DEFAULT_WITHHOLDING_RATE = 0.11   # msg 395 §2 — 11% ritenuta d'acconto
 # Categories that count as installation service (msg 392 §7).
 INSTALLATION_CATEGORIES = {"installation", "posa", "montaggio", "montaggi_posa"}
 # Categories that count as OTHER_DIRECT_COSTS (not supply, not install).
-OTHER_DIRECT_CATEGORIES = {"disposal", "smaltimento", "accessory", "accessori", "extra", "servizi"}
+OTHER_DIRECT_CATEGORIES = {"disposal", "smaltimento", "accessory", "accessori", "extra", "servizi", "logistics"}
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +237,11 @@ def compute_financial_snapshot(quote: Dict[str, Any]) -> Dict[str, Any]:
         pratica ENEA selezionata, ``commission_status=NEEDS_COST_CONFIGURATION``
         e ``financial_snapshot_status="INCOMPLETE"``.
     """
-    lines = quote.get("lines") or []
+    lines = list(quote.get("lines") or [])
+    # PO logistica: servizi (trasporto/gru) → ricavo = prezzo cliente finale, costo interno invariato (pseudo-righe, mai duplicate)
+    if quote.get("logistics_services") and not any(l.get("is_logistics") for l in lines):
+        from app.services.logistics_services import pseudo_lines as _logi_lines
+        lines += _logi_lines(quote.get("logistics_services"))
     subtotal = float(quote.get("subtotal") or quote.get("taxable_amount") or 0)
     vat = float(quote.get("vat_amount") or 0)
     total = float(quote.get("total") or (subtotal + vat))

@@ -90,14 +90,15 @@ def apply_automatic_discount(totals: Dict[str, Any], discount_percent: float) ->
 DISCOUNT_POLICY_VERSION = "global_discount_v1_msg407"
 
 
-def apply_global_discount(totals: Dict[str, Any], discount_type: Optional[str], discount_value: float) -> Dict[str, Any]:
+def apply_global_discount(totals: Dict[str, Any], discount_type: Optional[str], discount_value: float, excluded_base: float = 0.0) -> Dict[str, Any]:
     gross_subtotal = float(totals.get("subtotal") or 0)
     out = dict(totals)
     out.update({"commercial_subtotal": round(gross_subtotal, 2), "global_discount_amount": 0.0})
     v = float(discount_value or 0)
     if not discount_type or v <= 0 or gross_subtotal <= 0:
         return out
-    amount = round(gross_subtotal * v / 100.0, 2) if discount_type == "PERCENT" else round(min(v, gross_subtotal), 2)
+    discountable = max(0.0, gross_subtotal - float(excluded_base or 0))  # voci già scontate a riga escluse (no doppio sconto)
+    amount = round(discountable * v / 100.0, 2) if discount_type == "PERCENT" else round(min(v, discountable), 2)
     factor = (gross_subtotal - amount) / gross_subtotal
     subtotal = round(gross_subtotal - amount, 2)
     out.update({

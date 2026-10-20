@@ -26,6 +26,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { FilePdf, Download, Eye, CaretDown, Link, Copy, XCircle } from "@phosphor-icons/react";
 import { CompetitorAnalyzerCard } from "@/components/quotes/CompetitorAnalyzerCard";
 import { QuoteEmailDialog, QuoteEmailHistory } from "@/components/quotes/QuoteEmailDialog";
+import { LogisticsServicesCard } from "@/components/quotes/LogisticsServicesCard";
 
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0); } catch { return "€ 0,00"; } }
 function fmtPct(n) { return typeof n === "number" ? `${n.toFixed(2).replace(".", ",")} %` : "—"; }
@@ -344,6 +345,7 @@ export default function QuoteEditorPage() {
         <div className="lg:col-span-2 space-y-4">
           {/* --- Installation Mode V1 (msg 393) --- */}
           <InstallationModeCard q={q} editable={editable} onChange={reload} />
+          <LogisticsServicesCard quoteId={id} editable={editable} onChange={reload} />
 
           <Card className="rounded-sm border-border p-4" data-testid="quote-details-card">
             <div className="flex items-center justify-between mb-3">
@@ -557,6 +559,7 @@ export default function QuoteEditorPage() {
             <div className="space-y-2 text-sm">
               {Number(q.global_discount_value) > 0 && q.commercial_subtotal != null && <div className="flex justify-between text-xs"><span className="text-muted-foreground">Valore commerciale</span><span className="font-mono-plex" data-testid="totals-commercial-subtotal">{fmtEUR(q.commercial_subtotal)}</span></div>}
               {Number(q.global_discount_value) > 0 && <div className="flex justify-between text-xs"><span className="text-muted-foreground">Sconto {q.global_discount_type === "PERCENT" ? `${q.global_discount_value}%` : ""}</span><span className="font-mono-plex text-emerald-700" data-testid="totals-discount">−{fmtEUR(Number(q.commercial_subtotal || 0) - Number(q.subtotal || 0))}</span></div>}
+              {(q.logistics_services || []).filter((l) => l.customer_price != null).map((l) => <div key={l.code} className="flex justify-between text-xs"><span className="text-muted-foreground uppercase">{l.label}</span><span className="font-mono-plex" data-testid={`totals-logistics-${l.code}`}>{Number(l.customer_price) === 0 ? "OMAGGIO" : fmtEUR(l.customer_price)}</span></div>)}
               <div className="flex justify-between"><span className="text-muted-foreground">Imponibile</span><span className="font-mono-plex" data-testid="totals-net">{fmtEUR(q.subtotal)}</span></div>
               {(q.vat_breakdown || []).length > 1 ? (q.vat_breakdown || []).map((vb) => (
                 <div key={vb.rate} className="flex justify-between text-xs" data-testid={`totals-vat-${Math.round(Number(vb.rate) * 100)}`}><span className="text-muted-foreground">IVA {Math.round(Number(vb.rate) * 100)}% su {fmtEUR(vb.taxable)}</span><span className="font-mono-plex">{fmtEUR(vb.tax)}</span></div>

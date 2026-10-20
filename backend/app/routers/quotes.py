@@ -29,6 +29,7 @@ from app.services.payment_terms import resolve_payment_terms, apply_automatic_di
 from app.services.vat_engine import apply_vat, resolve_vat_regime, REQUESTABLE as VAT_REQUESTABLE, VAT_SELECTOR_OPTIONS, VAT_MODE_LABELS
 from app.services.delivery_policy import resolve_delivery, apply_delivery_surcharge, DELIVERY_MODES
 from app.services.delivery_lead_time import compute_quote_lead_time
+from app.services.logistics_services import pseudo_lines as logistics_pseudo_lines, discounted_base as logistics_discounted_base
 from app.models_multi_category import ConfigureRequest, SimplePricingInputs
 from app.services.service_resolver import build_profiling_service
 from app.services.service_resolver import (
@@ -107,16 +108,21 @@ def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
     check). If the quote is frozen (accepted/converted) the financial_snapshot
     is left untouched (§18).
     """
-    totals = compute_quote_totals(lines)
+    # PO logistica: servizi (trasporto cantiere/piano, gru) concorrono a totali, IVA e margine come righe sintetiche (mai salvate in lines)
+    logistics = existing_quote.get("logistics_services") or []
+    lines_all = list(lines) + logistics_pseudo_lines(logistics)
+    totals = compute_quote_totals(lines_all)
     # msg 402 Lotto 9 — maggiorazione consegna EXPRESS +20% (base commerciale, esclusi ENEA), poi sconto pagamento
-    totals = apply_delivery_surcharge(totals, lines, existing_quote.get("delivery_surcharge_percent") or 0)
-    # msg 407 — sconto globale / promo (QUOTE LEVEL, su tutto il preventivo, IVA dopo sconto) — PRIMA del payment discount
-    totals = apply_global_discount(totals, existing_quote.get("global_discount_type"), existing_quote.get("global_discount_value") or 0)
+    totals = apply_delivery_surcharge(totals, lines_all, existing_quote.get("delivery_surcharge_percent") or 0)
+    # msg 407 — sconto globale / promo (QUOTE LEVEL, IVA dopo sconto) — PRIMA del payment discount; esclusi i servizi già scontati a riga (no doppio sconto)
+    totals = apply_global_discount(totals, existing_quote.get("global_discount_type"), existing_quote.get("global_discount_value") or 0, excluded_base=logistics_discounted_base(logistics))
+    totals["logistics_services_sale_total"] = round(sum(float(i.get("customer_price") or 0) for i in logistics), 2)
+    totals["logistics_services_internal_cost_total"] = round(sum(float(i.get("internal_cost") or 0) for i in logistics), 2)
     # msg 402 Lotto 5 — sconto automatico da payment terms (FULL_UPFRONT = 5%) sulla base già scontata
     totals = apply_automatic_discount(totals, existing_quote.get("automatic_discount_percent") or 0)
     totals["total_discount_amount"] = round(float(totals.get("global_discount_amount") or 0) + float(totals.get("payment_discount_amount") or 0), 2)
     # VAT Engine V2 — breakdown reale per aliquota, regime dal Fiscal Dossier (backend source of truth)
-    totals = apply_vat(totals, lines, existing_quote.get("vat_regime") or "VAT_ORDINARY")
+    totals = apply_vat(totals, lines_all, existing_quote.get("vat_regime") or "VAT_ORDINARY")
     totals["discounted_net_revenue"] = totals["subtotal"]
     totals["discount_policy_version"] = DISCOUNT_POLICY_VERSION
     # Policy tempi di consegna PO: classe canonica per codice colore, commessa = lead time maggiore (solo STANDARD; EXPRESS resta da confermare)
@@ -127,7 +133,7 @@ def _financial_totals_patch(lines: list, existing_quote: dict) -> dict:
     if _is_frozen(existing_quote):
         return totals
     proposed = dict(existing_quote)
-    proposed["lines"] = lines
+    proposed["lines"] = lines_all
     proposed.update(totals)
     fs = compute_financial_snapshot(proposed)
     return {**totals, "financial_snapshot": fs}

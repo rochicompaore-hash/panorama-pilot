@@ -231,6 +231,8 @@ async def _resolve_quote_full(tenant_id: str, quote_id: str) -> Optional[dict]:
     q = await db.quotes.find_one({"_id": quote_id, "tenant_id": tenant_id, "deleted_at": None})
     if not q: return None
     q = from_mongo(q)
+    # PO logistica §11: mai costo interno nel PDF cliente (servizio azzerato → OMAGGIO)
+    q["logistics_services"] = [{k: v for k, v in i.items() if k not in ("internal_cost", "price_history")} for i in (q.get("logistics_services") or [])]
     # Attach customer snapshot
     if q.get("customer_id"):
         cust = await db.customers.find_one({"_id": q["customer_id"]})
