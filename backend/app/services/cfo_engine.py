@@ -491,6 +491,11 @@ async def overview(db, tenant_id: str, le: Optional[str] = None, today: Optional
         {"area": "TARGET", "ok": settings["configured"], "message": "OK" if settings["configured"] else "MANUAL CONFIGURATION REQUIRED (target, riserva minima)"},
     ]
     alerts, actions = _alerts_actions(today, calendar, gap_30, reserve, ar_rows, outf_items, revenue, forecast_month, cash)
+    from app.services import sustainability_engine as sus  # stessa verità: registry costi fissi + contribution engine + settings
+    structure = await sus.overview(db, tenant_id, le, today)
+    dq.append({"area": "COSTI FISSI", "ok": structure["fixed_cost_registry"]["reconciliation_status"] == "COMPLETE",
+               "message": f"registry {structure['fixed_cost_registry']['annual_total']} € vs PO reference {sus.PO_REFERENCE_ANNUAL_FIXED_COST} € → FIXED_COST_RECONCILIATION = {structure['fixed_cost_registry']['reconciliation_status']}"})
+    dq.append({"area": "PRICING SUSTAINABILITY", "ok": structure["plan"]["data_quality"] == "COMPLETE", "message": f"{structure['plan']['data_quality']}" + (f" (mancano: {', '.join(structure['plan']['missing'])})" if structure["plan"]["missing"] else "")})
     return {"engine_version": CFO_ENGINE_VERSION, "today": today.isoformat(), "legal_entity_id": le or GROUP, "settings": settings,
             "kpi_row1": {"invoiced_month": revenue["invoiced"]["month"], "invoiced_status": revenue["invoiced"]["data_status"], "collected_month": collected_month, "paid_month": paid_month,
                          "available_cash": avail, "cash_status": calendar["status"], "sold_month": revenue["sold"]["month"]},
@@ -508,7 +513,7 @@ async def overview(db, tenant_id: str, le: Optional[str] = None, today: Optional
             "collections_30d": sorted([c for c in coll_all if c["status"] in ("SCHEDULED", "OVERDUE") and _d(c["due_date"]) and _d(c["due_date"]) <= today + timedelta(days=30)], key=lambda c: c["due_date"])[:50],
             "collections_pending": [c for c in coll_all if c["status"] in ("TRIGGER_PENDING", "UNSCHEDULED")][:50],
             "revenue": revenue, "collected_ytd": collected_ytd, "cash_conversion_percent": conversion, "dso": dso if dso is not None else "NOT_AVAILABLE",
-            "forecast_month_end": forecast_month, "data_quality": dq, "alerts": alerts, "next_actions": actions,
+            "forecast_month_end": forecast_month, "data_quality": dq, "alerts": alerts, "next_actions": actions, "structure_coverage": structure["plan"], "fixed_cost_registry": structure["fixed_cost_registry"],
             "email_go_live": "BLOCKED_BY_SECRET"}
 
 

@@ -27,6 +27,7 @@ import { FilePdf, Download, Eye, CaretDown, Link, Copy, XCircle } from "@phospho
 import { CompetitorAnalyzerCard } from "@/components/quotes/CompetitorAnalyzerCard";
 import { QuoteEmailDialog, QuoteEmailHistory } from "@/components/quotes/QuoteEmailDialog";
 import { LogisticsServicesCard } from "@/components/quotes/LogisticsServicesCard";
+import { SustainabilityBox } from "@/components/quotes/SustainabilityBox";
 
 function fmtEUR(n) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0); } catch { return "€ 0,00"; } }
 function fmtPct(n) { return typeof n === "number" ? `${n.toFixed(2).replace(".", ",")} %` : "—"; }
@@ -582,6 +583,7 @@ export default function QuoteEditorPage() {
 
           {/* --- Marginalità (Margin Tachometer V1 — msg 392) --- */}
           <MarginPanel financial={financial} isAdmin={!!financial?.is_admin_master_view} />
+          <SustainabilityBox quoteId={id} isAdmin={isAdminMaster} refreshKey={`${q.subtotal}-${q.global_discount_value}-${q.version}`} />
           <CompetitorAnalyzerCard quoteId={id} editable={editable} isAdmin={isAdminMaster} />
           <Card className="rounded-sm border-border p-4" data-testid="quote-emails-card">
             <div className="overline mb-3">Email preventivo — stato consegna</div>

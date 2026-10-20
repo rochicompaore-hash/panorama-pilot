@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SustainabilityPanel } from "@/components/cfo/SustainabilityPanel";
 
 const eur = (v) => (v == null ? "—" : `${Number(v).toLocaleString("it-IT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €`);
 const pct = (v) => (v == null ? "—" : `${v}%`);
@@ -90,6 +91,7 @@ export function CfoControlTower({ legalEntityId }) {
         </tbody></table></div>
         <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-3">{Object.entries(d.cash_calendar).map(([k, h]) => <div key={k} className="border rounded-sm p-2 text-xs" data-testid={`cfo-horizon-${k}`}><div className="uppercase text-[10px] text-muted-foreground">{k}</div><div>+{eur(h.inflows)} / −{eur(h.outflows)}</div><div className="font-mono-plex font-bold">{h.forecast_closing_cash == null ? "n/d" : eur(h.forecast_closing_cash)}</div></div>)}</div>
       </Card>
+      <SustainabilityPanel legalEntityId={le} />
       <div className="grid md:grid-cols-2 gap-2">
         <Card className="rounded-sm p-3" data-testid="cfo-receivables">
           <div className="overline">Da incassare {eur(d.receivables.total_residual)} · scaduti {eur(d.receivables.aging.total_overdue)}</div>

@@ -34,6 +34,9 @@ class FixedCost(BaseDoc):
     active: bool = True
     is_demo: bool = False
     notes: Optional[str] = None
+    cost_class: Optional[str] = None  # FIXED_STRUCTURE_COST | DIRECT_JOB_COST | SEMI_VARIABLE_COST | CASH_ONLY_FINANCIAL_COST
+    fixed_component: Optional[float] = None
+    fixed_component_pct: Optional[float] = None
 
 
 class FixedCostCreate(BaseModel):
@@ -47,6 +50,9 @@ class FixedCostCreate(BaseModel):
     vat_rate: float = 22.0
     legal_entity_id: Optional[str] = None
     cost_center: Optional[str] = None
+    cost_class: Optional[str] = None  # FIXED_STRUCTURE_COST | DIRECT_JOB_COST | SEMI_VARIABLE_COST | CASH_ONLY_FINANCIAL_COST
+    fixed_component: Optional[float] = None
+    fixed_component_pct: Optional[float] = None
 
 
 class FixedCostUpdate(BaseModel):
@@ -60,6 +66,9 @@ class FixedCostUpdate(BaseModel):
     vat_rate: Optional[float] = None
     cost_center: Optional[str] = None
     active: Optional[bool] = None
+    cost_class: Optional[str] = None  # FIXED_STRUCTURE_COST | DIRECT_JOB_COST | SEMI_VARIABLE_COST | CASH_ONLY_FINANCIAL_COST
+    fixed_component: Optional[float] = None
+    fixed_component_pct: Optional[float] = None
 
 
 # =============================================================
@@ -89,6 +98,8 @@ class PersonnelCost(BaseDoc):
     active: bool = True
     is_demo: bool = False
     notes: Optional[str] = None
+    employee_cost_mode: Optional[str] = "ALL_IN_COMPANY_COST"  # ALL_IN_COMPANY_COST | PAYROLL_ONLY | MANUAL_BREAKDOWN
+    employer_charges_monthly: Optional[float] = None
 
 
 class PersonnelCostCreate(BaseModel):
@@ -102,6 +113,8 @@ class PersonnelCostCreate(BaseModel):
     start_date: Optional[date] = None
     legal_entity_id: Optional[str] = None
     cost_center: Optional[str] = None
+    employee_cost_mode: Optional[str] = "ALL_IN_COMPANY_COST"  # ALL_IN_COMPANY_COST | PAYROLL_ONLY | MANUAL_BREAKDOWN
+    employer_charges_monthly: Optional[float] = None
 
 
 class PersonnelCostUpdate(BaseModel):
@@ -112,6 +125,8 @@ class PersonnelCostUpdate(BaseModel):
     monthly_indirect: Optional[float] = None
     end_date: Optional[date] = None
     active: Optional[bool] = None
+    employee_cost_mode: Optional[str] = "ALL_IN_COMPANY_COST"  # ALL_IN_COMPANY_COST | PAYROLL_ONLY | MANUAL_BREAKDOWN
+    employer_charges_monthly: Optional[float] = None
 
 
 # =============================================================
