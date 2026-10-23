@@ -7,11 +7,6 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
-import requests
-from motor.motor_asyncio import AsyncIOMotorClient
-
-from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
-from tests.test_quote_economic_control_v2 import _login, BASE
 from app.services import cfo_engine as eng
 
 TENANT = "5e353147-2416-4ef7-aa3f-3e0007435c42"
@@ -19,11 +14,14 @@ TODAY = date(2026, 10, 16)
 
 
 def _db():
+    from motor.motor_asyncio import AsyncIOMotorClient
     return AsyncIOMotorClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 
 
 @pytest.fixture(scope="module")
 def admin():
+    from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
+    from tests.test_quote_economic_control_v2 import _login
     return _login(ADMIN_EMAIL, ADMIN_PASSWORD)
 
 
@@ -79,7 +77,10 @@ def test_receipts_dedup_and_expected_collections_trigger():
             assert len(coll) == 1 and coll[0]["status"] == "UNSCHEDULED" and coll[0]["due_date"] is None and coll[0]["amount"] == 6100  # goods_ready senza data attendibile
             await db.sales_orders.insert_one({"_id": f"so-{tag}", "tenant_id": TENANT, "deleted_at": None, "contract_id": cid, "order_status": "ready_for_installation", "updated_at": now.isoformat()})
             coll = [c for c in await eng.expected_collections(db, TENANT, contracts, plans, TODAY) if c["payment_plan_id"] == pid]
-            assert coll[0]["status"] in ("SCHEDULED", "OVERDUE", "DUE") and coll[0]["date_basis"] == "EVENT_GOODS_READY"
+            assert coll[0]["status"] == "UNSCHEDULED" and coll[0]["date_basis"] == "GOODS_READY_DATE_UNAVAILABLE"
+            await db.sales_orders.update_one({"_id": f"so-{tag}"}, {"$set": {"goods_ready_at": TODAY.isoformat()}})
+            coll = [c for c in await eng.expected_collections(db, TENANT, contracts, plans, TODAY) if c["payment_plan_id"] == pid]
+            assert coll[0]["status"] == "DUE" and coll[0]["date_basis"] == "EVENT_GOODS_READY"
             ov = await eng.overview(db, TENANT, "LE-T", TODAY)
             assert ov["kpi_row1"]["sold_month"] == 10000 and ov["revenue"]["sold"]["contracts_legacy_excluded"] == 0
             assert ov["kpi_row1"]["available_cash"] is None and ov["cash_flow_status"] == "INCOMPLETE"
@@ -92,6 +93,8 @@ def test_receipts_dedup_and_expected_collections_trigger():
 
 
 def test_api_overview_settings_and_bank_certification(admin):
+    import requests
+    from tests.test_quote_economic_control_v2 import BASE
     ov = admin.get(f"{BASE}/cfo/overview", timeout=30).json()
     assert ov["kpi_row1"]["invoiced_status"] == "NO_INVOICE_DATA_AVAILABLE" and ov["dso"] == "NOT_AVAILABLE"
     assert any(q["area"] == "VENDUTO" and "LEGACY" in q["message"] for q in ov["data_quality"])

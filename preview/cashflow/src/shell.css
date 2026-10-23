@@ -1,0 +1,48 @@
+html { background: #f5f6f7; }
+body { background: #f5f6f7; }
+button { -webkit-tap-highlight-color: transparent; }
+.preview-shell { width: min(1320px, calc(100% - 64px)); margin: 0 auto; padding: 26px 0 22px; }
+.preview-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 24px; border-bottom: 1px solid #e1e5e8; }
+.preview-brand { color: #172326; font-size: 15px; font-weight: 750; letter-spacing: -.03em; }
+.preview-brand > span { display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px; margin-left: 5px; border-radius: 5px; background: #172326; color: #fff; font-size: 11px; vertical-align: 1px; }
+.preview-label { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border: 1px solid #dadfe2; border-radius: 999px; background: #fff; color: #526067; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.preview-label > span { width: 6px; height: 6px; border-radius: 50%; background: #bc860d; }
+.preview-intro { padding: 30px 0 24px; max-width: 780px; }
+.preview-eyebrow { color: #49666a; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 10px; }
+.preview-intro h1 { color: #132b30; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: clamp(25px, 3vw, 35px); font-weight: 750; line-height: 1.16; letter-spacing: -.04em; margin: 0 0 11px; }
+.preview-intro p { color: #626d74; font-size: 13px; line-height: 1.65; max-width: 680px; margin: 0; }
+.preview-scenarios { padding: 0 0 24px; }
+.preview-scenarios h2 { color: #4d5c62; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin: 0 0 9px; }
+.preview-scenario-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.preview-scenario { display: flex; align-items: center; gap: 9px; min-height: 50px; text-align: left; padding: 11px 12px; border: 1px solid #dce2e4; border-radius: 6px; background: #fff; color: #53616a; font-size: 12px; font-weight: 600; line-height: 1.35; cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s; }
+.preview-scenario:hover { border-color: #92b7b6; background: #f9fdfc; }
+.preview-scenario:focus-visible { outline: 3px solid #7ac9c2; outline-offset: 3px; }
+.preview-scenario.is-active { border-color: #11766f; box-shadow: 0 0 0 1px #11766f; color: #0b5e58; background: #f0faf7; }
+.preview-scenario-number { font-size: 10px; font-variant-numeric: tabular-nums; color: #8b989d; flex: 0 0 auto; }
+.preview-scenario.is-active .preview-scenario-number { color: #2b827b; }
+.preview-scenario-check { margin-left: auto; color: #11766f; width: 14px; flex: 0 0 auto; font-size: 14px; }
+.preview-description { min-height: 38px; color: #53646d; padding: 10px 1px 0; font-size: 12px; line-height: 1.55; margin: 0; max-width: 1000px; }
+.preview-dashboard { padding: 22px; border: 1px solid #dce2e5; border-radius: 9px; background: #fff; box-shadow: 0 4px 18px rgb(22 43 45 / 3%); min-width: 0; }
+.preview-dashboard [data-testid="ccc-jobs"] > div { overflow-x: auto; }
+.preview-footer { display: flex; justify-content: space-between; gap: 14px; padding-top: 17px; font-size: 10px; color: #819097; }
+@media (max-width: 800px) {
+  .preview-shell { width: calc(100% - 32px); padding-top: 18px; }
+  .preview-header { padding-bottom: 18px; }
+  .preview-scenario-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .preview-dashboard { padding: 16px; }
+}
+@media (max-width: 480px) {
+  .preview-shell { width: calc(100% - 24px); padding-top: 14px; }
+  .preview-header { gap: 7px; }
+  .preview-brand { font-size: 13px; }
+  .preview-label { padding: 5px 7px; font-size: 9px; gap: 5px; }
+  .preview-intro { padding: 24px 0 20px; }
+  .preview-scenario { padding: 9px; gap: 6px; font-size: 11px; }
+  .preview-scenario-number { font-size: 9px; }
+  .preview-dashboard { padding: 11px; }
+  .preview-dashboard [data-testid="ccc-collect-row"],
+  .preview-dashboard [data-testid="ccc-pay-row"] { flex-wrap: wrap; gap: 5px; }
+  .preview-dashboard [data-testid="ccc-collect-row"] > span:last-child { flex-wrap: wrap; margin-left: auto; }
+  .preview-footer { flex-direction: column; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .preview-scenario { transition: none; } }

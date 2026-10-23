@@ -1,0 +1,11 @@
+{
+  "synthetic_data": true,
+  "as_of": "2026-10-23",
+  "generator": "preview/cashflow/generate_data.py",
+  "entrypoint": "app.services.cash_engine.command_center",
+  "source_sha256": {
+    "backend/app/services/cash_engine.py": "91717c72a64cfc2d5478c37962554f6ab50339b19d93fbf51b85990f772f9082",
+    "backend/app/services/cfo_engine.py": "ecc40994f3c840fcae9ed6520abb6ee08ecaa01be8086b2d9122ffa325094481"
+  },
+  "scenarios": 4
+}

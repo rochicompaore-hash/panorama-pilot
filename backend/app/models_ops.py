@@ -114,8 +114,21 @@ class SalesOrder(BaseDoc):
     #   in_production|completed|ready_for_installation|installed|closed|cancelled
     expected_ready_date: Optional[date] = None
     expected_installation_date: Optional[date] = None
+    goods_ready_at: Optional[datetime] = None
+    installed_at: Optional[datetime] = None
     priority: int = 3  # 1 (high) .. 5
     notes: Optional[str] = None
+
+
+def sales_order_event_timestamps(existing: dict, target: str, occurred_at: datetime) -> Dict[str, str]:
+    """Record first observed operational transitions, never infer historical event dates."""
+    current = existing.get("order_status", "draft")
+    fields = []
+    if current == "in_production" and target == "completed":
+        fields.append("goods_ready_at")
+    if current in ("ready_for_installation", "in_production", "completed") and target == "installed":
+        fields.append("installed_at")
+    return {field: occurred_at.isoformat() for field in fields if existing.get(field) is None}
 
 
 class Supplier(BaseDoc):

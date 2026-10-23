@@ -1,0 +1,5300 @@
+[
+  {
+    "id": "overdue",
+    "title": "Scaduti da recuperare",
+    "description": "18.000 € scaduti restano visibili tra i crediti. La previsione a 30 giorni considera 5.000 € di incassi pianificati e 10.000 € di uscite.",
+    "data": {
+      "engine_version": "cash_engine_v1_2026_11_cash_reliability",
+      "today": "2026-10-23",
+      "legal_entity_id": "PREVIEW",
+      "situation_today": {
+        "cash_today": 3000.0,
+        "cash_status": "COMPLETE",
+        "cash_as_of": "2026-10-23",
+        "accounts_not_configured": 0,
+        "certified_cash": 3000.0,
+        "current_cash_estimate": 3000.0,
+        "forecast_block_reason": null,
+        "forecast_block_message": null,
+        "actual_collections_since_as_of": 0,
+        "actual_payments_since_as_of": 0,
+        "bank_balance_message": null,
+        "collections_7d": 5000.0,
+        "outflows_7d": 4000.0,
+        "cash_gap_7d": {
+          "operating_cash_position": 4000.0,
+          "operating_cash_gap": 0.0,
+          "status": "SURPLUS",
+          "reserve": 1000.0,
+          "safety_cash_gap": 0.0,
+          "safety_cash_position": 3000.0,
+          "reserve_status": "CONFIGURED"
+        },
+        "projected_cash_7d": 4000.0,
+        "collections_30d": 5000.0,
+        "outflows_30d": 10000.0,
+        "projected_cash_30d": -2000.0,
+        "cash_gap_30d": {
+          "operating_cash_position": -2000.0,
+          "operating_cash_gap": 2000.0,
+          "status": "GAP",
+          "reserve": 1000.0,
+          "safety_cash_gap": 3000.0,
+          "safety_cash_position": -3000.0,
+          "reserve_status": "CONFIGURED"
+        },
+        "total_receivables": 27000.0,
+        "collectible_7d": 5000.0,
+        "collectible_30d": 5000.0,
+        "debt_position_30d": 10000.0,
+        "lowest_cash_point": {
+          "date": "2026-11-07",
+          "amount": -2000.0
+        },
+        "first_negative_date": "2026-10-26",
+        "cash_health": "AT_RISK",
+        "runway": {
+          "days": 3,
+          "exhaustion_date": "2026-10-26",
+          "status": "CRITICAL"
+        },
+        "liquidity_coverage": {
+          "ratio": 0.8,
+          "percent": 80.0,
+          "status": "AT_RISK",
+          "available": 8000.0,
+          "mandatory_outflows_30d": 10000.0,
+          "debt_coverage_gap": 2000.0
+        },
+        "reserve": 1000.0,
+        "reserve_status": "CONFIGURED"
+      },
+      "horizons": {
+        "today": {
+          "days": 0,
+          "opening_cash": 3000.0,
+          "expected_collections": 0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 0,
+          "mandatory_outflows": 0,
+          "projected_cash": 3000.0,
+          "projected_cash_with_triggers": 3000.0,
+          "operating_cash_gap": 0.0
+        },
+        "3d": {
+          "days": 3,
+          "opening_cash": 3000.0,
+          "expected_collections": 0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 4000.0,
+          "mandatory_outflows": 4000.0,
+          "projected_cash": -1000.0,
+          "projected_cash_with_triggers": -1000.0,
+          "operating_cash_gap": -1000.0
+        },
+        "7d": {
+          "days": 7,
+          "opening_cash": 3000.0,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 4000.0,
+          "mandatory_outflows": 4000.0,
+          "projected_cash": 4000.0,
+          "projected_cash_with_triggers": 4000.0,
+          "operating_cash_gap": 0.0
+        },
+        "14d": {
+          "days": 14,
+          "opening_cash": 3000.0,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 4000.0,
+          "mandatory_outflows": 4000.0,
+          "projected_cash": 4000.0,
+          "projected_cash_with_triggers": 8000.0,
+          "operating_cash_gap": 0.0
+        },
+        "30d": {
+          "days": 30,
+          "opening_cash": 3000.0,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 10000.0,
+          "mandatory_outflows": 10000.0,
+          "projected_cash": -2000.0,
+          "projected_cash_with_triggers": 2000.0,
+          "operating_cash_gap": -2000.0
+        },
+        "60d": {
+          "days": 60,
+          "opening_cash": 3000.0,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 10000.0,
+          "mandatory_outflows": 10000.0,
+          "projected_cash": -2000.0,
+          "projected_cash_with_triggers": 2000.0,
+          "operating_cash_gap": -2000.0
+        },
+        "90d": {
+          "days": 90,
+          "opening_cash": 3000.0,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 10000.0,
+          "mandatory_outflows": 10000.0,
+          "projected_cash": -2000.0,
+          "projected_cash_with_triggers": 2000.0,
+          "operating_cash_gap": -2000.0
+        },
+        "13w": {
+          "days": 90,
+          "opening_cash": 3000.0,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 10000.0,
+          "mandatory_outflows": 10000.0,
+          "projected_cash": -2000.0,
+          "projected_cash_with_triggers": 2000.0,
+          "operating_cash_gap": -2000.0
+        }
+      },
+      "daily_projection": [
+        {
+          "date": "2026-10-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 3000.0
+        },
+        {
+          "date": "2026-10-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 3000.0
+        },
+        {
+          "date": "2026-10-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 3000.0
+        },
+        {
+          "date": "2026-10-26",
+          "inflows": 0.0,
+          "outflows": 4000.0,
+          "projected_cash": -1000.0
+        },
+        {
+          "date": "2026-10-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -1000.0
+        },
+        {
+          "date": "2026-10-28",
+          "inflows": 5000.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-10-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-10-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-10-31",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-11-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-11-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-11-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-11-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-11-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-11-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 4000.0
+        },
+        {
+          "date": "2026-11-07",
+          "inflows": 0.0,
+          "outflows": 6000.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-22",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-11-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-22",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2026-12-31",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        },
+        {
+          "date": "2027-01-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": -2000.0
+        }
+      ],
+      "weeks_13": [
+        {
+          "week": "W1",
+          "start": "2026-10-23",
+          "end": "2026-10-29",
+          "opening": 3000.0,
+          "inflows": 5000.0,
+          "outflows": 4000.0,
+          "closing": 4000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W2",
+          "start": "2026-10-30",
+          "end": "2026-11-05",
+          "opening": 4000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 4000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W3",
+          "start": "2026-11-06",
+          "end": "2026-11-12",
+          "opening": 4000.0,
+          "inflows": 0,
+          "outflows": 6000.0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W4",
+          "start": "2026-11-13",
+          "end": "2026-11-19",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W5",
+          "start": "2026-11-20",
+          "end": "2026-11-26",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W6",
+          "start": "2026-11-27",
+          "end": "2026-12-03",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W7",
+          "start": "2026-12-04",
+          "end": "2026-12-10",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W8",
+          "start": "2026-12-11",
+          "end": "2026-12-17",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W9",
+          "start": "2026-12-18",
+          "end": "2026-12-24",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W10",
+          "start": "2026-12-25",
+          "end": "2026-12-31",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W11",
+          "start": "2027-01-01",
+          "end": "2027-01-07",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W12",
+          "start": "2027-01-08",
+          "end": "2027-01-14",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        },
+        {
+          "week": "W13",
+          "start": "2027-01-15",
+          "end": "2027-01-21",
+          "opening": -2000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": -2000.0,
+          "cash_gap": true
+        }
+      ],
+      "forecast_exclusions": {
+        "overdue_receivables": 18000.0,
+        "undated_receivables": 0.0,
+        "trigger_expected_receivables": 4000.0,
+        "disputed_receivables": 0.0,
+        "other_receivables": 0.0,
+        "total": 22000.0,
+        "count": 2,
+        "reason": "Gli scaduti restano crediti da recuperare e sono esclusi dalle entrate previste. Il forecast include solo DUE/SCHEDULED con scadenza valida da oggi; eventi attesi e rate senza data restano separati."
+      },
+      "receivable_quality": {
+        "total_receivables": 27000.0,
+        "by_status": {
+          "DUE": 0.0,
+          "OVERDUE": 18000.0,
+          "SCHEDULED": 5000.0,
+          "TRIGGER_EXPECTED": 4000.0,
+          "UNSCHEDULED": 0.0,
+          "DISPUTED": 0.0
+        },
+        "collectible_7d": 5000.0,
+        "collectible_30d": 5000.0,
+        "not_yet_monetizable": 4000.0,
+        "colors": {
+          "ACTUAL": "GREEN",
+          "DUE": "GREEN",
+          "SCHEDULED": "GREEN",
+          "TRIGGER_EXPECTED": "YELLOW",
+          "OVERDUE": "RED",
+          "UNSCHEDULED": "GREY",
+          "DISPUTED": "GREY"
+        },
+        "rule": "TOTAL RECEIVABLES ≠ AVAILABLE LIQUIDITY — solo DUE/SCHEDULED con scadenza valida da oggi entrano nel forecast; scaduti, date mancanti e trigger attesi restano esclusi."
+      },
+      "collection_priority": [
+        {
+          "payment_plan_id": "plan-scaduto",
+          "contract_id": "contract-scaduto",
+          "sales_order_id": null,
+          "customer_id": "customer-scaduto",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 18000.0,
+          "due_date": "2026-10-13",
+          "expected_date": null,
+          "days_overdue": 10,
+          "status": "OVERDUE",
+          "confidence": "MEDIUM",
+          "date_basis": "DUE_DATE_KNOWN",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-SCADUTO",
+          "order_status": null,
+          "forecast_eligible": false,
+          "certain": false,
+          "forecast_exclusion_reason": "OVERDUE_RECEIVABLE",
+          "customer_name": "Cliente dimostrativo SCADUTO",
+          "reason": "SCADUTO da 10 gg · escluso dal forecast",
+          "color": "RED",
+          "rank": 0
+        },
+        {
+          "payment_plan_id": "plan-pianificato",
+          "contract_id": "contract-pianificato",
+          "sales_order_id": null,
+          "customer_id": "customer-pianificato",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 5000.0,
+          "due_date": "2026-10-28",
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "SCHEDULED",
+          "confidence": "HIGH",
+          "date_basis": "DUE_DATE_KNOWN",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-PIANIFICATO",
+          "order_status": null,
+          "forecast_eligible": true,
+          "certain": true,
+          "forecast_exclusion_reason": null,
+          "customer_name": "Cliente dimostrativo PIANIFICATO",
+          "reason": "scadenza 2026-10-28",
+          "color": "GREEN",
+          "rank": 2
+        },
+        {
+          "payment_plan_id": "plan-merce-attesa",
+          "contract_id": "contract-merce-attesa",
+          "sales_order_id": "order-merce-attesa",
+          "customer_id": "customer-merce-attesa",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": "goods_ready",
+          "amount": 4000.0,
+          "due_date": null,
+          "expected_date": "2026-11-02",
+          "days_overdue": 0,
+          "status": "TRIGGER_EXPECTED",
+          "confidence": "MEDIUM",
+          "date_basis": "GOODS_EXPECTED_DATE",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-MERCE-ATTESA",
+          "order_status": "in_production",
+          "forecast_eligible": false,
+          "certain": false,
+          "forecast_exclusion_reason": "TRIGGER_EXPECTED",
+          "customer_name": "Cliente dimostrativo MERCE-ATTESA",
+          "reason": "MERCE IN ARRIVO 10 gg",
+          "color": "YELLOW",
+          "rank": 3
+        }
+      ],
+      "debt": {
+        "ladder": {
+          "7d": {
+            "total": 4000.0,
+            "mandatory": 4000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "STIPENDI": 4000.0
+            },
+            "count": 1
+          },
+          "14d": {
+            "total": 4000.0,
+            "mandatory": 4000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "STIPENDI": 4000.0
+            },
+            "count": 1
+          },
+          "30d": {
+            "total": 10000.0,
+            "mandatory": 10000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 6000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 6000.0,
+              "STIPENDI": 4000.0
+            },
+            "count": 2
+          },
+          "60d": {
+            "total": 10000.0,
+            "mandatory": 10000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 6000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 6000.0,
+              "STIPENDI": 4000.0
+            },
+            "count": 2
+          },
+          "90d": {
+            "total": 10000.0,
+            "mandatory": 10000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 6000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 6000.0,
+              "STIPENDI": 4000.0
+            },
+            "count": 2
+          }
+        },
+        "due_30d": [
+          {
+            "id": "payable-stipendi",
+            "source": "payable",
+            "label": "Uscita di prova stipendi",
+            "supplier": "Fornitore dimostrativo",
+            "category": "STIPENDI",
+            "amount": 4000.0,
+            "due_date": "2026-10-26",
+            "status": "SCHEDULED",
+            "days_overdue": 0,
+            "legal_entity_id": "PREVIEW",
+            "intercompany_pair_id": null,
+            "doc_ref": null,
+            "job_ref": null,
+            "priority": "CRITICAL"
+          },
+          {
+            "id": "payable-fornitore",
+            "source": "payable",
+            "label": "Uscita di prova fornitore",
+            "supplier": "Fornitore dimostrativo",
+            "category": "FORNITORI",
+            "amount": 6000.0,
+            "due_date": "2026-11-07",
+            "status": "SCHEDULED",
+            "days_overdue": 0,
+            "legal_entity_id": "PREVIEW",
+            "intercompany_pair_id": null,
+            "doc_ref": null,
+            "job_ref": null,
+            "priority": "IMPORTANT"
+          }
+        ],
+        "unscheduled": [],
+        "unscheduled_total": 0,
+        "priorities": [
+          "CRITICAL",
+          "IMPORTANT",
+          "DEFERRABLE",
+          "DISCRETIONARY"
+        ],
+        "categories": [
+          "STIPENDI",
+          "F24",
+          "FORNITORI",
+          "AFFITTI",
+          "LEASING",
+          "FINANZIAMENTI",
+          "ASSICURAZIONI",
+          "IMPOSTE",
+          "ALTRO"
+        ],
+        "payroll_cash_components_mismatch": []
+      },
+      "jobs": {
+        "rows": [
+          {
+            "contract_id": "contract-scaduto",
+            "contract_number": "DEMO-SCADUTO",
+            "customer_id": "customer-scaduto",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 18000.0,
+            "net_value": 14754.1,
+            "collected": 0.0,
+            "to_collect": 18000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "OVERDUE",
+              "amount": 18000.0,
+              "date": "2026-10-13",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "RED"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-pianificato",
+            "contract_number": "DEMO-PIANIFICATO",
+            "customer_id": "customer-pianificato",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 5000.0,
+            "net_value": 4098.36,
+            "collected": 0.0,
+            "to_collect": 5000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "SCHEDULED",
+              "amount": 5000.0,
+              "date": "2026-10-28",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-merce-attesa",
+            "contract_number": "DEMO-MERCE-ATTESA",
+            "customer_id": "customer-merce-attesa",
+            "order_status": "in_production",
+            "order_number": "ORD-MERCE-ATTESA",
+            "order_value": 4000.0,
+            "net_value": 3278.69,
+            "collected": 0.0,
+            "to_collect": 4000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "TRIGGER_EXPECTED",
+              "amount": 4000.0,
+              "date": "2026-11-02",
+              "label": "Saldo di prova",
+              "basis": "GOODS_EXPECTED_DATE",
+              "color": "YELLOW"
+            },
+            "financially_negative_today": false
+          }
+        ],
+        "count": 3,
+        "cash_absorbed_by_open_jobs": 0.0,
+        "total_to_collect": 27000.0,
+        "soon": [
+          {
+            "contract_id": "contract-scaduto",
+            "contract_number": "DEMO-SCADUTO",
+            "customer_id": "customer-scaduto",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 18000.0,
+            "net_value": 14754.1,
+            "collected": 0.0,
+            "to_collect": 18000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "OVERDUE",
+              "amount": 18000.0,
+              "date": "2026-10-13",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "RED"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-pianificato",
+            "contract_number": "DEMO-PIANIFICATO",
+            "customer_id": "customer-pianificato",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 5000.0,
+            "net_value": 4098.36,
+            "collected": 0.0,
+            "to_collect": 5000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "SCHEDULED",
+              "amount": 5000.0,
+              "date": "2026-10-28",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-merce-attesa",
+            "contract_number": "DEMO-MERCE-ATTESA",
+            "customer_id": "customer-merce-attesa",
+            "order_status": "in_production",
+            "order_number": "ORD-MERCE-ATTESA",
+            "order_value": 4000.0,
+            "net_value": 3278.69,
+            "collected": 0.0,
+            "to_collect": 4000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "TRIGGER_EXPECTED",
+              "amount": 4000.0,
+              "date": "2026-11-02",
+              "label": "Saldo di prova",
+              "basis": "GOODS_EXPECTED_DATE",
+              "color": "YELLOW"
+            },
+            "financially_negative_today": false
+          }
+        ]
+      },
+      "working_capital": {
+        "customer_receivables": 27000.0,
+        "work_in_progress_cash": 0.0,
+        "supplier_payables": 10000.0,
+        "net_working_capital": 17000.0
+      },
+      "stress_scenario": {
+        "assumptions": [
+          "NO_NEW_SALES",
+          "EXPECTED_COLLECTIONS_DELAY_7_DAYS",
+          "CUSTOMER_BALANCE_TRIGGER_NOT_PAID",
+          "SUPPLIER_PAYMENTS_NOT_DEFERRED"
+        ],
+        "cash_7d": -1000.0,
+        "cash_30d": -2000.0,
+        "cash_gap_30d": -2000.0,
+        "lowest_cash_point": {
+          "date": "2026-11-07",
+          "amount": -2000.0
+        },
+        "first_negative_date": "2026-10-26",
+        "kind": "SCENARIO"
+      },
+      "structure": {
+        "annual_fixed_costs_real": 0.0,
+        "kpi_status": "PROVISIONAL / DATA_INCOMPLETE",
+        "structure_coverage_percent": 0.0,
+        "secured_contribution_ytd": 0.0,
+        "structure_residual": 506627.6,
+        "reconciliation": "INCOMPLETE",
+        "note": "STRUCTURE COVERED ≠ CASH SAFE"
+      },
+      "next_actions": [
+        {
+          "code": "CASH_DEFICIT_30D",
+          "severity": "critical",
+          "message": "Nei prossimi 30 giorni è previsto un deficit di €2.000."
+        },
+        {
+          "code": "LOWEST_CASH_POINT",
+          "severity": "critical",
+          "message": "Punto minimo di liquidità previsto il 2026-11-07: €-2.000."
+        },
+        {
+          "code": "COLLECTION_PRIORITY",
+          "severity": "high",
+          "message": "Priorità recupero: Cliente dimostrativo SCADUTO €18.000 (SCADUTO da 10 gg · escluso dal forecast) · Cliente dimostrativo PIANIFICATO €5.000 (scadenza 2026-10-28) · Cliente dimostrativo MERCE-ATTESA €4.000 (MERCE IN ARRIVO 10 gg)",
+          "items": [
+            {
+              "customer_id": "customer-scaduto",
+              "customer_name": "Cliente dimostrativo SCADUTO",
+              "amount": 18000.0,
+              "status": "OVERDUE",
+              "reason": "SCADUTO da 10 gg · escluso dal forecast"
+            },
+            {
+              "customer_id": "customer-pianificato",
+              "customer_name": "Cliente dimostrativo PIANIFICATO",
+              "amount": 5000.0,
+              "status": "SCHEDULED",
+              "reason": "scadenza 2026-10-28"
+            },
+            {
+              "customer_id": "customer-merce-attesa",
+              "customer_name": "Cliente dimostrativo MERCE-ATTESA",
+              "amount": 4000.0,
+              "status": "TRIGGER_EXPECTED",
+              "reason": "MERCE IN ARRIVO 10 gg"
+            }
+          ]
+        },
+        {
+          "code": "ACCELERATE_APM",
+          "severity": "medium",
+          "message": "Accelerare APM/merce pronta commessa DEMO-MERCE-ATTESA: sblocca €4.000 (previsto 2026-11-02)."
+        },
+        {
+          "code": "CRITICAL_PAYMENT_DUE",
+          "severity": "high",
+          "message": "Uscita CRITICAL Uscita di prova stipendi €4.000 il 2026-10-26."
+        }
+      ],
+      "principles": [
+        "NO_FALSE_LIQUIDITY",
+        "RECEIVABLES_ARE_NOT_CASH",
+        "CERTIFIED_CASH_ONLY",
+        "OVERDUE_RECEIVABLES_EXCLUDED",
+        "TRIGGER_EXPECTED_SEPARATE",
+        "NO_AUTOMATIC_EXECUTION"
+      ],
+      "email_module": "BLOCKED_BY_CONFIGURATION"
+    }
+  },
+  {
+    "id": "uncertified",
+    "title": "Saldo non certificato",
+    "description": "Senza un saldo certificato, la cassa e il relativo grafico restano non disponibili. Crediti e scadenze sono comunque consultabili.",
+    "data": {
+      "engine_version": "cash_engine_v1_2026_11_cash_reliability",
+      "today": "2026-10-23",
+      "legal_entity_id": "PREVIEW",
+      "situation_today": {
+        "cash_today": null,
+        "cash_status": "INCOMPLETE",
+        "cash_as_of": null,
+        "accounts_not_configured": 1,
+        "certified_cash": null,
+        "current_cash_estimate": null,
+        "forecast_block_reason": null,
+        "forecast_block_message": null,
+        "actual_collections_since_as_of": 0,
+        "actual_payments_since_as_of": 0,
+        "bank_balance_message": "BANK_BALANCE_NOT_CONFIGURED — certificare tutti i conti con una data valida non futura",
+        "collections_7d": 5000.0,
+        "outflows_7d": 4000.0,
+        "cash_gap_7d": {
+          "operating_cash_position": null,
+          "operating_cash_gap": null,
+          "safety_cash_gap": null,
+          "reserve_status": "CONFIGURED",
+          "status": "INCOMPLETE"
+        },
+        "projected_cash_7d": null,
+        "collections_30d": 5000.0,
+        "outflows_30d": 10000.0,
+        "projected_cash_30d": null,
+        "cash_gap_30d": {
+          "operating_cash_position": null,
+          "operating_cash_gap": null,
+          "safety_cash_gap": null,
+          "reserve_status": "CONFIGURED",
+          "status": "INCOMPLETE"
+        },
+        "total_receivables": 27000.0,
+        "collectible_7d": 5000.0,
+        "collectible_30d": 5000.0,
+        "debt_position_30d": 10000.0,
+        "lowest_cash_point": null,
+        "first_negative_date": null,
+        "cash_health": "INCOMPLETE",
+        "runway": {
+          "days": null,
+          "status": "INCOMPLETE"
+        },
+        "liquidity_coverage": {
+          "ratio": null,
+          "status": "INCOMPLETE",
+          "available": null,
+          "mandatory_outflows_30d": 10000.0
+        },
+        "reserve": 1000.0,
+        "reserve_status": "CONFIGURED"
+      },
+      "horizons": {
+        "today": {
+          "days": 0,
+          "opening_cash": null,
+          "expected_collections": 0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 0,
+          "mandatory_outflows": 0,
+          "projected_cash": null,
+          "projected_cash_with_triggers": null,
+          "operating_cash_gap": null
+        },
+        "3d": {
+          "days": 3,
+          "opening_cash": null,
+          "expected_collections": 0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 4000.0,
+          "mandatory_outflows": 4000.0,
+          "projected_cash": null,
+          "projected_cash_with_triggers": null,
+          "operating_cash_gap": null
+        },
+        "7d": {
+          "days": 7,
+          "opening_cash": null,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 4000.0,
+          "mandatory_outflows": 4000.0,
+          "projected_cash": null,
+          "projected_cash_with_triggers": null,
+          "operating_cash_gap": null
+        },
+        "14d": {
+          "days": 14,
+          "opening_cash": null,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 4000.0,
+          "mandatory_outflows": 4000.0,
+          "projected_cash": null,
+          "projected_cash_with_triggers": null,
+          "operating_cash_gap": null
+        },
+        "30d": {
+          "days": 30,
+          "opening_cash": null,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 10000.0,
+          "mandatory_outflows": 10000.0,
+          "projected_cash": null,
+          "projected_cash_with_triggers": null,
+          "operating_cash_gap": null
+        },
+        "60d": {
+          "days": 60,
+          "opening_cash": null,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 10000.0,
+          "mandatory_outflows": 10000.0,
+          "projected_cash": null,
+          "projected_cash_with_triggers": null,
+          "operating_cash_gap": null
+        },
+        "90d": {
+          "days": 90,
+          "opening_cash": null,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 10000.0,
+          "mandatory_outflows": 10000.0,
+          "projected_cash": null,
+          "projected_cash_with_triggers": null,
+          "operating_cash_gap": null
+        },
+        "13w": {
+          "days": 90,
+          "opening_cash": null,
+          "expected_collections": 5000.0,
+          "trigger_expected_collections": 4000.0,
+          "expected_outflows": 10000.0,
+          "mandatory_outflows": 10000.0,
+          "projected_cash": null,
+          "projected_cash_with_triggers": null,
+          "operating_cash_gap": null
+        }
+      },
+      "daily_projection": [
+        {
+          "date": "2026-10-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-10-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-10-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-10-26",
+          "inflows": 0.0,
+          "outflows": 4000.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-10-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-10-28",
+          "inflows": 5000.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-10-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-10-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-10-31",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-07",
+          "inflows": 0.0,
+          "outflows": 6000.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-22",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-11-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-22",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2026-12-31",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        },
+        {
+          "date": "2027-01-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": null
+        }
+      ],
+      "weeks_13": [
+        {
+          "week": "W1",
+          "start": "2026-10-23",
+          "end": "2026-10-29",
+          "opening": null,
+          "inflows": 5000.0,
+          "outflows": 4000.0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W2",
+          "start": "2026-10-30",
+          "end": "2026-11-05",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W3",
+          "start": "2026-11-06",
+          "end": "2026-11-12",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 6000.0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W4",
+          "start": "2026-11-13",
+          "end": "2026-11-19",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W5",
+          "start": "2026-11-20",
+          "end": "2026-11-26",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W6",
+          "start": "2026-11-27",
+          "end": "2026-12-03",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W7",
+          "start": "2026-12-04",
+          "end": "2026-12-10",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W8",
+          "start": "2026-12-11",
+          "end": "2026-12-17",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W9",
+          "start": "2026-12-18",
+          "end": "2026-12-24",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W10",
+          "start": "2026-12-25",
+          "end": "2026-12-31",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W11",
+          "start": "2027-01-01",
+          "end": "2027-01-07",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W12",
+          "start": "2027-01-08",
+          "end": "2027-01-14",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        },
+        {
+          "week": "W13",
+          "start": "2027-01-15",
+          "end": "2027-01-21",
+          "opening": null,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": null,
+          "cash_gap": false
+        }
+      ],
+      "forecast_exclusions": {
+        "overdue_receivables": 18000.0,
+        "undated_receivables": 0.0,
+        "trigger_expected_receivables": 4000.0,
+        "disputed_receivables": 0.0,
+        "other_receivables": 0.0,
+        "total": 22000.0,
+        "count": 2,
+        "reason": "Gli scaduti restano crediti da recuperare e sono esclusi dalle entrate previste. Il forecast include solo DUE/SCHEDULED con scadenza valida da oggi; eventi attesi e rate senza data restano separati."
+      },
+      "receivable_quality": {
+        "total_receivables": 27000.0,
+        "by_status": {
+          "DUE": 0.0,
+          "OVERDUE": 18000.0,
+          "SCHEDULED": 5000.0,
+          "TRIGGER_EXPECTED": 4000.0,
+          "UNSCHEDULED": 0.0,
+          "DISPUTED": 0.0
+        },
+        "collectible_7d": 5000.0,
+        "collectible_30d": 5000.0,
+        "not_yet_monetizable": 4000.0,
+        "colors": {
+          "ACTUAL": "GREEN",
+          "DUE": "GREEN",
+          "SCHEDULED": "GREEN",
+          "TRIGGER_EXPECTED": "YELLOW",
+          "OVERDUE": "RED",
+          "UNSCHEDULED": "GREY",
+          "DISPUTED": "GREY"
+        },
+        "rule": "TOTAL RECEIVABLES ≠ AVAILABLE LIQUIDITY — solo DUE/SCHEDULED con scadenza valida da oggi entrano nel forecast; scaduti, date mancanti e trigger attesi restano esclusi."
+      },
+      "collection_priority": [
+        {
+          "payment_plan_id": "plan-scaduto",
+          "contract_id": "contract-scaduto",
+          "sales_order_id": null,
+          "customer_id": "customer-scaduto",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 18000.0,
+          "due_date": "2026-10-13",
+          "expected_date": null,
+          "days_overdue": 10,
+          "status": "OVERDUE",
+          "confidence": "MEDIUM",
+          "date_basis": "DUE_DATE_KNOWN",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-SCADUTO",
+          "order_status": null,
+          "forecast_eligible": false,
+          "certain": false,
+          "forecast_exclusion_reason": "OVERDUE_RECEIVABLE",
+          "customer_name": "Cliente dimostrativo SCADUTO",
+          "reason": "SCADUTO da 10 gg · escluso dal forecast",
+          "color": "RED",
+          "rank": 0
+        },
+        {
+          "payment_plan_id": "plan-pianificato",
+          "contract_id": "contract-pianificato",
+          "sales_order_id": null,
+          "customer_id": "customer-pianificato",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 5000.0,
+          "due_date": "2026-10-28",
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "SCHEDULED",
+          "confidence": "HIGH",
+          "date_basis": "DUE_DATE_KNOWN",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-PIANIFICATO",
+          "order_status": null,
+          "forecast_eligible": true,
+          "certain": true,
+          "forecast_exclusion_reason": null,
+          "customer_name": "Cliente dimostrativo PIANIFICATO",
+          "reason": "scadenza 2026-10-28",
+          "color": "GREEN",
+          "rank": 2
+        },
+        {
+          "payment_plan_id": "plan-merce-attesa",
+          "contract_id": "contract-merce-attesa",
+          "sales_order_id": "order-merce-attesa",
+          "customer_id": "customer-merce-attesa",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": "goods_ready",
+          "amount": 4000.0,
+          "due_date": null,
+          "expected_date": "2026-11-02",
+          "days_overdue": 0,
+          "status": "TRIGGER_EXPECTED",
+          "confidence": "MEDIUM",
+          "date_basis": "GOODS_EXPECTED_DATE",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-MERCE-ATTESA",
+          "order_status": "in_production",
+          "forecast_eligible": false,
+          "certain": false,
+          "forecast_exclusion_reason": "TRIGGER_EXPECTED",
+          "customer_name": "Cliente dimostrativo MERCE-ATTESA",
+          "reason": "MERCE IN ARRIVO 10 gg",
+          "color": "YELLOW",
+          "rank": 3
+        }
+      ],
+      "debt": {
+        "ladder": {
+          "7d": {
+            "total": 4000.0,
+            "mandatory": 4000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "STIPENDI": 4000.0
+            },
+            "count": 1
+          },
+          "14d": {
+            "total": 4000.0,
+            "mandatory": 4000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "STIPENDI": 4000.0
+            },
+            "count": 1
+          },
+          "30d": {
+            "total": 10000.0,
+            "mandatory": 10000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 6000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 6000.0,
+              "STIPENDI": 4000.0
+            },
+            "count": 2
+          },
+          "60d": {
+            "total": 10000.0,
+            "mandatory": 10000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 6000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 6000.0,
+              "STIPENDI": 4000.0
+            },
+            "count": 2
+          },
+          "90d": {
+            "total": 10000.0,
+            "mandatory": 10000.0,
+            "by_priority": {
+              "CRITICAL": 4000.0,
+              "IMPORTANT": 6000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 6000.0,
+              "STIPENDI": 4000.0
+            },
+            "count": 2
+          }
+        },
+        "due_30d": [
+          {
+            "id": "payable-stipendi",
+            "source": "payable",
+            "label": "Uscita di prova stipendi",
+            "supplier": "Fornitore dimostrativo",
+            "category": "STIPENDI",
+            "amount": 4000.0,
+            "due_date": "2026-10-26",
+            "status": "SCHEDULED",
+            "days_overdue": 0,
+            "legal_entity_id": "PREVIEW",
+            "intercompany_pair_id": null,
+            "doc_ref": null,
+            "job_ref": null,
+            "priority": "CRITICAL"
+          },
+          {
+            "id": "payable-fornitore",
+            "source": "payable",
+            "label": "Uscita di prova fornitore",
+            "supplier": "Fornitore dimostrativo",
+            "category": "FORNITORI",
+            "amount": 6000.0,
+            "due_date": "2026-11-07",
+            "status": "SCHEDULED",
+            "days_overdue": 0,
+            "legal_entity_id": "PREVIEW",
+            "intercompany_pair_id": null,
+            "doc_ref": null,
+            "job_ref": null,
+            "priority": "IMPORTANT"
+          }
+        ],
+        "unscheduled": [],
+        "unscheduled_total": 0,
+        "priorities": [
+          "CRITICAL",
+          "IMPORTANT",
+          "DEFERRABLE",
+          "DISCRETIONARY"
+        ],
+        "categories": [
+          "STIPENDI",
+          "F24",
+          "FORNITORI",
+          "AFFITTI",
+          "LEASING",
+          "FINANZIAMENTI",
+          "ASSICURAZIONI",
+          "IMPOSTE",
+          "ALTRO"
+        ],
+        "payroll_cash_components_mismatch": []
+      },
+      "jobs": {
+        "rows": [
+          {
+            "contract_id": "contract-scaduto",
+            "contract_number": "DEMO-SCADUTO",
+            "customer_id": "customer-scaduto",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 18000.0,
+            "net_value": 14754.1,
+            "collected": 0.0,
+            "to_collect": 18000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "OVERDUE",
+              "amount": 18000.0,
+              "date": "2026-10-13",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "RED"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-pianificato",
+            "contract_number": "DEMO-PIANIFICATO",
+            "customer_id": "customer-pianificato",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 5000.0,
+            "net_value": 4098.36,
+            "collected": 0.0,
+            "to_collect": 5000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "SCHEDULED",
+              "amount": 5000.0,
+              "date": "2026-10-28",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-merce-attesa",
+            "contract_number": "DEMO-MERCE-ATTESA",
+            "customer_id": "customer-merce-attesa",
+            "order_status": "in_production",
+            "order_number": "ORD-MERCE-ATTESA",
+            "order_value": 4000.0,
+            "net_value": 3278.69,
+            "collected": 0.0,
+            "to_collect": 4000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "TRIGGER_EXPECTED",
+              "amount": 4000.0,
+              "date": "2026-11-02",
+              "label": "Saldo di prova",
+              "basis": "GOODS_EXPECTED_DATE",
+              "color": "YELLOW"
+            },
+            "financially_negative_today": false
+          }
+        ],
+        "count": 3,
+        "cash_absorbed_by_open_jobs": 0.0,
+        "total_to_collect": 27000.0,
+        "soon": [
+          {
+            "contract_id": "contract-scaduto",
+            "contract_number": "DEMO-SCADUTO",
+            "customer_id": "customer-scaduto",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 18000.0,
+            "net_value": 14754.1,
+            "collected": 0.0,
+            "to_collect": 18000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "OVERDUE",
+              "amount": 18000.0,
+              "date": "2026-10-13",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "RED"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-pianificato",
+            "contract_number": "DEMO-PIANIFICATO",
+            "customer_id": "customer-pianificato",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 5000.0,
+            "net_value": 4098.36,
+            "collected": 0.0,
+            "to_collect": 5000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "SCHEDULED",
+              "amount": 5000.0,
+              "date": "2026-10-28",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-merce-attesa",
+            "contract_number": "DEMO-MERCE-ATTESA",
+            "customer_id": "customer-merce-attesa",
+            "order_status": "in_production",
+            "order_number": "ORD-MERCE-ATTESA",
+            "order_value": 4000.0,
+            "net_value": 3278.69,
+            "collected": 0.0,
+            "to_collect": 4000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "TRIGGER_EXPECTED",
+              "amount": 4000.0,
+              "date": "2026-11-02",
+              "label": "Saldo di prova",
+              "basis": "GOODS_EXPECTED_DATE",
+              "color": "YELLOW"
+            },
+            "financially_negative_today": false
+          }
+        ]
+      },
+      "working_capital": {
+        "customer_receivables": 27000.0,
+        "work_in_progress_cash": 0.0,
+        "supplier_payables": 10000.0,
+        "net_working_capital": 17000.0
+      },
+      "stress_scenario": {
+        "assumptions": [
+          "NO_NEW_SALES",
+          "EXPECTED_COLLECTIONS_DELAY_7_DAYS",
+          "CUSTOMER_BALANCE_TRIGGER_NOT_PAID",
+          "SUPPLIER_PAYMENTS_NOT_DEFERRED"
+        ],
+        "cash_7d": null,
+        "cash_30d": null,
+        "cash_gap_30d": null,
+        "lowest_cash_point": null,
+        "first_negative_date": null,
+        "kind": "SCENARIO"
+      },
+      "structure": {
+        "annual_fixed_costs_real": 0.0,
+        "kpi_status": "PROVISIONAL / DATA_INCOMPLETE",
+        "structure_coverage_percent": 0.0,
+        "secured_contribution_ytd": 0.0,
+        "structure_residual": 506627.6,
+        "reconciliation": "INCOMPLETE",
+        "note": "STRUCTURE COVERED ≠ CASH SAFE"
+      },
+      "next_actions": [
+        {
+          "code": "CONFIGURE_BANK_BALANCE",
+          "severity": "critical",
+          "message": "Certificare il saldo banca: senza saldo certificato CASH FORECAST = INCOMPLETE (saldo 0 non significa cassa 0)."
+        },
+        {
+          "code": "COLLECTION_PRIORITY",
+          "severity": "high",
+          "message": "Priorità recupero: Cliente dimostrativo SCADUTO €18.000 (SCADUTO da 10 gg · escluso dal forecast) · Cliente dimostrativo PIANIFICATO €5.000 (scadenza 2026-10-28) · Cliente dimostrativo MERCE-ATTESA €4.000 (MERCE IN ARRIVO 10 gg)",
+          "items": [
+            {
+              "customer_id": "customer-scaduto",
+              "customer_name": "Cliente dimostrativo SCADUTO",
+              "amount": 18000.0,
+              "status": "OVERDUE",
+              "reason": "SCADUTO da 10 gg · escluso dal forecast"
+            },
+            {
+              "customer_id": "customer-pianificato",
+              "customer_name": "Cliente dimostrativo PIANIFICATO",
+              "amount": 5000.0,
+              "status": "SCHEDULED",
+              "reason": "scadenza 2026-10-28"
+            },
+            {
+              "customer_id": "customer-merce-attesa",
+              "customer_name": "Cliente dimostrativo MERCE-ATTESA",
+              "amount": 4000.0,
+              "status": "TRIGGER_EXPECTED",
+              "reason": "MERCE IN ARRIVO 10 gg"
+            }
+          ]
+        },
+        {
+          "code": "ACCELERATE_APM",
+          "severity": "medium",
+          "message": "Accelerare APM/merce pronta commessa DEMO-MERCE-ATTESA: sblocca €4.000 (previsto 2026-11-02)."
+        },
+        {
+          "code": "CRITICAL_PAYMENT_DUE",
+          "severity": "high",
+          "message": "Uscita CRITICAL Uscita di prova stipendi €4.000 il 2026-10-26."
+        }
+      ],
+      "principles": [
+        "NO_FALSE_LIQUIDITY",
+        "RECEIVABLES_ARE_NOT_CASH",
+        "CERTIFIED_CASH_ONLY",
+        "OVERDUE_RECEIVABLES_EXCLUDED",
+        "TRIGGER_EXPECTED_SEPARATE",
+        "NO_AUTOMATIC_EXECUTION"
+      ],
+      "email_module": "BLOCKED_BY_CONFIGURATION"
+    }
+  },
+  {
+    "id": "undated",
+    "title": "Date da verificare",
+    "description": "Le rate senza data valida e la merce pronta senza una data dell'evento restano fuori previsione. I debiti scaduti sono considerati subito.",
+    "data": {
+      "engine_version": "cash_engine_v1_2026_11_cash_reliability",
+      "today": "2026-10-23",
+      "legal_entity_id": "PREVIEW",
+      "situation_today": {
+        "cash_today": 3000.0,
+        "cash_status": "COMPLETE",
+        "cash_as_of": "2026-10-23",
+        "accounts_not_configured": 0,
+        "certified_cash": 3000.0,
+        "current_cash_estimate": 3000.0,
+        "forecast_block_reason": null,
+        "forecast_block_message": null,
+        "actual_collections_since_as_of": 0,
+        "actual_payments_since_as_of": 0,
+        "bank_balance_message": null,
+        "collections_7d": 1000.0,
+        "outflows_7d": 3000.0,
+        "cash_gap_7d": {
+          "operating_cash_position": 1000.0,
+          "operating_cash_gap": 0.0,
+          "status": "SURPLUS",
+          "reserve": 1000.0,
+          "safety_cash_gap": 0.0,
+          "safety_cash_position": 0.0,
+          "reserve_status": "CONFIGURED"
+        },
+        "projected_cash_7d": 1000.0,
+        "collections_30d": 1000.0,
+        "outflows_30d": 3000.0,
+        "projected_cash_30d": 1000.0,
+        "cash_gap_30d": {
+          "operating_cash_position": 1000.0,
+          "operating_cash_gap": 0.0,
+          "status": "SURPLUS",
+          "reserve": 1000.0,
+          "safety_cash_gap": 0.0,
+          "safety_cash_position": 0.0,
+          "reserve_status": "CONFIGURED"
+        },
+        "total_receivables": 16500.0,
+        "collectible_7d": 1000.0,
+        "collectible_30d": 1000.0,
+        "debt_position_30d": 3000.0,
+        "lowest_cash_point": {
+          "date": "2026-10-29",
+          "amount": 1000.0
+        },
+        "first_negative_date": null,
+        "cash_health": "SAFE",
+        "runway": {
+          "days": 365,
+          "exhaustion_date": null,
+          "status": "OK",
+          "note": "> 365 giorni con le uscite previste"
+        },
+        "liquidity_coverage": {
+          "ratio": 1.333,
+          "percent": 133.3,
+          "status": "SAFE",
+          "available": 4000.0,
+          "mandatory_outflows_30d": 3000.0,
+          "debt_coverage_gap": 0.0
+        },
+        "reserve": 1000.0,
+        "reserve_status": "CONFIGURED"
+      },
+      "horizons": {
+        "today": {
+          "days": 0,
+          "opening_cash": 3000.0,
+          "expected_collections": 0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 1500.0,
+          "mandatory_outflows": 1500.0,
+          "projected_cash": 1500.0,
+          "projected_cash_with_triggers": 1500.0,
+          "operating_cash_gap": 0.0
+        },
+        "3d": {
+          "days": 3,
+          "opening_cash": 3000.0,
+          "expected_collections": 0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 1500.0,
+          "mandatory_outflows": 1500.0,
+          "projected_cash": 1500.0,
+          "projected_cash_with_triggers": 1500.0,
+          "operating_cash_gap": 0.0
+        },
+        "7d": {
+          "days": 7,
+          "opening_cash": 3000.0,
+          "expected_collections": 1000.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 3000.0,
+          "mandatory_outflows": 3000.0,
+          "projected_cash": 1000.0,
+          "projected_cash_with_triggers": 1000.0,
+          "operating_cash_gap": 0.0
+        },
+        "14d": {
+          "days": 14,
+          "opening_cash": 3000.0,
+          "expected_collections": 1000.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 3000.0,
+          "mandatory_outflows": 3000.0,
+          "projected_cash": 1000.0,
+          "projected_cash_with_triggers": 1000.0,
+          "operating_cash_gap": 0.0
+        },
+        "30d": {
+          "days": 30,
+          "opening_cash": 3000.0,
+          "expected_collections": 1000.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 3000.0,
+          "mandatory_outflows": 3000.0,
+          "projected_cash": 1000.0,
+          "projected_cash_with_triggers": 1000.0,
+          "operating_cash_gap": 0.0
+        },
+        "60d": {
+          "days": 60,
+          "opening_cash": 3000.0,
+          "expected_collections": 1000.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 3000.0,
+          "mandatory_outflows": 3000.0,
+          "projected_cash": 1000.0,
+          "projected_cash_with_triggers": 1000.0,
+          "operating_cash_gap": 0.0
+        },
+        "90d": {
+          "days": 90,
+          "opening_cash": 3000.0,
+          "expected_collections": 1000.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 3000.0,
+          "mandatory_outflows": 3000.0,
+          "projected_cash": 1000.0,
+          "projected_cash_with_triggers": 1000.0,
+          "operating_cash_gap": 0.0
+        },
+        "13w": {
+          "days": 90,
+          "opening_cash": 3000.0,
+          "expected_collections": 1000.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 3000.0,
+          "mandatory_outflows": 3000.0,
+          "projected_cash": 1000.0,
+          "projected_cash_with_triggers": 1000.0,
+          "operating_cash_gap": 0.0
+        }
+      },
+      "daily_projection": [
+        {
+          "date": "2026-10-23",
+          "inflows": 0.0,
+          "outflows": 1500.0,
+          "projected_cash": 1500.0
+        },
+        {
+          "date": "2026-10-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1500.0
+        },
+        {
+          "date": "2026-10-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1500.0
+        },
+        {
+          "date": "2026-10-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1500.0
+        },
+        {
+          "date": "2026-10-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1500.0
+        },
+        {
+          "date": "2026-10-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1500.0
+        },
+        {
+          "date": "2026-10-29",
+          "inflows": 1000.0,
+          "outflows": 1500.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-10-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-10-31",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-22",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-11-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-22",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2026-12-31",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        },
+        {
+          "date": "2027-01-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 1000.0
+        }
+      ],
+      "weeks_13": [
+        {
+          "week": "W1",
+          "start": "2026-10-23",
+          "end": "2026-10-29",
+          "opening": 3000.0,
+          "inflows": 1000.0,
+          "outflows": 3000.0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W2",
+          "start": "2026-10-30",
+          "end": "2026-11-05",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W3",
+          "start": "2026-11-06",
+          "end": "2026-11-12",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W4",
+          "start": "2026-11-13",
+          "end": "2026-11-19",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W5",
+          "start": "2026-11-20",
+          "end": "2026-11-26",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W6",
+          "start": "2026-11-27",
+          "end": "2026-12-03",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W7",
+          "start": "2026-12-04",
+          "end": "2026-12-10",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W8",
+          "start": "2026-12-11",
+          "end": "2026-12-17",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W9",
+          "start": "2026-12-18",
+          "end": "2026-12-24",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W10",
+          "start": "2026-12-25",
+          "end": "2026-12-31",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W11",
+          "start": "2027-01-01",
+          "end": "2027-01-07",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W12",
+          "start": "2027-01-08",
+          "end": "2027-01-14",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W13",
+          "start": "2027-01-15",
+          "end": "2027-01-21",
+          "opening": 1000.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 1000.0,
+          "cash_gap": false
+        }
+      ],
+      "forecast_exclusions": {
+        "overdue_receivables": 0.0,
+        "undated_receivables": 13500.0,
+        "trigger_expected_receivables": 0.0,
+        "disputed_receivables": 2000.0,
+        "other_receivables": 0.0,
+        "total": 15500.0,
+        "count": 4,
+        "reason": "Gli scaduti restano crediti da recuperare e sono esclusi dalle entrate previste. Il forecast include solo DUE/SCHEDULED con scadenza valida da oggi; eventi attesi e rate senza data restano separati."
+      },
+      "receivable_quality": {
+        "total_receivables": 16500.0,
+        "by_status": {
+          "DUE": 0.0,
+          "OVERDUE": 0.0,
+          "SCHEDULED": 1000.0,
+          "TRIGGER_EXPECTED": 0.0,
+          "UNSCHEDULED": 13500.0,
+          "DISPUTED": 2000.0
+        },
+        "collectible_7d": 1000.0,
+        "collectible_30d": 1000.0,
+        "not_yet_monetizable": 15500.0,
+        "colors": {
+          "ACTUAL": "GREEN",
+          "DUE": "GREEN",
+          "SCHEDULED": "GREEN",
+          "TRIGGER_EXPECTED": "YELLOW",
+          "OVERDUE": "RED",
+          "UNSCHEDULED": "GREY",
+          "DISPUTED": "GREY"
+        },
+        "rule": "TOTAL RECEIVABLES ≠ AVAILABLE LIQUIDITY — solo DUE/SCHEDULED con scadenza valida da oggi entrano nel forecast; scaduti, date mancanti e trigger attesi restano esclusi."
+      },
+      "collection_priority": [
+        {
+          "payment_plan_id": "plan-pianificato",
+          "contract_id": "contract-pianificato",
+          "sales_order_id": null,
+          "customer_id": "customer-pianificato",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 1000.0,
+          "due_date": "2026-10-29",
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "SCHEDULED",
+          "confidence": "HIGH",
+          "date_basis": "DUE_DATE_KNOWN",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-PIANIFICATO",
+          "order_status": null,
+          "forecast_eligible": true,
+          "certain": true,
+          "forecast_exclusion_reason": null,
+          "customer_name": "Cliente dimostrativo PIANIFICATO",
+          "reason": "scadenza 2026-10-29",
+          "color": "GREEN",
+          "rank": 2
+        },
+        {
+          "payment_plan_id": "plan-senza-data",
+          "contract_id": "contract-senza-data",
+          "sales_order_id": null,
+          "customer_id": "customer-senza-data",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 7000.0,
+          "due_date": null,
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "UNSCHEDULED",
+          "confidence": "LOW",
+          "date_basis": "NO_RELIABLE_DATE",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-SENZA-DATA",
+          "order_status": null,
+          "forecast_eligible": false,
+          "certain": false,
+          "forecast_exclusion_reason": "NO_RELIABLE_DATE",
+          "customer_name": "Cliente dimostrativo SENZA-DATA",
+          "reason": "senza data attendibile · escluso dal forecast",
+          "color": "GREY",
+          "rank": 4
+        },
+        {
+          "payment_plan_id": "plan-merce-pronta",
+          "contract_id": "contract-merce-pronta",
+          "sales_order_id": "order-merce-pronta",
+          "customer_id": "customer-merce-pronta",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": "goods_ready",
+          "amount": 4000.0,
+          "due_date": null,
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "UNSCHEDULED",
+          "confidence": "LOW",
+          "date_basis": "GOODS_READY_DATE_UNAVAILABLE",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-MERCE-PRONTA",
+          "order_status": "completed",
+          "forecast_eligible": false,
+          "certain": false,
+          "forecast_exclusion_reason": "NO_RELIABLE_DATE",
+          "customer_name": "Cliente dimostrativo MERCE-PRONTA",
+          "reason": "senza data attendibile · escluso dal forecast",
+          "color": "GREY",
+          "rank": 4
+        },
+        {
+          "payment_plan_id": "plan-data-invalida",
+          "contract_id": "contract-data-invalida",
+          "sales_order_id": null,
+          "customer_id": "customer-data-invalida",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 2500.0,
+          "due_date": null,
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "UNSCHEDULED",
+          "confidence": "LOW",
+          "date_basis": "INVALID_DUE_DATE",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-DATA-INVALIDA",
+          "order_status": null,
+          "forecast_eligible": false,
+          "certain": false,
+          "forecast_exclusion_reason": "NO_RELIABLE_DATE",
+          "customer_name": "Cliente dimostrativo DATA-INVALIDA",
+          "reason": "senza data attendibile · escluso dal forecast",
+          "color": "GREY",
+          "rank": 4
+        },
+        {
+          "payment_plan_id": "plan-contestato",
+          "contract_id": "contract-contestato",
+          "sales_order_id": null,
+          "customer_id": "customer-contestato",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 2000.0,
+          "due_date": "2026-10-25",
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "DISPUTED",
+          "confidence": "LOW",
+          "date_basis": "CUSTOMER_DISPUTE",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-CONTESTATO",
+          "order_status": null,
+          "forecast_eligible": false,
+          "certain": false,
+          "forecast_exclusion_reason": "DISPUTED",
+          "customer_name": "Cliente dimostrativo CONTESTATO",
+          "reason": "CONTESTATO",
+          "color": "GREY",
+          "rank": 5
+        }
+      ],
+      "debt": {
+        "ladder": {
+          "7d": {
+            "total": 3000.0,
+            "mandatory": 3000.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 3000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 3000.0
+            },
+            "count": 2
+          },
+          "14d": {
+            "total": 3000.0,
+            "mandatory": 3000.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 3000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 3000.0
+            },
+            "count": 2
+          },
+          "30d": {
+            "total": 3000.0,
+            "mandatory": 3000.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 3000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 3000.0
+            },
+            "count": 2
+          },
+          "60d": {
+            "total": 3000.0,
+            "mandatory": 3000.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 3000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 3000.0
+            },
+            "count": 2
+          },
+          "90d": {
+            "total": 3000.0,
+            "mandatory": 3000.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 3000.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 3000.0
+            },
+            "count": 2
+          }
+        },
+        "due_30d": [
+          {
+            "id": "payable-scaduta",
+            "source": "payable",
+            "label": "Uscita di prova scaduta",
+            "supplier": "Fornitore dimostrativo",
+            "category": "FORNITORI",
+            "amount": 1500.0,
+            "due_date": "2026-10-20",
+            "status": "OVERDUE",
+            "days_overdue": 3,
+            "legal_entity_id": "PREVIEW",
+            "intercompany_pair_id": null,
+            "doc_ref": null,
+            "job_ref": null,
+            "priority": "IMPORTANT"
+          },
+          {
+            "id": "payable-prossima",
+            "source": "payable",
+            "label": "Uscita di prova prossima",
+            "supplier": "Fornitore dimostrativo",
+            "category": "FORNITORI",
+            "amount": 1500.0,
+            "due_date": "2026-10-29",
+            "status": "SCHEDULED",
+            "days_overdue": 0,
+            "legal_entity_id": "PREVIEW",
+            "intercompany_pair_id": null,
+            "doc_ref": null,
+            "job_ref": null,
+            "priority": "IMPORTANT"
+          }
+        ],
+        "unscheduled": [],
+        "unscheduled_total": 0,
+        "priorities": [
+          "CRITICAL",
+          "IMPORTANT",
+          "DEFERRABLE",
+          "DISCRETIONARY"
+        ],
+        "categories": [
+          "STIPENDI",
+          "F24",
+          "FORNITORI",
+          "AFFITTI",
+          "LEASING",
+          "FINANZIAMENTI",
+          "ASSICURAZIONI",
+          "IMPOSTE",
+          "ALTRO"
+        ],
+        "payroll_cash_components_mismatch": []
+      },
+      "jobs": {
+        "rows": [
+          {
+            "contract_id": "contract-contestato",
+            "contract_number": "DEMO-CONTESTATO",
+            "customer_id": "customer-contestato",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 2000.0,
+            "net_value": 1639.34,
+            "collected": 0.0,
+            "to_collect": 2000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "DISPUTED",
+              "amount": 2000.0,
+              "date": "2026-10-25",
+              "label": "Saldo di prova",
+              "basis": "CUSTOMER_DISPUTE",
+              "color": "GREY"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-pianificato",
+            "contract_number": "DEMO-PIANIFICATO",
+            "customer_id": "customer-pianificato",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 1000.0,
+            "net_value": 819.67,
+            "collected": 0.0,
+            "to_collect": 1000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "SCHEDULED",
+              "amount": 1000.0,
+              "date": "2026-10-29",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-senza-data",
+            "contract_number": "DEMO-SENZA-DATA",
+            "customer_id": "customer-senza-data",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 7000.0,
+            "net_value": 5737.7,
+            "collected": 0.0,
+            "to_collect": 7000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": null,
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-merce-pronta",
+            "contract_number": "DEMO-MERCE-PRONTA",
+            "customer_id": "customer-merce-pronta",
+            "order_status": "completed",
+            "order_number": "ORD-MERCE-PRONTA",
+            "order_value": 4000.0,
+            "net_value": 3278.69,
+            "collected": 0.0,
+            "to_collect": 4000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": null,
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-data-invalida",
+            "contract_number": "DEMO-DATA-INVALIDA",
+            "customer_id": "customer-data-invalida",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 2500.0,
+            "net_value": 2049.18,
+            "collected": 0.0,
+            "to_collect": 2500.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": null,
+            "financially_negative_today": false
+          }
+        ],
+        "count": 5,
+        "cash_absorbed_by_open_jobs": 0.0,
+        "total_to_collect": 16500.0,
+        "soon": [
+          {
+            "contract_id": "contract-contestato",
+            "contract_number": "DEMO-CONTESTATO",
+            "customer_id": "customer-contestato",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 2000.0,
+            "net_value": 1639.34,
+            "collected": 0.0,
+            "to_collect": 2000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "DISPUTED",
+              "amount": 2000.0,
+              "date": "2026-10-25",
+              "label": "Saldo di prova",
+              "basis": "CUSTOMER_DISPUTE",
+              "color": "GREY"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-pianificato",
+            "contract_number": "DEMO-PIANIFICATO",
+            "customer_id": "customer-pianificato",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 1000.0,
+            "net_value": 819.67,
+            "collected": 0.0,
+            "to_collect": 1000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "SCHEDULED",
+              "amount": 1000.0,
+              "date": "2026-10-29",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          }
+        ]
+      },
+      "working_capital": {
+        "customer_receivables": 16500.0,
+        "work_in_progress_cash": 0.0,
+        "supplier_payables": 3000.0,
+        "net_working_capital": 13500.0
+      },
+      "stress_scenario": {
+        "assumptions": [
+          "NO_NEW_SALES",
+          "EXPECTED_COLLECTIONS_DELAY_7_DAYS",
+          "CUSTOMER_BALANCE_TRIGGER_NOT_PAID",
+          "SUPPLIER_PAYMENTS_NOT_DEFERRED"
+        ],
+        "cash_7d": 0.0,
+        "cash_30d": 1000.0,
+        "cash_gap_30d": 0.0,
+        "lowest_cash_point": {
+          "date": "2026-10-29",
+          "amount": 0.0
+        },
+        "first_negative_date": null,
+        "kind": "SCENARIO"
+      },
+      "structure": {
+        "annual_fixed_costs_real": 0.0,
+        "kpi_status": "PROVISIONAL / DATA_INCOMPLETE",
+        "structure_coverage_percent": 0.0,
+        "secured_contribution_ytd": 0.0,
+        "structure_residual": 506627.6,
+        "reconciliation": "INCOMPLETE",
+        "note": "STRUCTURE COVERED ≠ CASH SAFE"
+      },
+      "next_actions": [
+        {
+          "code": "COLLECTION_PRIORITY",
+          "severity": "high",
+          "message": "Priorità recupero: Cliente dimostrativo PIANIFICATO €1.000 (scadenza 2026-10-29)",
+          "items": [
+            {
+              "customer_id": "customer-pianificato",
+              "customer_name": "Cliente dimostrativo PIANIFICATO",
+              "amount": 1000.0,
+              "status": "SCHEDULED",
+              "reason": "scadenza 2026-10-29"
+            }
+          ]
+        }
+      ],
+      "principles": [
+        "NO_FALSE_LIQUIDITY",
+        "RECEIVABLES_ARE_NOT_CASH",
+        "CERTIFIED_CASH_ONLY",
+        "OVERDUE_RECEIVABLES_EXCLUDED",
+        "TRIGGER_EXPECTED_SEPARATE",
+        "NO_AUTOMATIC_EXECUTION"
+      ],
+      "email_module": "BLOCKED_BY_CONFIGURATION"
+    }
+  },
+  {
+    "id": "boundary",
+    "title": "Tredici settimane",
+    "description": "La previsione comprende 91 date: oggi e i 90 giorni successivi. Le scadenze al giorno 91 restano fuori da questo intervallo.",
+    "data": {
+      "engine_version": "cash_engine_v1_2026_11_cash_reliability",
+      "today": "2026-10-23",
+      "legal_entity_id": "PREVIEW",
+      "situation_today": {
+        "cash_today": 3000.0,
+        "cash_status": "COMPLETE",
+        "cash_as_of": "2026-10-23",
+        "accounts_not_configured": 0,
+        "certified_cash": 3000.0,
+        "current_cash_estimate": 3000.0,
+        "forecast_block_reason": null,
+        "forecast_block_message": null,
+        "actual_collections_since_as_of": 0,
+        "actual_payments_since_as_of": 0,
+        "bank_balance_message": null,
+        "collections_7d": 500.0,
+        "outflows_7d": 700.0,
+        "cash_gap_7d": {
+          "operating_cash_position": 2800.0,
+          "operating_cash_gap": 0.0,
+          "status": "SURPLUS",
+          "reserve": 1000.0,
+          "safety_cash_gap": 0.0,
+          "safety_cash_position": 1800.0,
+          "reserve_status": "CONFIGURED"
+        },
+        "projected_cash_7d": 2800.0,
+        "collections_30d": 500.0,
+        "outflows_30d": 700.0,
+        "projected_cash_30d": 2800.0,
+        "cash_gap_30d": {
+          "operating_cash_position": 2800.0,
+          "operating_cash_gap": 0.0,
+          "status": "SURPLUS",
+          "reserve": 1000.0,
+          "safety_cash_gap": 0.0,
+          "safety_cash_position": 1800.0,
+          "reserve_status": "CONFIGURED"
+        },
+        "total_receivables": 15500.0,
+        "collectible_7d": 500.0,
+        "collectible_30d": 500.0,
+        "debt_position_30d": 700.0,
+        "lowest_cash_point": {
+          "date": "2026-10-23",
+          "amount": 2800.0
+        },
+        "first_negative_date": null,
+        "cash_health": "SAFE",
+        "runway": {
+          "days": 91,
+          "exhaustion_date": "2027-01-22",
+          "status": "LIMITED"
+        },
+        "liquidity_coverage": {
+          "ratio": 5.0,
+          "percent": 500.0,
+          "status": "SAFE",
+          "available": 3500.0,
+          "mandatory_outflows_30d": 700.0,
+          "debt_coverage_gap": 0.0
+        },
+        "reserve": 1000.0,
+        "reserve_status": "CONFIGURED"
+      },
+      "horizons": {
+        "today": {
+          "days": 0,
+          "opening_cash": 3000.0,
+          "expected_collections": 500.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 700.0,
+          "mandatory_outflows": 700.0,
+          "projected_cash": 2800.0,
+          "projected_cash_with_triggers": 2800.0,
+          "operating_cash_gap": 0.0
+        },
+        "3d": {
+          "days": 3,
+          "opening_cash": 3000.0,
+          "expected_collections": 500.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 700.0,
+          "mandatory_outflows": 700.0,
+          "projected_cash": 2800.0,
+          "projected_cash_with_triggers": 2800.0,
+          "operating_cash_gap": 0.0
+        },
+        "7d": {
+          "days": 7,
+          "opening_cash": 3000.0,
+          "expected_collections": 500.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 700.0,
+          "mandatory_outflows": 700.0,
+          "projected_cash": 2800.0,
+          "projected_cash_with_triggers": 2800.0,
+          "operating_cash_gap": 0.0
+        },
+        "14d": {
+          "days": 14,
+          "opening_cash": 3000.0,
+          "expected_collections": 500.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 700.0,
+          "mandatory_outflows": 700.0,
+          "projected_cash": 2800.0,
+          "projected_cash_with_triggers": 2800.0,
+          "operating_cash_gap": 0.0
+        },
+        "30d": {
+          "days": 30,
+          "opening_cash": 3000.0,
+          "expected_collections": 500.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 700.0,
+          "mandatory_outflows": 700.0,
+          "projected_cash": 2800.0,
+          "projected_cash_with_triggers": 2800.0,
+          "operating_cash_gap": 0.0
+        },
+        "60d": {
+          "days": 60,
+          "opening_cash": 3000.0,
+          "expected_collections": 500.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 700.0,
+          "mandatory_outflows": 700.0,
+          "projected_cash": 2800.0,
+          "projected_cash_with_triggers": 2800.0,
+          "operating_cash_gap": 0.0
+        },
+        "90d": {
+          "days": 90,
+          "opening_cash": 3000.0,
+          "expected_collections": 6500.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 1700.0,
+          "mandatory_outflows": 1700.0,
+          "projected_cash": 7800.0,
+          "projected_cash_with_triggers": 7800.0,
+          "operating_cash_gap": 0.0
+        },
+        "13w": {
+          "days": 90,
+          "opening_cash": 3000.0,
+          "expected_collections": 6500.0,
+          "trigger_expected_collections": 0,
+          "expected_outflows": 1700.0,
+          "mandatory_outflows": 1700.0,
+          "projected_cash": 7800.0,
+          "projected_cash_with_triggers": 7800.0,
+          "operating_cash_gap": 0.0
+        }
+      },
+      "daily_projection": [
+        {
+          "date": "2026-10-23",
+          "inflows": 500.0,
+          "outflows": 700.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-10-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-10-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-10-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-10-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-10-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-10-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-10-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-10-31",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-22",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-11-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-21",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-22",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-23",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-24",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-25",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-26",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-27",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-28",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-29",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-30",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2026-12-31",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-01",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-02",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-03",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-04",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-05",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-06",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-07",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-08",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-09",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-10",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-11",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-12",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-13",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-14",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-15",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-16",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-17",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-18",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-19",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-20",
+          "inflows": 0.0,
+          "outflows": 0.0,
+          "projected_cash": 2800.0
+        },
+        {
+          "date": "2027-01-21",
+          "inflows": 6000.0,
+          "outflows": 1000.0,
+          "projected_cash": 7800.0
+        }
+      ],
+      "weeks_13": [
+        {
+          "week": "W1",
+          "start": "2026-10-23",
+          "end": "2026-10-29",
+          "opening": 3000.0,
+          "inflows": 500.0,
+          "outflows": 700.0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W2",
+          "start": "2026-10-30",
+          "end": "2026-11-05",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W3",
+          "start": "2026-11-06",
+          "end": "2026-11-12",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W4",
+          "start": "2026-11-13",
+          "end": "2026-11-19",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W5",
+          "start": "2026-11-20",
+          "end": "2026-11-26",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W6",
+          "start": "2026-11-27",
+          "end": "2026-12-03",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W7",
+          "start": "2026-12-04",
+          "end": "2026-12-10",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W8",
+          "start": "2026-12-11",
+          "end": "2026-12-17",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W9",
+          "start": "2026-12-18",
+          "end": "2026-12-24",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W10",
+          "start": "2026-12-25",
+          "end": "2026-12-31",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W11",
+          "start": "2027-01-01",
+          "end": "2027-01-07",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W12",
+          "start": "2027-01-08",
+          "end": "2027-01-14",
+          "opening": 2800.0,
+          "inflows": 0,
+          "outflows": 0,
+          "closing": 2800.0,
+          "cash_gap": false
+        },
+        {
+          "week": "W13",
+          "start": "2027-01-15",
+          "end": "2027-01-21",
+          "opening": 2800.0,
+          "inflows": 6000.0,
+          "outflows": 1000.0,
+          "closing": 7800.0,
+          "cash_gap": false
+        }
+      ],
+      "forecast_exclusions": {
+        "overdue_receivables": 0.0,
+        "undated_receivables": 0.0,
+        "trigger_expected_receivables": 0.0,
+        "disputed_receivables": 0.0,
+        "other_receivables": 0.0,
+        "total": 0.0,
+        "count": 0,
+        "reason": "Gli scaduti restano crediti da recuperare e sono esclusi dalle entrate previste. Il forecast include solo DUE/SCHEDULED con scadenza valida da oggi; eventi attesi e rate senza data restano separati."
+      },
+      "receivable_quality": {
+        "total_receivables": 15500.0,
+        "by_status": {
+          "DUE": 500.0,
+          "OVERDUE": 0.0,
+          "SCHEDULED": 15000.0,
+          "TRIGGER_EXPECTED": 0.0,
+          "UNSCHEDULED": 0.0,
+          "DISPUTED": 0.0
+        },
+        "collectible_7d": 500.0,
+        "collectible_30d": 500.0,
+        "not_yet_monetizable": 0.0,
+        "colors": {
+          "ACTUAL": "GREEN",
+          "DUE": "GREEN",
+          "SCHEDULED": "GREEN",
+          "TRIGGER_EXPECTED": "YELLOW",
+          "OVERDUE": "RED",
+          "UNSCHEDULED": "GREY",
+          "DISPUTED": "GREY"
+        },
+        "rule": "TOTAL RECEIVABLES ≠ AVAILABLE LIQUIDITY — solo DUE/SCHEDULED con scadenza valida da oggi entrano nel forecast; scaduti, date mancanti e trigger attesi restano esclusi."
+      },
+      "collection_priority": [
+        {
+          "payment_plan_id": "plan-oggi",
+          "contract_id": "contract-oggi",
+          "sales_order_id": null,
+          "customer_id": "customer-oggi",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 500.0,
+          "due_date": "2026-10-23",
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "DUE",
+          "confidence": "HIGH",
+          "date_basis": "DUE_DATE_KNOWN",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-OGGI",
+          "order_status": null,
+          "forecast_eligible": true,
+          "certain": true,
+          "forecast_exclusion_reason": null,
+          "customer_name": "Cliente dimostrativo OGGI",
+          "reason": "DUE OGGI",
+          "color": "GREEN",
+          "rank": 1
+        },
+        {
+          "payment_plan_id": "plan-giorno-91",
+          "contract_id": "contract-giorno-91",
+          "sales_order_id": null,
+          "customer_id": "customer-giorno-91",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 9000.0,
+          "due_date": "2027-01-22",
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "SCHEDULED",
+          "confidence": "HIGH",
+          "date_basis": "DUE_DATE_KNOWN",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-GIORNO-91",
+          "order_status": null,
+          "forecast_eligible": true,
+          "certain": true,
+          "forecast_exclusion_reason": null,
+          "customer_name": "Cliente dimostrativo GIORNO-91",
+          "reason": "scadenza 2027-01-22",
+          "color": "GREEN",
+          "rank": 2
+        },
+        {
+          "payment_plan_id": "plan-giorno-90",
+          "contract_id": "contract-giorno-90",
+          "sales_order_id": null,
+          "customer_id": "customer-giorno-90",
+          "installment_ref": "saldo",
+          "label": "Saldo di prova",
+          "trigger": null,
+          "amount": 6000.0,
+          "due_date": "2027-01-21",
+          "expected_date": null,
+          "days_overdue": 0,
+          "status": "SCHEDULED",
+          "confidence": "HIGH",
+          "date_basis": "DUE_DATE_KNOWN",
+          "legal_entity_id": "PREVIEW",
+          "linked": true,
+          "contract_number": "DEMO-GIORNO-90",
+          "order_status": null,
+          "forecast_eligible": true,
+          "certain": true,
+          "forecast_exclusion_reason": null,
+          "customer_name": "Cliente dimostrativo GIORNO-90",
+          "reason": "scadenza 2027-01-21",
+          "color": "GREEN",
+          "rank": 2
+        }
+      ],
+      "debt": {
+        "ladder": {
+          "7d": {
+            "total": 700.0,
+            "mandatory": 700.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 700.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 700.0
+            },
+            "count": 1
+          },
+          "14d": {
+            "total": 700.0,
+            "mandatory": 700.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 700.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 700.0
+            },
+            "count": 1
+          },
+          "30d": {
+            "total": 700.0,
+            "mandatory": 700.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 700.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 700.0
+            },
+            "count": 1
+          },
+          "60d": {
+            "total": 700.0,
+            "mandatory": 700.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 700.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 700.0
+            },
+            "count": 1
+          },
+          "90d": {
+            "total": 1700.0,
+            "mandatory": 1700.0,
+            "by_priority": {
+              "CRITICAL": 0,
+              "IMPORTANT": 1700.0,
+              "DEFERRABLE": 0,
+              "DISCRETIONARY": 0
+            },
+            "by_category": {
+              "FORNITORI": 1700.0
+            },
+            "count": 2
+          }
+        },
+        "due_30d": [
+          {
+            "id": "payable-scaduta",
+            "source": "payable",
+            "label": "Uscita di prova scaduta",
+            "supplier": "Fornitore dimostrativo",
+            "category": "FORNITORI",
+            "amount": 700.0,
+            "due_date": "2026-10-18",
+            "status": "OVERDUE",
+            "days_overdue": 5,
+            "legal_entity_id": "PREVIEW",
+            "intercompany_pair_id": null,
+            "doc_ref": null,
+            "job_ref": null,
+            "priority": "IMPORTANT"
+          }
+        ],
+        "unscheduled": [],
+        "unscheduled_total": 0,
+        "priorities": [
+          "CRITICAL",
+          "IMPORTANT",
+          "DEFERRABLE",
+          "DISCRETIONARY"
+        ],
+        "categories": [
+          "STIPENDI",
+          "F24",
+          "FORNITORI",
+          "AFFITTI",
+          "LEASING",
+          "FINANZIAMENTI",
+          "ASSICURAZIONI",
+          "IMPOSTE",
+          "ALTRO"
+        ],
+        "payroll_cash_components_mismatch": []
+      },
+      "jobs": {
+        "rows": [
+          {
+            "contract_id": "contract-oggi",
+            "contract_number": "DEMO-OGGI",
+            "customer_id": "customer-oggi",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 500.0,
+            "net_value": 409.84,
+            "collected": 0.0,
+            "to_collect": 500.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "DUE",
+              "amount": 500.0,
+              "date": "2026-10-23",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-giorno-90",
+            "contract_number": "DEMO-GIORNO-90",
+            "customer_id": "customer-giorno-90",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 6000.0,
+            "net_value": 4918.03,
+            "collected": 0.0,
+            "to_collect": 6000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "SCHEDULED",
+              "amount": 6000.0,
+              "date": "2027-01-21",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          },
+          {
+            "contract_id": "contract-giorno-91",
+            "contract_number": "DEMO-GIORNO-91",
+            "customer_id": "customer-giorno-91",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 9000.0,
+            "net_value": 7377.05,
+            "collected": 0.0,
+            "to_collect": 9000.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "SCHEDULED",
+              "amount": 9000.0,
+              "date": "2027-01-22",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          }
+        ],
+        "count": 3,
+        "cash_absorbed_by_open_jobs": 0.0,
+        "total_to_collect": 15500.0,
+        "soon": [
+          {
+            "contract_id": "contract-oggi",
+            "contract_number": "DEMO-OGGI",
+            "customer_id": "customer-oggi",
+            "order_status": null,
+            "order_number": null,
+            "order_value": 500.0,
+            "net_value": 409.84,
+            "collected": 0.0,
+            "to_collect": 500.0,
+            "supplier_paid": 0.0,
+            "direct_costs_expected": null,
+            "direct_costs_unpaid": null,
+            "cash_position": 0.0,
+            "peak_cash_exposure": null,
+            "exposure_level": null,
+            "next_cash_event": {
+              "status": "DUE",
+              "amount": 500.0,
+              "date": "2026-10-23",
+              "label": "Saldo di prova",
+              "basis": "DUE_DATE_KNOWN",
+              "color": "GREEN"
+            },
+            "financially_negative_today": false
+          }
+        ]
+      },
+      "working_capital": {
+        "customer_receivables": 15500.0,
+        "work_in_progress_cash": 0.0,
+        "supplier_payables": 3700.0,
+        "net_working_capital": 11800.0
+      },
+      "stress_scenario": {
+        "assumptions": [
+          "NO_NEW_SALES",
+          "EXPECTED_COLLECTIONS_DELAY_7_DAYS",
+          "CUSTOMER_BALANCE_TRIGGER_NOT_PAID",
+          "SUPPLIER_PAYMENTS_NOT_DEFERRED"
+        ],
+        "cash_7d": 2800.0,
+        "cash_30d": 2800.0,
+        "cash_gap_30d": 0.0,
+        "lowest_cash_point": {
+          "date": "2027-01-21",
+          "amount": 1800.0
+        },
+        "first_negative_date": null,
+        "kind": "SCENARIO"
+      },
+      "structure": {
+        "annual_fixed_costs_real": 0.0,
+        "kpi_status": "PROVISIONAL / DATA_INCOMPLETE",
+        "structure_coverage_percent": 0.0,
+        "secured_contribution_ytd": 0.0,
+        "structure_residual": 506627.6,
+        "reconciliation": "INCOMPLETE",
+        "note": "STRUCTURE COVERED ≠ CASH SAFE"
+      },
+      "next_actions": [
+        {
+          "code": "COLLECTION_PRIORITY",
+          "severity": "high",
+          "message": "Priorità recupero: Cliente dimostrativo OGGI €500 (DUE OGGI) · Cliente dimostrativo GIORNO-91 €9.000 (scadenza 2027-01-22) · Cliente dimostrativo GIORNO-90 €6.000 (scadenza 2027-01-21)",
+          "items": [
+            {
+              "customer_id": "customer-oggi",
+              "customer_name": "Cliente dimostrativo OGGI",
+              "amount": 500.0,
+              "status": "DUE",
+              "reason": "DUE OGGI"
+            },
+            {
+              "customer_id": "customer-giorno-91",
+              "customer_name": "Cliente dimostrativo GIORNO-91",
+              "amount": 9000.0,
+              "status": "SCHEDULED",
+              "reason": "scadenza 2027-01-22"
+            },
+            {
+              "customer_id": "customer-giorno-90",
+              "customer_name": "Cliente dimostrativo GIORNO-90",
+              "amount": 6000.0,
+              "status": "SCHEDULED",
+              "reason": "scadenza 2027-01-21"
+            }
+          ]
+        }
+      ],
+      "principles": [
+        "NO_FALSE_LIQUIDITY",
+        "RECEIVABLES_ARE_NOT_CASH",
+        "CERTIFIED_CASH_ONLY",
+        "OVERDUE_RECEIVABLES_EXCLUDED",
+        "TRIGGER_EXPECTED_SEPARATE",
+        "NO_AUTOMATIC_EXECUTION"
+      ],
+      "email_module": "BLOCKED_BY_CONFIGURATION"
+    }
+  }
+]

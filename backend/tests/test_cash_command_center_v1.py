@@ -8,10 +8,6 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
-from motor.motor_asyncio import AsyncIOMotorClient
-
-from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
-from tests.test_quote_economic_control_v2 import _login, BASE
 from app.services import cash_engine as ce
 from app.services import cfo_engine as eng
 from app.services import sustainability_engine as sus
@@ -21,11 +17,14 @@ TODAY = date(2026, 11, 10)
 
 
 def _db():
+    from motor.motor_asyncio import AsyncIOMotorClient
     return AsyncIOMotorClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 
 
 @pytest.fixture(scope="module")
 def admin():
+    from tests._creds import ADMIN_EMAIL, ADMIN_PASSWORD
+    from tests.test_quote_economic_control_v2 import _login
     return _login(ADMIN_EMAIL, ADMIN_PASSWORD)
 
 
@@ -33,15 +32,16 @@ def _coll(amount, status, due=None, expected=None):
     return {"amount": amount, "status": status, "due_date": due, "expected_date": expected, "customer_id": "c", "days_overdue": 0}
 
 
-def test_no_false_liquidity_only_certain_in_forecast():
+def test_no_false_liquidity_only_scheduled_non_past_collections_in_forecast():
     coll = [_coll(100000, "UNSCHEDULED"), _coll(12000, "TRIGGER_EXPECTED", expected="2026-11-20"), _coll(5000, "SCHEDULED", due="2026-11-12"), _coll(3000, "OVERDUE", due="2026-11-01")]
     outf = [{"amount": 18000, "due_date": "2026-11-14", "category": "STIPENDI"}]
     h = ce.horizons(2000.0, TODAY, coll, outf)
-    assert h["7d"]["expected_collections"] == 8000 and h["7d"]["trigger_expected_collections"] == 0
-    assert h["30d"]["trigger_expected_collections"] == 12000 and h["30d"]["expected_collections"] == 8000
-    assert h["7d"]["projected_cash"] == 2000 + 8000 - 18000 == -8000
+    assert h["7d"]["expected_collections"] == 5000 and h["7d"]["trigger_expected_collections"] == 0
+    assert h["30d"]["trigger_expected_collections"] == 12000 and h["30d"]["expected_collections"] == 5000
+    assert h["7d"]["projected_cash"] == 2000 + 5000 - 18000 == -11000
     q = ce.receivable_quality(coll, TODAY)
-    assert q["total_receivables"] == 120000 and q["collectible_7d"] == 8000 and q["not_yet_monetizable"] == 112000
+    assert q["total_receivables"] == 120000 and q["collectible_7d"] == 5000 and q["not_yet_monetizable"] == 112000
+    assert eng.forecast_exclusions(coll, TODAY)["overdue_receivables"] == 3000
 
 
 def test_cash_gap_operating_vs_safety_reserve_not_configured():
@@ -181,6 +181,7 @@ def test_demo_cost_exclusion_and_cash_profile_no_double_counting():
 
 
 def test_api_command_center_and_quote_cash(admin):
+    from tests.test_quote_economic_control_v2 import BASE
     cc = admin.get(f"{BASE}/cfo/cash-command-center", timeout=60).json()
     s = cc["situation_today"]
     for k in ("cash_today", "collections_7d", "outflows_7d", "cash_gap_7d", "collections_30d", "outflows_30d", "cash_gap_30d", "total_receivables", "collectible_30d", "debt_position_30d", "lowest_cash_point", "runway", "liquidity_coverage"):
