@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app.db import get_db
 from app.deps import require_permission, get_client_ip
 from app.models import new_id
-from app.models_ops import SalesOrder, SalesOrderLine
+from app.models_ops import SalesOrder, SalesOrderLine, sales_order_event_timestamps
 from app.mongo_utils import to_mongo, from_mongo
 from app.services.timeline import record_activity
 from app.services.ops_common import (
@@ -128,6 +128,7 @@ async def change_status(oid: str, body: StatusChange, request: Request,
     if not existing: raise HTTPException(status_code=404, detail="Ordine non trovato")
     enforce_status_transition(existing.get("order_status", "draft"), body.order_status, ORDER_FLOW)
     updates = {"order_status": body.order_status}
+    updates.update(sales_order_event_timestamps(existing, body.order_status, datetime.now(timezone.utc)))
     return await update_doc(collection="sales_orders", doc_id=oid, updates=updates, user=user,
                              entity_type="sales_order", ip=get_client_ip(request))
 

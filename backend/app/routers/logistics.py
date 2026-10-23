@@ -8,7 +8,7 @@ from app.db import get_db
 from app.deps import require_permission, get_client_ip
 from app.models import new_id
 from app.models_ops import (
-    FinishedGoodPack, Shipment, InstallationCrew, InstallationPlan, InstallationReport,
+    FinishedGoodPack, Shipment, InstallationCrew, InstallationPlan, InstallationReport, sales_order_event_timestamps,
 )
 from app.services.ops_common import (create_doc, get_doc, list_docs, update_doc, soft_delete_doc,
                                        enforce_status_transition)
@@ -257,10 +257,11 @@ class ReportSubmit(BaseModel):
 @rep_router.post("/{rid}/submit")
 async def submit_report(rid: str, body: ReportSubmit, request: Request,
                          user: dict = Depends(require_permission("installation.edit"))):
+    occurred_at = datetime.now(timezone.utc)
     updates = {
         "outcome": body.outcome,
         "report_status": "submitted",
-        "check_out_at": datetime.now(timezone.utc).isoformat(),
+        "check_out_at": occurred_at.isoformat(),
         "customer_signer_name": body.customer_signer_name,
         "customer_signature_hash": body.customer_signature_hash,
         "crew_signer_name": body.crew_signer_name,
@@ -276,9 +277,13 @@ async def submit_report(rid: str, body: ReportSubmit, request: Request,
             {"$set": {"plan_status": "completed", "updated_at": datetime.now(timezone.utc).isoformat()}})
         # Advance sales order to installed
         if doc.get("sales_order_id"):
-            await db.sales_orders.update_one(
-                {"_id": doc["sales_order_id"], "tenant_id": user["tenant_id"], "order_status": {"$in": ["ready_for_installation", "in_production", "completed"]}},
-                {"$set": {"order_status": "installed", "updated_at": datetime.now(timezone.utc).isoformat()}})
+            order_filter = {"_id": doc["sales_order_id"], "tenant_id": user["tenant_id"], "deleted_at": None,
+                            "order_status": {"$in": ["ready_for_installation", "in_production", "completed"]}}
+            existing = await db.sales_orders.find_one(order_filter)
+            if existing:
+                order_updates = {"order_status": "installed", "updated_at": occurred_at.isoformat(),
+                                 **sales_order_event_timestamps(existing, "installed", occurred_at)}
+                await db.sales_orders.update_one(order_filter, {"$set": order_updates})
         await record_activity(
             tenant_id=user["tenant_id"], type="installation_completed",
             subject=f"Posa completata (piano {doc.get('installation_plan_id')})",
