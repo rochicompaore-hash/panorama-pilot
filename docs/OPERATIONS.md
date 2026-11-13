@@ -33,7 +33,7 @@ Le verifiche commerciali, tecniche e amministrative sono cumulative. La fase sin
 5. L’incaricato apre **Solo le mie**, prende in carico, esegue il lavoro e inserisce un esito con riferimento al documento e alla revisione. **Concludi e consegna al reparto successivo** chiude la sua attività e assegna la successiva secondo la configurazione. Anche un amministratore deve essere l’incaricato nominativo per attestare l’esecuzione.
 6. Se manca la configurazione o il destinatario non è più abilitato, l’attività successiva viene comunque creata e compare tra quelle da assegnare. Non è possibile prenderla in carico senza persona e termine. La direzione usa il filtro **Da assegnare, bloccate o scadute**, valido sull’intero insieme dei risultati, e assegna un utente competente.
 
-Una modifica alla regola di assegnazione riguarda solo i futuri incarichi: non sposta scadenze o responsabilità già assegnate. Per il lavoro aperto usare **Assegna, ripianifica o rinvia**, indicando il motivo. Un cambio di incaricato richiede una nuova presa in carico. Un blocco aperto resta tale anche dopo la riassegnazione.
+Una modifica alla regola di assegnazione riguarda solo i futuri incarichi: non sposta scadenze o responsabilità già assegnate. Per il lavoro aperto usare **Assegna, ripianifica o rinvia**, indicando il motivo. Un cambio di incaricato richiede una nuova presa in carico. Un blocco aperto resta tale anche dopo la riassegnazione, l’adozione di una vecchia commessa o una revisione: serve registrarne esplicitamente la soluzione.
 
 ## Blocchi, varianti e completamenti
 
@@ -79,6 +79,6 @@ La coda è consultabile nel centro e si aggiorna dopo le operazioni o con **Aggi
 
 Il workflow GitHub esegue i test isolati e la compilazione del frontend; non distribuisce l’applicazione. I test coprono il ciclo dei 15 passaggi, permessi del reparto e dell’incaricato, isolamento aziendale, configurazioni mancanti/inattive, esiti, blocchi, rinvii, concorrenza, varianti, finanziamenti, completamenti, esportazione e regressioni assistenza.
 
-Verificati localmente 36 test passati con dipendenze isolate e build produzione riuscita, con soli avvisi React preesistenti. Il collaudo browser usa dati sintetici, API reali e MongoDB simulato, con autenticazione e invii esterni sostituiti nel solo ambiente temporaneo. Verificati avvio, presa in carico, passaggio commerciale → amministrazione, blocco, soluzione e storico leggibile.
+Verificati localmente 37 test passati con dipendenze isolate e build produzione riuscita, con soli avvisi React preesistenti. Il collaudo browser usa dati sintetici, API reali e MongoDB simulato, con autenticazione e invii esterni sostituiti nel solo ambiente temporaneo. Verificati avvio, presa in carico, passaggio commerciale → amministrazione, blocco, soluzione e storico leggibile.
 
 Prima dell’uso aziendale rimangono da verificare utenti e permessi reali, integrazioni dei moduli, prestazioni sui volumi effettivi, backup/ripristino e un ciclo completo in staging. Non è una certificazione dell’intero gestionale. Non inserire dati reali o esportazioni nel repository pubblico.

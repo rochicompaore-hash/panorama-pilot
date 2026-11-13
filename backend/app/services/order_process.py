@@ -73,6 +73,9 @@ def required_before(key):
 def rewind_fields(order, key, task):
     """Invalidate only dependent checks. History remains append-only."""
     index = list(BY_KEY).index(key)
+    if order.get("operational_block"):
+        # Adoption/revision is not evidence that the underlying problem was solved.
+        task.update(status="blocked", block=order["operational_block"])
     updates = task_fields(task)
     updates["order_status"] = STEPS[index - 1]["order_status"] if index else "draft"
     for step in STEPS[index:]:

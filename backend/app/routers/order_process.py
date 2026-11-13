@@ -104,7 +104,9 @@ async def start(oid: str, body: control.Command, user=Depends(require_permission
         raise HTTPException(409, "Procedura già avviata")
     task = await process.make_task(control.get_db(), user["tenant_id"], "contract")
     return await control.write_order(oid, user, body.version, process.rewind_fields(order, "contract", task),
-        "process.started", {"to_task": task, "evidence": "Avvio dal controllo del fascicolo; nessun passaggio pregresso attestato automaticamente"})
+        "process.started", {"to_task": task,
+            "previous_plan": {k: order.get(k) for k in ("order_status", "operational_owner_id", "operational_next_action", "operational_due_at", "operational_block")},
+            "evidence": "Avvio dal controllo del fascicolo; nessun passaggio pregresso attestato automaticamente"})
 
 
 @router.put("/orders/{oid}/assignment")

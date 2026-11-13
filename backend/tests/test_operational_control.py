@@ -473,3 +473,19 @@ async def test_process_tenant_isolation_and_configuration_versioning(environment
         assert (await c.get("/api/operations/process/schema")).json()["routes"] == {}
         r = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "accept"})
         assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_adoption_and_revision_never_silently_clear_an_existing_block(environment):
+    db, _, _ = environment
+    async with await process_seed(environment) as c:
+        await db.sales_orders.update_one({"_id": "order-1"}, {"$set": {"operational_block": "Accessorio da recuperare", "order_status": "waiting_materials"}})
+        order = await start_process(c)
+        assert order["operational_process"]["task"]["status"] == "blocked"
+        assert order["operational_block"] == "Accessorio da recuperare"
+        assert order["operational_history"][-1]["details"]["previous_plan"]["order_status"] == "waiting_materials"
+        r = await c.patch("/api/sales-orders/order-1", json={"expected_version": order["version"], "site_address": {"city": "Indirizzo corretto"}})
+        assert r.status_code == 200, r.text
+        assert r.json()["operational_process"]["task"]["block"] == "Accessorio da recuperare"
+        order = await process_action(c, r.json(), "resume", evidence="Accessorio recuperato e verificato")
+        assert not order["operational_block"]
