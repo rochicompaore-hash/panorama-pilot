@@ -60,7 +60,7 @@ def assert_version(order, version):
         raise HTTPException(409, "Commessa modificata. Ricarica prima di salvare.")
 
 
-async def write_order(oid, user, version, updates, event):
+async def write_order(oid, user, version, updates, event, details=None):
     now = datetime.now(timezone.utc).isoformat()
     query = {"_id": oid, "tenant_id": user["tenant_id"], "deleted_at": None,
              "order_status": {"$nin": ["closed", "cancelled"]}}
@@ -70,6 +70,8 @@ async def write_order(oid, user, version, updates, event):
         query["version"] = version
     updates.update(updated_at=now, updated_by=user["id"])
     record = {"at": now, "actor_id": user["id"], "event": event, "changes": updates.copy()}
+    if details:
+        record["details"] = details
     result = await get_db().sales_orders.find_one_and_update(query, {
         "$set": updates, "$inc": {"version": 1},
         "$push": {"operational_history": record},
@@ -167,6 +169,8 @@ async def detail(oid: str, user=Depends(require_permission("sales_orders.view"))
 async def plan(oid: str, body: Plan, user=Depends(require_permission("sales_orders.edit"))):
     order = await load_order(oid, user)
     assert_version(order, body.version)
+    if order.get("operational_process"):
+        raise HTTPException(409, "Usa l’assegnazione dell’attività: il passaggio di reparto è gestito dalla procedura")
     assignee = await get_db().users.find_one({"_id": body.owner_id, "tenant_id": user["tenant_id"], "deleted_at": None, "is_active": {"$ne": False}})
     if not assignee:
         raise HTTPException(422, "Seleziona un incaricato attivo della stessa azienda")
@@ -187,6 +191,8 @@ async def check(oid: str, body: Check, user=Depends(require_permission("sales_or
         raise HTTPException(403, "Permesso mancante: " + CHECKS[body.key][1])
     order = await load_order(oid, user)
     assert_version(order, body.version)
+    if order.get("operational_process"):
+        raise HTTPException(409, "Il controllo si registra completando l’attività assegnata")
     if not order.get("operational_enabled"):
         raise HTTPException(409, "Assegna prima responsabile, prossima azione e scadenza")
     if body.satisfied and body.key == "admin_survey" and order.get("payment_mode") == "financed" and order.get("financing_status") not in ("signed", "liquidation_requested", "disbursed"):
@@ -204,7 +210,19 @@ async def finance(oid: str, body: Finance, user=Depends(require_permission("admi
     if body.payment_mode == "standard" and body.financing_status != "none":
         raise HTTPException(422, "Nel pagamento ordinario lo stato finanziamento deve essere Non prevista")
     updates = {"payment_mode": body.payment_mode, "financing_status": body.financing_status, "finance_evidence": body.evidence}
+    details = None
     if order.get("payment_mode", "standard") != body.payment_mode or order.get("financing_status", "none") != body.financing_status:
         for key in ("admin_survey", "admin_order", "admin_install", "admin_close"):
             updates["operational_checks." + key + ".satisfied"] = False
-    return await write_order(oid, user, body.version, updates, "finance.updated")
+        if order.get("operational_process"):
+            from app.services import order_process as process
+            before = order["operational_process"]["task"]
+            if list(process.BY_KEY).index(before["step"]) > 1:
+                task = await process.make_task(get_db(), user["tenant_id"], "admin_survey")
+                updates.update(process.rewind_fields(order, "admin_survey", task))
+                details = {"from_task": before, "to_task": task, "evidence": "Condizioni finanziarie variate: nuova verifica dei nulla osta. " + body.evidence}
+    return await write_order(oid, user, body.version, updates, "finance.updated", details)
+
+
+from app.routers.order_process import router as process_router
+router.include_router(process_router)

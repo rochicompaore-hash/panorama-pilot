@@ -80,6 +80,12 @@ async def create_order(body: SalesOrderCreate, request: Request,
         priority=body.priority, lines=body.lines,
     )
     _recalc_totals(so)
+    from app.services import order_process as process
+    task = await process.make_task(get_db(), user["tenant_id"], "contract")
+    for key, value in process.task_fields(task).items():
+        setattr(so, key, value)
+    so.operational_history = [{"at": datetime.now(timezone.utc).isoformat(), "actor_id": user["id"],
+        "event": "process.started", "details": {"to_task": task, "evidence": "Commessa creata con attività commerciale"}}]
     doc = await create_doc(collection="sales_orders", model_instance=so, user=user,
                             entity_type="sales_order", ip=get_client_ip(request),
                             set_number=True, number_key="sales_order", number_prefix="ORD-")
@@ -120,10 +126,17 @@ async def patch_order(oid: str, body: SalesOrderPatch, request: Request,
         if body.expected_version is None:
             raise HTTPException(409, "Versione richiesta per modificare una commessa gestita dal centro operativo")
         assert_version(existing, body.expected_version)
+        details = None
         if body.lines is not None or body.site_address is not None:
             for key in ("contract", "technical", "admin_order", "materials", "admin_install", "resources", "acceptance", "documents", "admin_close"):
                 updates["operational_checks." + key + ".satisfied"] = False
-        return await write_order(oid, user, body.expected_version, updates, "order.revised")
+            if existing.get("operational_process"):
+                from app.services import order_process as process
+                task = await process.make_task(db, user["tenant_id"], "contract")
+                updates.update(process.rewind_fields(existing, "contract", task))
+                details = {"from_task": existing["operational_process"]["task"], "to_task": task,
+                    "evidence": "Righe o indirizzo modificati: nuova verifica del fascicolo"}
+        return await write_order(oid, user, body.expected_version, updates, "order.revised", details)
     return await update_doc(collection="sales_orders", doc_id=oid, updates=updates, user=user,
                              entity_type="sales_order", ip=get_client_ip(request))
 
@@ -140,6 +153,8 @@ async def change_status(oid: str, body: StatusChange, request: Request,
     db = get_db()
     existing = await db.sales_orders.find_one({"_id": oid, "tenant_id": user["tenant_id"], "deleted_at": None})
     if not existing: raise HTTPException(status_code=404, detail="Ordine non trovato")
+    if existing.get("operational_process"):
+        raise HTTPException(409, "Completa l’attività assegnata: la procedura determina il passaggio di reparto")
     enforce_status_transition(existing.get("order_status", "draft"), body.order_status, ORDER_FLOW)
     updates = {"order_status": body.order_status}
     if existing.get("operational_enabled"):
@@ -162,5 +177,8 @@ async def change_status(oid: str, body: StatusChange, request: Request,
 @router.delete("/{oid}")
 async def delete_order(oid: str, request: Request,
                         user: dict = Depends(require_permission("sales_orders.delete"))):
+    existing = await get_doc(collection="sales_orders", doc_id=oid, tenant_id=user["tenant_id"])
+    if existing.get("operational_process"):
+        raise HTTPException(409, "Le commesse con storico di reparto si annullano con un motivo; non si eliminano")
     return await soft_delete_doc(collection="sales_orders", doc_id=oid, user=user,
                                    entity_type="sales_order", ip=get_client_ip(request))

@@ -1,95 +1,84 @@
-# Centro operativo — guida di adozione
+# Centro operativo — attività, consegne e verifiche
 
-## Cosa introduce
+## Il percorso operativo
 
-Il centro operativo usa la collezione `sales_orders` esistente. Non crea un secondo registro delle commesse. CRM, preventivi, contratti, acquisti, produzione, magazzino, tesoreria e portale cliente restano nei moduli già presenti.
+Il centro `/operations` usa le commesse già presenti in `sales_orders`. Ogni commessa adottata ha **una sola attività corrente**, con reparto, persona, scadenza e stato. Concludere un’attività registra l’esito e genera quella successiva nella stessa scrittura atomica: un passaggio non può chiudere il lavoro precedente senza conservarne la destinazione.
 
-L’intervento implementa la gestione operativa di commesse e assistenze. Non certifica l’intero gestionale e non importa automaticamente Drive, contabilità, movimenti bancari o dati di una finanziaria. Un incasso deve essere riscontrato da una persona autorizzata prima di registrare la relativa verifica.
+| Attività | Reparto destinatario | Permesso per eseguirla |
+| --- | --- | --- |
+| Contratto e allegati | Commerciale | `sales_orders.edit` |
+| Nulla osta al rilievo | Amministrazione | `admin.payments.edit` |
+| Pianificazione rilievo | Coordinamento | `surveys.assign` |
+| Rilievo e fascicolo | Tecnico | `surveys.measure` |
+| Verifica tecnica e varianti | Tecnico | `surveys.validate` |
+| Copertura dell’ordine | Amministrazione | `admin.payments.edit` |
+| Invio ordine con revisione | Acquisti | `purchase_orders.edit` |
+| Conferma fornitore e data | Acquisti | `purchase_orders.edit` |
+| Completezza e integrità materiali | Magazzino | `logistics.edit` |
+| Condizioni per la posa | Amministrazione | `admin.payments.edit` |
+| Data, caposquadra, mezzi e accessi | Coordinamento | `installation.edit` |
+| Posa, rapporto e riserve | Posa | `installation.edit` |
+| Collaudo e completamenti | Posa | `installation.edit` |
+| Documenti finali | Documentazione | `sales_orders.edit` |
+| Chiusura amministrativa | Amministrazione | `admin.payments.edit` |
 
-## Avvio pratico
+Le verifiche commerciali, tecniche e amministrative sono cumulative. La fase sintetica della commessa è aggiornata dalla procedura e non sostituisce l’attività dettagliata. Il percorso è quello di fornitura e posa: non simula le lavorazioni di una fabbrica.
 
-1. Distribuire frontend e backend della stessa versione in staging, con database separato e invio email disattivato o reindirizzato al collaudo.
-2. Verificare i ruoli effettivi degli utenti della propria azienda. Gli incaricati provengono dagli utenti attivi della stessa azienda.
-3. Aprire **Centro operativo**. Le nuove commesse nascono già soggette ai controlli; non avanzano finché mancano le verifiche. Per quelle pregresse, **Attiva procedura e salva** adotta il controllo sulla singola commessa.
-4. Registrare responsabile, prossima azione e scadenza reale. Per le commesse avanzate, verificare anche i prerequisiti delle fasi precedenti: non sono attestati automaticamente.
-5. Ogni reparto inserisce un riscontro concreto nel proprio controllo. Il testo deve identificare documento/revisione/verifica; il programma conserva autore e data, ma non certifica la veridicità del contenuto.
-6. Eseguire un ciclo di collaudo completo, incluse revisione ordine, annullamento, esportazione e assistenza. Dopo il collaudo, distribuire con backup e piano di ripristino dell’ambiente esistente.
+## Avvio e lavoro quotidiano
 
-Le commesse pregresse non ancora adottate conservano il comportamento precedente e sono indicate come **Da attivare**. Non c’è una migrazione automatica che possa attestare documenti mancanti. Le commesse chiuse o annullate non sono modificabili da questo centro.
+1. Distribuire frontend e backend della stessa versione in staging, con database separato e invii esterni disattivati o reindirizzati al collaudo.
+2. Verificare i ruoli reali. Tutti gli operatori del centro devono avere `sales_orders.view`, oltre al permesso della propria attività. Le configurazioni e le riassegnazioni richiedono anche `workflow.assign`. I ruoli predefiniti del gestionale potrebbero non avere ancora questi permessi: il codice non li amplia automaticamente.
+3. In **Attività dei reparti → Incaricati e tempi dei passaggi automatici**, configurare il destinatario di ogni attività e il suo obiettivo interno in ore continuative. La scelta include solo utenti attivi della stessa azienda con i permessi richiesti. I tempi non sono scadenze contrattuali, turni o giorni lavorativi: impostare i termini effettivi sulla specifica attività quando necessario.
+4. Le nuove commesse nascono già con la prima attività. Per quelle pregresse, aprire la scheda e usare **Avvia procedura dal fascicolo**: riparte la verifica commerciale, le attestazioni precedenti vengono revocate e lo storico rimane. Nessuna attività pregressa viene dichiarata eseguita automaticamente.
+5. L’incaricato apre **Solo le mie**, prende in carico, esegue il lavoro e inserisce un esito con riferimento al documento e alla revisione. **Concludi e consegna al reparto successivo** chiude la sua attività e assegna la successiva secondo la configurazione. Anche un amministratore deve essere l’incaricato nominativo per attestare l’esecuzione.
+6. Se manca la configurazione o il destinatario non è più abilitato, l’attività successiva viene comunque creata e compare tra quelle da assegnare. Non è possibile prenderla in carico senza persona e termine. La direzione usa il filtro **Da assegnare, bloccate o scadute**, valido sull’intero insieme dei risultati, e assegna un utente competente.
 
-## Regole di avanzamento
+Una modifica alla regola di assegnazione riguarda solo i futuri incarichi: non sposta scadenze o responsabilità già assegnate. Per il lavoro aperto usare **Assegna, ripianifica o rinvia**, indicando il motivo. Un cambio di incaricato richiede una nuova presa in carico. Un blocco aperto resta tale anche dopo la riassegnazione.
 
-| Passaggio | Evidenze richieste |
-| --- | --- |
-| Rilievo da completare | Contratto/allegati e nulla osta amministrativo al rilievo |
-| Ordine validato e fasi di fornitura | Prerequisiti precedenti, rilievo/revisione tecnica, copertura e nulla osta all’ordine |
-| Posa confermata o eseguita | Prerequisiti precedenti, materiali completi/utilizzabili, nulla osta posa, squadra/mezzi/accessi |
-| Chiusura | Prerequisiti precedenti, collaudo, documenti finali, verifica amministrativa e zero completamenti aperti |
-| Annullamento | Motivo scritto; non richiede di completare i controlli operativi |
+## Blocchi, varianti e completamenti
 
-Un blocco aperto impedisce l’avanzamento della commessa interessata. Gli altri lavori restano utilizzabili. Una scadenza superata resta visibile e richiede gestione; non viene interpretata come prova automatica di impossibilità a lavorare.
+- **Segnala blocco** conserva motivo, responsabile e termine. **Registra soluzione e riprendi** richiede un riscontro. Il blocco impedisce il completamento dell’attività; altre commesse e moduli rimangono accessibili.
+- **Rinvia** genera una nuova attività nella stessa fase o in una precedente, revoca i controlli dipendenti e conserva quelli precedenti. Non permette salti in avanti.
+- Una modifica a righe o indirizzo riapre il fascicolo commerciale. Una variazione delle condizioni finanziarie, quando il percorso ha già superato il primo nulla osta, lo rinvia in amministrazione e revoca le verifiche successive. È una scelta prudenziale esplicita: va rivalutata con i dati reali se provoca lavoro ridondante.
+- Approvazione, firma ed erogazione restano distinte. Il finanziamento deve essere almeno sottoscritto per superare il nulla osta al rilievo; gli altri nulla osta richiedono comunque la verifica competente.
+- Il rapporto posa può lasciare un numero di completamenti aperti. Il collaudo non consegna il lavoro alla documentazione finché questi non sono risolti. Restano completamenti della commessa, non nuove assistenze.
+- Le commesse adottate non si eliminano: si annullano con un motivo. Chiuse o annullate non sono modificabili dal centro.
 
-Le verifiche sono cumulative. Una modifica a righe o indirizzo invalida contratto, controllo tecnico, copertura ordine, materiali, condizioni posa, risorse e controlli finali. Una variazione di modalità o stato del finanziamento invalida i quattro nulla osta amministrativi. Riattestarli dopo aver verificato le nuove condizioni.
+## Storico e consistenza
 
-**Approvato ≠ sottoscritto ≠ erogato.** Nei lavori finanziati, il rilievo richiede almeno la sottoscrizione registrata. Produzione/ordine e posa richiedono comunque i rispettivi nulla osta: il solo stato del finanziamento non li concede.
+Lo storico registra autore e data, attività e responsabili prima/dopo, scadenze, presa in carico, esito, blocco, soluzione, riassegnazione e rinvio. Due esecuzioni della stessa fase restano eventi distinti. Non sono deduplicate per il solo nome dello stato. Gli esiti sono attestazioni degli operatori: il software non certifica il contenuto di un documento citato.
 
-I completamenti restano sulla commessa, con numero aperto, azione e scadenza. Il contatore non è una lista dettagliata dei singoli difetti: usare il riscontro e la documentazione della commessa per il dettaglio.
+Attività corrente, aggiornamento della commessa e storico sono scritti con confronto della versione nella stessa operazione MongoDB. Due completamenti concorrenti producono una sola attività successiva; il secondo riceve 409. Ricaricare e rivalutare senza sovrascrivere. Nessuna transazione su più collezioni è necessaria per la consegna.
 
-## Permessi
+Le vecchie API di piano, controllo e cambio stato non possono saltare il percorso sulle commesse adottate. Il rapporto posa non le avanza automaticamente. I record pregressi non adottati mantengono il comportamento precedente, con i controlli operativi precedenti se abilitati.
 
-| Azione | Permesso |
-| --- | --- |
-| Leggere centro, dettaglio ed esportare commesse | `sales_orders.view` |
-| Assegnare e avanzare commessa; verificare contratto e documenti | `sales_orders.edit` |
-| Creare commessa | `sales_orders.create` (la selezione cliente in UI richiede anche `crm.customers.view`) |
-| Stato finanziamento e nulla osta amministrativi | `admin.payments.edit` |
-| Verifica tecnica | `surveys.validate` |
-| Disponibilità materiali | `logistics.edit` |
-| Risorse, collaudo e contatore completamenti | `installation.edit` |
-| Leggere, creare, modificare assistenze | `service.view`, `service.create`, `service.edit` rispettivamente |
+## API
 
-Le verifiche di reparto richiedono anche la lettura della commessa. I superamministratori mantengono i poteri già previsti. I ruoli ordinari sono cercati esclusivamente nell’azienda dell’utente. La scheda assistenze del centro richiede anche accesso al centro; il modulo assistenze esistente resta disponibile ai ruoli dedicati.
+Tutti i percorsi sono sotto `/api` e richiedono autenticazione e isolamento per azienda.
 
-## Assistenze
-
-La prima segnalazione effettiva può essere indicata all’apertura, non in futuro, e non può essere riscritta da PATCH. Per i ticket pregressi si usa `created_at` se manca la data dedicata; un’origine assente è mostrata come dato mancante.
-
-- Rosso: 48 ore continuative.
-- Arancione: 15 giorni di calendario.
-- Verde: 30 giorni di calendario.
-- Attesa cliente/ricambio e pianificazione non fermano il conteggio.
-- Se un caso diventa rosso, si conserva il termine precedente quando più vicino; altrimenti scade dopo 48 ore dall’escalation. Le successive letture e modifiche non ricalcolano il termine dalla vecchia apertura.
-- Abbassare la priorità non sposta in avanti un termine già assegnato.
-- Per risolvere, chiudere o non accogliere occorre un esito scritto. Un ticket risolto può tornare in lavorazione con la transizione prevista; il termine originario resta conservato.
-
-Il precedente sistema di notifiche cliente sugli avanzamenti dei ticket rimane in uso. Le modifiche interne a incarico/priorità/azione non inviano notifiche da questo centro. I test isolano le notifiche e non contattano destinatari.
-
-## Compatibilità API e concorrenza
-
-Le API sono sotto `/api`. `/operations/schema`, `/operations/assignees`, `/operations/orders` e `/operations/orders/{id}` alimentano la schermata. `/service-tickets/options` espone gli stati ammessi.
-
-- `PUT /operations/orders/{id}/plan`: `version`, `owner_id`, `next_action`, `due_at` con fuso orario, `block`, `residuals`.
-- `POST /operations/orders/{id}/checks`: `version`, `key`, `satisfied`, `evidence`.
+- `GET /operations/process/schema`: fasi, reparti, candidati abilitati, regole e permessi del chiamante.
+- `GET /operations/process/inbox`: filtri `area`, `mine`, `attention`, paginazione `skip`/`limit` e totale.
+- `PUT /operations/process/routes/{step}`: `version`, `owner_id`, `target_hours`; configurazione con concorrenza e storico separato.
+- `POST /operations/process/orders/{id}/start`: `version`, avvio controllato di una commessa pregressa.
+- `PUT /operations/process/orders/{id}/assignment`: `version`, `owner_id`, `due_at` con fuso orario, `reason`.
+- `POST /operations/process/orders/{id}/action`: `version`, `action` (`accept`, `complete`, `block`, `resume`, `return`, `cancel`), `evidence`; `target_step` per il rinvio; `residuals` alla conclusione di posa/collaudo.
 - `PUT /operations/orders/{id}/finance`: `version`, `payment_mode`, `financing_status`, `evidence`.
-- PATCH di una commessa gestita e POST al suo `/status` richiedono `expected_version`.
-- PATCH ticket richiede `version` e accetta solo i campi esplicitamente previsti. Tenant, stato e origine del termine non sono modificabili da PATCH. Gli stati usano `/status`; il nuovo centro invia anche `expected_version`.
+- `GET /operations/orders`, `/operations/orders/{id}` e `/operations/export?format=csv|json`: consultazione ed esportazione.
 
-Le scritture confrontano versione letta e versione nel database, incrementano il numero e registrano lo storico nella stessa operazione MongoDB. Un conflitto restituisce 409; ricaricare e rivalutare, senza sovrascrivere ciecamente.
+Il JSON comprende lo storico. Il CSV include tutte le commesse corrispondenti a ricerca e fase, con separatore `;`, BOM UTF-8 e protezione delle celle interpretabili come formule. Non sono backup completi: file allegati e altre collezioni non sono inclusi. Gli indicatori e il filtro criticità nella scheda **Commesse** restano locali alla pagina; il filtro della coda **Attività dei reparti** è invece applicato dal server.
 
-Il vecchio endpoint di avanzamento commessa applica gli stessi controlli. Il rapporto posa non avanza automaticamente una commessa gestita: registrare il rapporto e poi effettuare il passaggio controllato dal centro. Per i record non adottati rimane il comportamento precedente.
+## Assistenze e confini attuali
 
-## Esportazione e limiti
+Il centro mantiene la gestione assistenze già introdotta: prima segnalazione conservata, priorità rosso 48 ore continuative/arancione 15 giorni/verde 30 giorni, assegnazione e chiusura motivata. Attese e declassamenti non prorogano il termine. Una nuova urgenza rossa usa 48 ore dall’escalation o il precedente termine se più vicino. Gli esiti cliente continuano a usare le notifiche del modulo preesistente.
 
-`GET /operations/export?format=csv|json&q=...&status=...` esporta tutte le commesse autorizzate corrispondenti ai filtri, senza il limite della pagina. CSV separato da punto e virgola, UTF-8 con BOM e protezione delle celle interpretabili come formule. JSON include i campi della commessa e lo storico, senza `tenant_id`.
+Il nuovo passaggio automatico **copre le attività delle commesse dal fascicolo commerciale alla chiusura**. Non collega ancora automaticamente qualificazione lead, firma contratto e apertura commessa; non trasforma tutti i ticket assistenza in questa sequenza. I collegamenti a rilievi, acquisti, produzione e posa restano quelli del gestionale: concludere un’attività non crea né invia automaticamente documenti nei rispettivi moduli. La regola richiede il riscontro dell’operatore, non una semplice modifica allo stato esterno.
 
-L’esportazione non è un backup dell’intero gestionale: non include i file binari allegati né le altre collezioni. Conservare database e storage con gli strumenti di backup dell’infrastruttura. L’export richiede autenticazione; salvare il risultato in uno spazio aziendale riservato, mai nel repository pubblico.
+La coda è consultabile nel centro e si aggiorna dopo le operazioni o con **Aggiorna**. Non sono stati introdotti notifiche email/push, escalation pianificate, calendario di turni, un motore di attività parallele per singola riga, né integrazioni Drive, contabilità, banca o finanziaria. Il blocco riguarda il percorso principale della commessa; non modella dipendenze parziali tra righe. Questi limiti non vanno presentati come conformità completa di tutti i moduli.
 
-Gli indicatori di ritardo/blocco nella schermata sono dichiarati **in pagina**. La ricerca riguarda numero commessa, azione e blocco. Il numero totale riguarda tutti i risultati di ricerca/fase. Il filtro criticità locale non restringe l’export.
+## Collaudo
 
-## Verifica automatica
+Il workflow GitHub esegue i test isolati e la compilazione del frontend; non distribuisce l’applicazione. I test coprono il ciclo dei 15 passaggi, permessi del reparto e dell’incaricato, isolamento aziendale, configurazioni mancanti/inattive, esiti, blocchi, rinvii, concorrenza, varianti, finanziamenti, completamenti, esportazione e regressioni assistenza.
 
-Il workflow GitHub `Operational control` esegue i test isolati delle regole/API e la compilazione del frontend. Non usa MongoDB reale, credenziali aziendali, servizi bancari o SMTP. Non distribuisce automaticamente l’applicazione.
+Verificati localmente 36 test passati con dipendenze isolate e build produzione riuscita, con soli avvisi React preesistenti. Il collaudo browser usa dati sintetici, API reali e MongoDB simulato, con autenticazione e invii esterni sostituiti nel solo ambiente temporaneo. Verificati avvio, presa in carico, passaggio commerciale → amministrazione, blocco, soluzione e storico leggibile.
 
-Restano da verificare nell’ambiente di staging: dati e ruoli reali, integrazioni con i moduli preesistenti, prestazioni sui volumi aziendali, storage e ripristino. I test di questa modifica non equivalgono a una certificazione completa degli altri moduli.
-
-Verifiche eseguite per questa versione: 26 test di dominio/API passati anche con installazione pulita delle dipendenze di test; compilazione produzione riuscita (avvisi React preesistenti fuori dal nuovo centro); collaudo nel browser con dati sintetici, API reali dei tre router e MongoDB simulato. Nel browser verificati assegnazione/scadenza commessa, blocco e sblocco dopo evidenze, avanzamento di fase, assegnazione e avanzamento assistenza senza spostare il termine. Autenticazione e invio email erano sostituiti nel solo ambiente di collaudo temporaneo.
+Prima dell’uso aziendale rimangono da verificare utenti e permessi reali, integrazioni dei moduli, prestazioni sui volumi effettivi, backup/ripristino e un ciclo completo in staging. Non è una certificazione dell’intero gestionale. Non inserire dati reali o esportazioni nel repository pubblico.

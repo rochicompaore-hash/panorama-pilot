@@ -99,6 +99,12 @@ class SalesOrderLine(BaseModel):
 
 class SalesOrder(BaseDoc):
     operational_enabled: bool = True
+    operational_process: Optional[Dict[str, Any]] = None
+    operational_owner_id: Optional[str] = None
+    operational_next_action: Optional[str] = None
+    operational_due_at: Optional[str] = None
+    operational_block: str = ""
+    operational_history: List[Dict[str, Any]] = Field(default_factory=list)
     number: Optional[str] = None
     number_int: Optional[int] = None
     quote_id: Optional[str] = None

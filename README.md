@@ -1,8 +1,10 @@
 # Panorama Pilot
 
-Gestionale con frontend React e backend FastAPI/MongoDB. Il centro operativo `/operations` aggiunge responsabilità, controlli con evidenze e scadenze alle commesse già utilizzate dagli altri moduli.
+Gestionale con frontend React e backend FastAPI/MongoDB. Il centro operativo `/operations` collega le attività delle commesse attraverso 15 passaggi dal fascicolo commerciale alla chiusura, con una coda per reparto.
 
 - **Commesse:** responsabile, prossima azione, scadenza, blocchi e completamenti.
+- **Consegne tra reparti:** presa in carico e conclusione documentata generano automaticamente l’attività successiva. Incaricati e tempi sono configurabili; gli incarichi incompleti restano nella coda da assegnare.
+- **Tracciabilità:** autore, data, attività precedente/successiva, incaricati, termini, motivi di blocco, riassegnazione e rinvio. Una revisione riapre le verifiche dipendenti senza cancellare lo storico.
 - **Avanzamenti controllati:** verifiche commerciali, amministrative, tecniche, logistiche e di posa, con autore e data.
 - **Finanziamenti:** approvazione, firma, richiesta di liquidazione ed erogazione distinte.
 - **Assistenza:** prima segnalazione conservata, termini per priorità, assegnazione e chiusura motivata.

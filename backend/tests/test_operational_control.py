@@ -80,7 +80,7 @@ def environment(monkeypatch):
     for module in (ops, sales_orders, service_tickets, ops_common, audit, deps):
         monkeypatch.setattr(module, "get_db", lambda: db)
     async def permissions(current):
-        return current["permissions"]
+        return current.get("permissions", [])
     monkeypatch.setattr(deps, "get_permission_keys_for_user", permissions)
     monkeypatch.setattr(ops, "get_permission_keys_for_user", permissions)
     app = FastAPI()
@@ -193,6 +193,8 @@ async def test_new_order_is_managed_and_customer_must_belong_to_tenant(environme
         r = await c.post("/api/sales-orders", json={"customer_id": "own"})
         assert r.status_code == 200, r.text
         assert r.json()["operational_enabled"]
+        assert r.json()["operational_process"]["task"]["step"] == "contract"
+        assert r.json()["operational_history"][0]["event"] == "process.started"
         assert missing_checks(r.json(), "confirmed")
 
 
@@ -260,3 +262,214 @@ async def test_role_permissions_do_not_cross_tenant(monkeypatch):
     ])
     permissions = await deps.get_permission_keys_for_user({"tenant_id": "tenant-a", "role_ids": ["own-role", "other-role"]})
     assert permissions == ["sales_orders.view"]
+
+# Handoffs share the order's CAS boundary: no second task ledger or partial transfer.
+from app.services.order_process import STEPS
+import asyncio
+
+
+async def process_seed(environment, configured=True):
+    db, user, app = environment
+    await db.users.insert_one({"_id": user["id"], **user, "is_active": True})
+    await db.sales_orders.insert_one({**ready_order(), "operational_checks": {}})
+    if configured:
+        await db.order_process_routes.insert_many([{"_id": f"tenant-a:{s['key']}", "tenant_id": "tenant-a", "step": s["key"], "owner_id": user["id"], "target_hours": 24, "version": 1} for s in STEPS])
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+async def start_process(c):
+    r = await c.post("/api/operations/process/orders/order-1/start", json={"version": 1})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+async def process_action(c, order, action, **fields):
+    r = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": action, "evidence": "Documento revisione 1 verificato", **fields})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@pytest.mark.asyncio
+async def test_complete_process_follows_all_departments_and_preserves_history(environment):
+    db, _, _ = environment
+    async with await process_seed(environment) as c:
+        order = await start_process(c)
+        ids = []
+        for step in STEPS:
+            task = order["operational_process"]["task"]
+            assert task["step"] == step["key"] and task["area"] == step["area"]
+            assert task["status"] == "pending"
+            ids.append(task["id"])
+            premature = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "complete", "evidence": "non preso in carico"})
+            assert premature.status_code == 409
+            order = await process_action(c, order, "accept")
+            order = await process_action(c, order, "complete")
+            assert order["order_status"] == step["order_status"]
+        assert len(set(ids)) == len(STEPS)
+        assert order["order_status"] == "closed"
+        assert order["operational_process"]["task"]["status"] == "completed"
+        assert len(order["operational_history"]) == 1 + 2 * len(STEPS)
+        for h in order["operational_history"]:
+            assert h["actor_id"] == "operator-1" and h["at"]
+        completions = [h for h in order["operational_history"] if h["event"] == "process.complete"]
+        assert all(h["details"]["completed_task"]["evidence"] for h in completions)
+        assert (await c.get("/api/operations/process/inbox")).json()["total"] == 0
+        assert len((await c.get("/api/operations/export?format=json")).json()[0]["operational_history"]) == 31
+        r = await c.put("/api/operations/process/orders/order-1/assignment", json={"version": order["version"], "owner_id": "operator-1", "due_at": "2027-01-01T10:00:00Z", "reason": "tentativo su chiusa"})
+        assert r.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_completion_race_produces_exactly_one_successor(environment):
+    async with await process_seed(environment) as c:
+        order = await process_action(c, await start_process(c), "accept")
+        payload = {"version": order["version"], "action": "complete", "evidence": "Contratto allegato revisione 1"}
+        responses = await asyncio.gather(*[c.post("/api/operations/process/orders/order-1/action", json=payload) for _ in range(2)])
+        assert sorted(r.status_code for r in responses) == [200, 409]
+        stored = await environment[0].sales_orders.find_one({"_id": "order-1"})
+        assert stored["operational_process"]["task"]["step"] == "admin_survey"
+        assert len([h for h in stored["operational_history"] if h["event"] == "process.complete"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_missing_configuration_routes_to_visible_assignment_queue(environment):
+    async with await process_seed(environment, configured=False) as c:
+        order = await start_process(c)
+        assert not order["operational_process"]["task"]["owner_id"]
+        q = (await c.get("/api/operations/process/inbox?attention=true")).json()
+        assert q["total"] == 1 and q["items"][0]["id"] == "order-1"
+        assert (await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "accept"})).status_code == 403
+        r = await c.put("/api/operations/process/orders/order-1/assignment", json={"version": order["version"], "owner_id": "operator-1", "due_at": "2027-01-01T10:00:00Z", "reason": "Incaricato e termine effettivi"})
+        assert r.status_code == 200
+        order = await process_action(c, r.json(), "accept")
+        order = await process_action(c, order, "complete")
+        assert order["operational_process"]["task"]["step"] == "admin_survey"
+        assert not order["operational_process"]["task"]["owner_id"]
+        assert (await c.get("/api/operations/process/inbox?attention=true&area=administration")).json()["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_block_reassign_resume_and_rework_keep_all_prior_events(environment):
+    db, user, _ = environment
+    async with await process_seed(environment) as c:
+        order = await process_action(c, await start_process(c), "accept")
+        order = await process_action(c, order, "block", evidence="Manca allegato da richiedere")
+        blocked_id = order["operational_process"]["task"]["id"]
+        r = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "complete", "evidence": "non deve passare"})
+        assert r.status_code == 409
+        order = await process_action(c, order, "resume", evidence="Allegato acquisito revisione 2")
+        order = await process_action(c, order, "complete")
+        order = await process_action(c, order, "return", target_step="contract", evidence="Contratto rettificato da riverificare")
+        assert not order["operational_checks"]["contract"]["satisfied"]
+        assert order["operational_process"]["task"]["id"] != blocked_id
+        order = await process_action(c, order, "accept")
+        order = await process_action(c, order, "complete", evidence="Seconda revisione del contratto")
+        assert len([h for h in order["operational_history"] if h["event"] == "process.complete"]) == 2
+        assert (await c.get("/api/operations/process/inbox?mine=true&area=sales")).json()["total"] == 0
+        assert (await c.get("/api/operations/process/inbox?mine=true&area=administration")).json()["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_legacy_mutations_cannot_bypass_active_process(environment):
+    async with await process_seed(environment) as c:
+        order = await start_process(c)
+        version = order["version"]
+        checks = await c.post("/api/operations/orders/order-1/checks", json={"version": version, "key": "contract", "satisfied": True, "evidence": "Tentativo bypass"})
+        status = await c.post("/api/sales-orders/order-1/status", json={"expected_version": version, "order_status": "confirmed"})
+        plan = await c.put("/api/operations/orders/order-1/plan", json={"version": version, "owner_id": "operator-1", "next_action": "Salto di reparto", "due_at": "2027-01-01T10:00:00Z"})
+        delete = await c.delete("/api/sales-orders/order-1")
+        assert all(r.status_code == 409 for r in (checks, status, plan, delete))
+        assert (await c.post("/api/operations/process/orders/order-1/start", json={"version": version})).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_assignment_requires_active_competent_same_tenant_user(environment):
+    db, _, _ = environment
+    async with await process_seed(environment) as c:
+        order = await start_process(c)
+        await db.users.insert_many([
+            {"_id": "foreign", "tenant_id": "tenant-b", "permissions": ["*"]},
+            {"_id": "inactive", "tenant_id": "tenant-a", "permissions": ["*"], "is_active": False},
+            {"_id": "unqualified", "tenant_id": "tenant-a", "permissions": ["sales_orders.view"]},
+        ])
+        for uid in ("foreign", "inactive", "unqualified"):
+            r = await c.put("/api/operations/process/orders/order-1/assignment", json={"version": order["version"], "owner_id": uid, "due_at": "2027-01-01T10:00:00Z", "reason": "Assegnazione non valida"})
+            assert r.status_code == 422
+            r = await c.put("/api/operations/process/routes/contract", json={"version": 1, "owner_id": uid, "target_hours": 24})
+            assert r.status_code == 422
+        await db.order_process_routes.update_one({"step": "admin_survey"}, {"$set": {"owner_id": "inactive"}})
+        order = await process_action(c, order, "accept")
+        order = await process_action(c, order, "complete")
+        assert order["operational_process"]["task"]["owner_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_only_current_assignee_can_work_and_department_permission_is_rechecked(environment):
+    db, user, _ = environment
+    async with await process_seed(environment) as c:
+        order = await start_process(c)
+        await db.users.insert_one({"_id": "admin-person", "tenant_id": "tenant-a", "permissions": ["sales_orders.view", "admin.payments.edit"], "is_active": True})
+        await db.order_process_routes.update_one({"step": "admin_survey"}, {"$set": {"owner_id": "admin-person"}})
+        order = await process_action(c, order, "accept")
+        order = await process_action(c, order, "complete")
+        r = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "accept"})
+        assert r.status_code == 403  # Even the admin must be the named assignee.
+        user.update(id="admin-person", permissions=["sales_orders.view", "admin.payments.edit"])
+        order = await process_action(c, order, "accept")
+        user["permissions"] = ["sales_orders.view"]
+        r = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "complete", "evidence": "Permesso revocato"})
+        assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_variants_and_finance_reopen_required_department(environment):
+    async with await process_seed(environment) as c:
+        order = await start_process(c)
+        for _ in range(3):
+            order = await process_action(c, order, "accept")
+            order = await process_action(c, order, "complete")
+        r = await c.put("/api/operations/orders/order-1/finance", json={"version": order["version"], "payment_mode": "financed", "financing_status": "approved", "evidence": "Pratica ancora da sottoscrivere"})
+        assert r.status_code == 200, r.text
+        order = r.json()
+        assert order["operational_process"]["task"]["step"] == "admin_survey"
+        order = await process_action(c, order, "accept")
+        r = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "complete", "evidence": "Manca sottoscrizione"})
+        assert r.status_code == 409
+        r = await c.patch("/api/sales-orders/order-1", json={"expected_version": order["version"], "site_address": {"city": "Nuovo cantiere"}})
+        assert r.status_code == 200, r.text
+        assert r.json()["operational_process"]["task"]["step"] == "contract"
+        assert not r.json()["operational_checks"]["contract"]["satisfied"]
+        assert r.json()["operational_history"][-1]["details"]["from_task"]["step"] == "admin_survey"
+
+
+@pytest.mark.asyncio
+async def test_residuals_stay_with_installation_until_actual_completion(environment):
+    async with await process_seed(environment) as c:
+        order = await start_process(c)
+        for step in STEPS[:12]:
+            order = await process_action(c, order, "accept")
+            order = await process_action(c, order, "complete", **({"residuals": 2} if step["key"] == "installation" else {}))
+        assert order["operational_process"]["task"]["step"] == "acceptance"
+        order = await process_action(c, order, "accept")
+        r = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "complete", "evidence": "Completamenti pendenti"})
+        assert r.status_code == 409
+        order = await process_action(c, order, "complete", residuals=0, evidence="Riserva risolta e collaudo firmato")
+        assert order["operational_process"]["task"]["step"] == "documents"
+        assert order["operational_residuals"] == 0
+
+
+@pytest.mark.asyncio
+async def test_process_tenant_isolation_and_configuration_versioning(environment):
+    db, user, _ = environment
+    async with await process_seed(environment) as c:
+        order = await start_process(c)
+        r = await c.put("/api/operations/process/routes/contract", json={"version": 1, "owner_id": user["id"], "target_hours": 8})
+        assert r.status_code == 200 and r.json()["version"] == 2
+        assert (await c.put("/api/operations/process/routes/contract", json={"version": 1, "owner_id": user["id"], "target_hours": 4})).status_code == 409
+        stored = await db.sales_orders.find_one({"_id": "order-1"})
+        assert stored["operational_process"]["task"]["due_at"] == order["operational_process"]["task"]["due_at"]
+        user["tenant_id"] = "tenant-b"
+        assert (await c.get("/api/operations/process/inbox")).json()["total"] == 0
+        assert (await c.get("/api/operations/process/schema")).json()["routes"] == {}
+        r = await c.post("/api/operations/process/orders/order-1/action", json={"version": order["version"], "action": "accept"})
+        assert r.status_code == 404
