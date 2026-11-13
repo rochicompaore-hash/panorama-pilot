@@ -98,6 +98,7 @@ class SalesOrderLine(BaseModel):
 
 
 class SalesOrder(BaseDoc):
+    operational_enabled: bool = True
     number: Optional[str] = None
     number_int: Optional[int] = None
     quote_id: Optional[str] = None
@@ -508,6 +509,9 @@ class ServiceTicket(BaseDoc):
     subject: str
     description: Optional[str] = None
     priority: str = "normal"  # low|normal|high|urgent
+    first_reported_at: Optional[datetime] = None
+    service_due_at: Optional[datetime] = None
+    next_action: Optional[str] = None
     warranty_scope: Optional[str] = None  # product|glass|installation|hardware|out_of_warranty
     ticket_status: str = "opened"
     # ^ opened|triaged|waiting_customer|waiting_material|scheduled|in_progress|resolved|closed|rejected

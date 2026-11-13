@@ -277,7 +277,7 @@ async def submit_report(rid: str, body: ReportSubmit, request: Request,
         # Advance sales order to installed
         if doc.get("sales_order_id"):
             await db.sales_orders.update_one(
-                {"_id": doc["sales_order_id"], "tenant_id": user["tenant_id"], "order_status": {"$in": ["ready_for_installation", "in_production", "completed"]}},
+                {"_id": doc["sales_order_id"], "tenant_id": user["tenant_id"], "operational_enabled": {"$ne": True}, "order_status": {"$in": ["ready_for_installation", "in_production", "completed"]}},
                 {"$set": {"order_status": "installed", "updated_at": datetime.now(timezone.utc).isoformat()}})
         await record_activity(
             tenant_id=user["tenant_id"], type="installation_completed",

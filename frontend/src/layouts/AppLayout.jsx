@@ -32,6 +32,7 @@ const NAV = [
     label: "Operatività",
     items: [
       { to: "/dashboard", i18n: "nav.dashboard", icon: House, perm: "dashboard.view" },
+      { to: "/operations", label: "Centro operativo", icon: ListChecks, perm: "sales_orders.view" },
       { to: "/customers", i18n: "nav.customers", icon: UserCircle, perm: "crm.customers.view" },
       { to: "/quotes", label: "Preventivi", icon: FileText, perm: "quotes.view" },
       { to: "/leads", i18n: "nav.leads", icon: Kanban, perm: "crm.leads.view" },

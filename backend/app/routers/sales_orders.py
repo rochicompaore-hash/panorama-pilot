@@ -70,6 +70,9 @@ async def get_order(oid: str, user: dict = Depends(require_permission("sales_ord
 @router.post("")
 async def create_order(body: SalesOrderCreate, request: Request,
                         user: dict = Depends(require_permission("sales_orders.create"))):
+    customer = await get_db().customers.find_one({"_id": body.customer_id, "tenant_id": user["tenant_id"], "deleted_at": None})
+    if not customer:
+        raise HTTPException(422, "Seleziona un cliente della stessa azienda")
     so = SalesOrder(
         id=new_id(),
         customer_id=body.customer_id, contract_id=body.contract_id, quote_id=body.quote_id,
@@ -88,6 +91,7 @@ async def create_order(body: SalesOrderCreate, request: Request,
 
 
 class SalesOrderPatch(BaseModel):
+    expected_version: Optional[int] = None
     lines: Optional[List[SalesOrderLine]] = None
     priority: Optional[int] = None
     expected_ready_date: Optional[str] = None
@@ -104,13 +108,22 @@ async def patch_order(oid: str, body: SalesOrderPatch, request: Request,
     if not existing: raise HTTPException(status_code=404, detail="Ordine non trovato")
     if existing.get("order_status") in ("installed", "closed", "cancelled"):
         raise HTTPException(status_code=400, detail="Ordine chiuso: non modificabile")
-    updates = body.model_dump(exclude_none=True)
+    updates = body.model_dump(exclude_none=True, exclude={"expected_version"})
     if body.lines is not None:
         # recalc totals
         so = SalesOrder(**{**existing, "lines": [ln.model_dump() for ln in body.lines]})
         _recalc_totals(so)
         updates["lines"] = [ln.model_dump() for ln in body.lines]
         updates.update({"subtotal": so.subtotal, "vat_amount": so.vat_amount, "total": so.total})
+    if existing.get("operational_enabled"):
+        from app.routers.operational_control import write_order, assert_version
+        if body.expected_version is None:
+            raise HTTPException(409, "Versione richiesta per modificare una commessa gestita dal centro operativo")
+        assert_version(existing, body.expected_version)
+        if body.lines is not None or body.site_address is not None:
+            for key in ("contract", "technical", "admin_order", "materials", "admin_install", "resources", "acceptance", "documents", "admin_close"):
+                updates["operational_checks." + key + ".satisfied"] = False
+        return await write_order(oid, user, body.expected_version, updates, "order.revised")
     return await update_doc(collection="sales_orders", doc_id=oid, updates=updates, user=user,
                              entity_type="sales_order", ip=get_client_ip(request))
 
@@ -118,6 +131,7 @@ async def patch_order(oid: str, body: SalesOrderPatch, request: Request,
 class StatusChange(BaseModel):
     order_status: str
     reason: Optional[str] = None
+    expected_version: Optional[int] = None
 
 
 @router.post("/{oid}/status")
@@ -128,6 +142,19 @@ async def change_status(oid: str, body: StatusChange, request: Request,
     if not existing: raise HTTPException(status_code=404, detail="Ordine non trovato")
     enforce_status_transition(existing.get("order_status", "draft"), body.order_status, ORDER_FLOW)
     updates = {"order_status": body.order_status}
+    if existing.get("operational_enabled"):
+        from app.services.operational_control import missing_checks
+        from app.routers.operational_control import write_order, assert_version
+        if body.expected_version is None:
+            raise HTTPException(409, "Ricarica la commessa: versione richiesta")
+        assert_version(existing, body.expected_version)
+        missing = missing_checks(existing, body.order_status)
+        if missing:
+            raise HTTPException(409, {"message": "Passaggio bloccato", "missing": missing})
+        if body.order_status == "cancelled" and len((body.reason or "").strip()) < 5:
+            raise HTTPException(422, "Indica il motivo dell’annullamento")
+        updates["operational_transition_reason"] = body.reason
+        return await write_order(oid, user, body.expected_version, updates, "status." + body.order_status)
     return await update_doc(collection="sales_orders", doc_id=oid, updates=updates, user=user,
                              entity_type="sales_order", ip=get_client_ip(request))
 

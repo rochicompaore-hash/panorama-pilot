@@ -91,6 +91,7 @@ from app.routers.sites import router as sites_router
 # Ops & Production (M4–M8)
 from app.routers.surveys import router as surveys_router
 from app.routers.sales_orders import router as sales_orders_router
+from app.routers.operational_control import router as operational_control_router
 from app.routers.purchasing import (
     suppliers_router, splist_router, po_router as purchase_orders_router,
     gr_router as goods_receipts_router,
@@ -260,6 +261,7 @@ QUOTING_ROUTERS = [
     zanzariere_colors_router,    # F1 Real Catalog — colori zanzariere (tassonomia separata)
 ]
 OPS_ROUTERS = [
+    operational_control_router,
     surveys_router, sales_orders_router,
     suppliers_router, splist_router, purchase_orders_router, goods_receipts_router,
     items_router, stock_locations_router, stock_router, inventory_counts_router,
