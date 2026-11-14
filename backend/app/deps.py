@@ -56,7 +56,7 @@ async def get_permission_keys_for_user(user: dict) -> List[str]:
     role_ids = user.get("role_ids") or []
     if not role_ids:
         return []
-    roles = await db.roles.find({"_id": {"$in": role_ids}, "deleted_at": None}).to_list(100)
+    roles = await db.roles.find({"_id": {"$in": role_ids}, "tenant_id": user["tenant_id"], "deleted_at": None}).to_list(100)
     keys: set[str] = set()
     for r in roles:
         for k in r.get("permission_keys") or []:

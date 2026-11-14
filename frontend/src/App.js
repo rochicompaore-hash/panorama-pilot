@@ -11,6 +11,7 @@ import ResetPassword from "@/pages/ResetPassword";
 import AcceptInvitation from "@/pages/AcceptInvitation";
 import ChangePassword from "@/pages/ChangePassword";
 import Dashboard from "@/pages/Dashboard";
+import OperationsCenterPage from "@/pages/OperationsCenterPage";
 import UsersPage from "@/pages/UsersPage";
 import RolesPage from "@/pages/RolesPage";
 import CompanyPage from "@/pages/CompanyPage";
@@ -135,6 +136,7 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="operations" element={<OperationsCenterPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="leads/:id" element={<LeadDetailPage />} />
           <Route path="customers" element={<CustomersPage />} />

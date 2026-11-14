@@ -98,6 +98,13 @@ class SalesOrderLine(BaseModel):
 
 
 class SalesOrder(BaseDoc):
+    operational_enabled: bool = True
+    operational_process: Optional[Dict[str, Any]] = None
+    operational_owner_id: Optional[str] = None
+    operational_next_action: Optional[str] = None
+    operational_due_at: Optional[str] = None
+    operational_block: str = ""
+    operational_history: List[Dict[str, Any]] = Field(default_factory=list)
     number: Optional[str] = None
     number_int: Optional[int] = None
     quote_id: Optional[str] = None
@@ -508,6 +515,9 @@ class ServiceTicket(BaseDoc):
     subject: str
     description: Optional[str] = None
     priority: str = "normal"  # low|normal|high|urgent
+    first_reported_at: Optional[datetime] = None
+    service_due_at: Optional[datetime] = None
+    next_action: Optional[str] = None
     warranty_scope: Optional[str] = None  # product|glass|installation|hardware|out_of_warranty
     ticket_status: str = "opened"
     # ^ opened|triaged|waiting_customer|waiting_material|scheduled|in_progress|resolved|closed|rejected
