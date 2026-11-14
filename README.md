@@ -12,6 +12,8 @@ Gestionale con frontend React e backend FastAPI/MongoDB. Il centro operativo `/o
 
 La [guida del centro operativo](docs/OPERATIONS.md) descrive uso, permessi, compatibilità e verifiche di avvio.
 
+La [scheda di collaudo per reparti](docs/COLLAUDO_OPERATIVO.md) contiene tre casi con dati fittizi, azioni, risultati attesi e registro degli esiti per verificare il percorso con utenti distinti.
+
 ## Sviluppo e verifica
 
 Per le sole verifiche delle nuove regole, senza database esterno né invio email:
